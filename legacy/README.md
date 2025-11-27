@@ -1,1 +1,0 @@
-This legacy folder contains legacy implementations that are not meant to be used in the actual package, but simply, for reference by either AI coding assistants or human coders.
