@@ -1,0 +1,67 @@
+"""
+Base classes for tools
+"""
+
+from abc import ABC, abstractmethod
+from typing import Any, Generic, TypeVar
+
+from google.genai.types import FunctionDeclaration
+
+
+TParams = TypeVar("TParams")
+TResult = TypeVar("TResult")
+
+
+class ToolResult:
+    """Result from tool execution"""
+
+    def __init__(self, output: Any = None, error: str | None = None):
+        self.output = output
+        self.error = error
+
+    def is_success(self) -> bool:
+        return self.error is None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for function response"""
+        if self.error:
+            return {"error": self.error}
+        return {"result": self.output}
+
+
+class BaseToolInvocation(ABC, Generic[TParams, TResult]):
+    """Base class for tool invocations"""
+
+    def __init__(self, params: TParams):
+        self.params = params
+
+    @abstractmethod
+    def get_description(self) -> str:
+        """Human-readable description of what this invocation will do"""
+        pass
+
+    @abstractmethod
+    async def execute(self) -> ToolResult:
+        """Execute the tool and return result"""
+        pass
+
+
+class BaseDeclarativeTool(ABC):
+    """Base class for declarative tools that can be called by the LLM"""
+
+    def __init__(self, name: str, schema: FunctionDeclaration):
+        self.name = name
+        self.schema = schema
+
+    @abstractmethod
+    async def build(self, params: dict[str, Any]) -> BaseToolInvocation:
+        """
+        Validate parameters and build a tool invocation.
+
+        Args:
+            params: Raw parameters from LLM
+
+        Returns:
+            ToolInvocation ready to execute
+        """
+        pass

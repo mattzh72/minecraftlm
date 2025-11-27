@@ -21,7 +21,7 @@ class SessionService:
 
         # Initialize empty files
         (session_dir / "conversation.json").write_text(json.dumps([]))
-        (session_dir / "code.py").write_text("# Generated SDK code will appear here\n")
+        (session_dir / "code.py").write_text("")  # Start with empty file
         (session_dir / "metadata.json").write_text(
             json.dumps({
                 "session_id": session_id,
