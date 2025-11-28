@@ -1,0 +1,38 @@
+{
+  "width": 7,
+  "height": 9,
+  "depth": 7,
+  "blocks": [
+    {
+      "start": [
+        3,
+        1,
+        3
+      ],
+      "end": [
+        4,
+        6,
+        4
+      ],
+      "type": "minecraft:oak_log",
+      "fill": true,
+      "properties": {
+        "axis": "y"
+      }
+    },
+    {
+      "start": [
+        1,
+        5,
+        1
+      ],
+      "end": [
+        6,
+        8,
+        6
+      ],
+      "type": "minecraft:oak_leaves",
+      "fill": true
+    }
+  ]
+}

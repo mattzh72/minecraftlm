@@ -65,9 +65,21 @@ class AgentHarness:
         ]
         self.tool_registry = ToolRegistry(tools)
 
-        # Load system prompt
+        # Load system prompt and inject SDK docs
         prompt_path = Path(__file__).parent / "prompts" / "system_prompt.txt"
-        self.system_prompt = prompt_path.read_text()
+        template = prompt_path.read_text()
+
+        docs_dir = Path(__file__).parent / "minecraft_sdk" / "docs"
+        replacements = {
+            "[[SDK_OVERVIEW]]": (docs_dir / "01-overview.md").read_text(),
+            "[[SDK_API_SCENE]]": (docs_dir / "02-api-scene.md").read_text(),
+            "[[SDK_BLOCKS_REFERENCE]]": (docs_dir / "03-blocks-reference.md").read_text(),
+            "[[SDK_BLOCK_LIST]]": (docs_dir / "04-block-list.md").read_text(),
+        }
+        for marker, text in replacements.items():
+            template = template.replace(marker, text)
+
+        self.system_prompt = template
 
         # Track whether code has been read (for edit safety)
         self.code_read_since_edit = True  # Start True for initial empty file

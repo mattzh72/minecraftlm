@@ -12,22 +12,22 @@ The goal is to give you a “just enough” mental model so you can reliably gen
 The SDK includes a `BlockCatalog` that knows the list of valid Minecraft block
 ids and their blockstate variants. You do not need to load any files yourself.
 
-```js
-const catalog = new BlockCatalog();
+```python
+catalog = BlockCatalog()
 
-// Example: check membership
-const ok = catalog.blockIds.has("minecraft:oak_planks");
+# Example: check membership
+ok = "minecraft:oak_planks" in catalog.block_ids
 ```
 
-**Rule:** any id present in `catalog.blockIds` is valid. They are exposed as
+**Rule:** any id present in `catalog.block_ids` is valid. They are exposed as
 `minecraft:<name>` (e.g. `minecraft:acacia_log`, `minecraft:stone_brick_stairs`).
 
-`BlockCatalog.assertValid(id)` is used internally by `Block` to normalize and validate ids:
+`BlockCatalog.assert_valid(id)` is used internally by `Block` to normalize and validate ids:
 
-```js
-const stone = new Block("stone", { catalog });          // ok, normalized
-const stairs = new Block("minecraft:oak_stairs", { catalog }); // ok
-const bad = new Block("minecraft:oook_stairs", { catalog });   // throws
+```python
+stone = Block("stone", catalog=catalog)                         # ok, normalized
+stairs = Block("minecraft:oak_stairs", catalog=catalog)         # ok
+bad = Block("minecraft:oook_stairs", catalog=catalog)           # raises ValueError
 ```
 
 ## Full blocks (simple cubes)
@@ -44,8 +44,8 @@ Many blocks are simple cubes that look the same from all directions (planks, sto
 
 Use them directly:
 
-```js
-new Block("minecraft:stone", { size: [4, 1, 4], catalog });
+```python
+Block("minecraft:stone", size=(4, 1, 4), catalog=catalog)
 ```
 
 Some “simple” blocks still expose minor properties (e.g. `grass_block` has `snowy=true|false`). In most cases you can ignore these unless you specifically want a variant.
@@ -64,16 +64,18 @@ Many blocks that represent columns use an `axis` property:
 
 Use the helper:
 
-```js
-const verticalLog = new Block("minecraft:oak_log", {
-  catalog,
-  properties: axisProperties("y"),  // default
-});
+```python
+vertical_log = Block(
+    "minecraft:oak_log",
+    catalog=catalog,
+    properties=axis_properties("y"),  # default
+)
 
-const horizontalLog = new Block("minecraft:oak_log", {
-  catalog,
-  properties: axisProperties("x"),
-});
+horizontal_log = Block(
+    "minecraft:oak_log",
+    catalog=catalog,
+    properties=axis_properties("x"),
+)
 ```
 
 ## Slabs (`type` property)
@@ -89,21 +91,24 @@ Slabs occupy half a block vertically, or a full block when doubled.
 
 Use the helper:
 
-```js
-const bottomSlab = new Block("minecraft:stone_slab", {
-  catalog,
-  properties: slabProperties(), // bottom
-});
+```python
+bottom_slab = Block(
+    "minecraft:stone_slab",
+    catalog=catalog,
+    properties=slab_properties(),  # bottom
+)
 
-const topSlab = new Block("minecraft:stone_slab", {
-  catalog,
-  properties: slabProperties({ top: true }),
-});
+top_slab = Block(
+    "minecraft:stone_slab",
+    catalog=catalog,
+    properties=slab_properties(top=True),
+)
 
-const doubleSlab = new Block("minecraft:stone_slab", {
-  catalog,
-  properties: slabProperties({ double: true }),
-});
+double_slab = Block(
+    "minecraft:stone_slab",
+    catalog=catalog,
+    properties=slab_properties(double=True),
+)
 ```
 
 ## Stairs (`facing`, `half`, `shape`)
@@ -120,28 +125,31 @@ Stairs are among the most configuration‑heavy blocks:
 
 Use provided helpers:
 
-```js
-// Explicit use via properties
-const southStair = new Block("minecraft:oak_stairs", {
-  catalog,
-  properties: stairProperties({ facing: "south" }),
-});
+```python
+# Explicit use via properties
+south_stair = Block(
+    "minecraft:oak_stairs",
+    catalog=catalog,
+    properties=stair_properties(facing="south"),
+)
 
-const upsideDownCorner = new Block("minecraft:stone_brick_stairs", {
-  catalog,
-  properties: stairProperties({
-    facing: "east",
-    upsideDown: true,
-    shape: "inner_left",
-  }),
-});
+upside_down_corner = Block(
+    "minecraft:stone_brick_stairs",
+    catalog=catalog,
+    properties=stair_properties(
+        facing="east",
+        upside_down=True,
+        shape="inner_left",
+    ),
+)
 
-// Convenience factory
-const quickStair = makeStair("minecraft:oak_stairs", {
-  direction: "west",
-  upsideDown: false,
-  catalog,
-});
+# Convenience factory
+quick_stair = make_stair(
+    "minecraft:oak_stairs",
+    direction="west",
+    upside_down=False,
+    catalog=catalog,
+)
 ```
 
 When in doubt:
@@ -164,19 +172,20 @@ Doors span two blocks vertically and have several properties. This SDK does **no
 
 Example:
 
-```js
-const doorLower = new Block("minecraft:oak_door", {
-  catalog,
-  properties: {
-    facing: "south",
-    half: "lower",
-    hinge: "left",
-    open: "false",
-  },
-});
+```python
+door_lower = Block(
+    "minecraft:oak_door",
+    catalog=catalog,
+    properties={
+        "facing": "south",
+        "half": "lower",
+        "hinge": "left",
+        "open": "false",
+    },
+)
 
-doorLower.position = new Vector3(8, 1, 2);
-scene.add(doorLower);
+door_lower.position = Vector3(8, 1, 2)
+scene.add(door_lower)
 ```
 
 If you want to explicitly place the upper half, add a second block one unit higher with `half: "upper"`.
@@ -195,15 +204,16 @@ Trapdoors are similar to doors but usually inhabit half the block thickness and 
 
 Example:
 
-```js
-const trapdoor = new Block("minecraft:oak_trapdoor", {
-  catalog,
-  properties: {
-    facing: "north",
-    half: "top",
-    open: "false",
-  },
-});
+```python
+trapdoor = Block(
+    "minecraft:oak_trapdoor",
+    catalog=catalog,
+    properties={
+        "facing": "north",
+        "half": "top",
+        "open": "false",
+    },
+)
 ```
 
 ## Fences and walls (`north/east/south/west` booleans)
@@ -222,14 +232,14 @@ For most schematic use cases, you can place fence blocks as simple cubes and let
 
 Sometimes you want a block to face “toward” something (e.g. stair facing toward a door). Use the helper:
 
-```js
-const dir = { x: 1, z: 0 };          // positive X
-const facing = facingFromVector(dir); // "east"
+```python
+facing = facing_from_vector(1, 0)  # positive X -> "east"
 
-const stair = new Block("minecraft:oak_stairs", {
-  catalog,
-  properties: stairProperties({ facing }),
-});
+stair = Block(
+    "minecraft:oak_stairs",
+    catalog=catalog,
+    properties=stair_properties(facing=facing),
+)
 ```
 
 The helper:
@@ -241,12 +251,12 @@ The helper:
 
 If you need detailed properties for a specific block that is not covered above:
 
-1. **Inspect `catalog.assets.blockstates`**
+1. **Inspect `catalog.assets["blockstates"]`**
 
-   ```js
-   const catalog = new BlockCatalog();
-   const blockstates = catalog.assets.blockstates;
-   console.log(blockstates["acacia_stairs"]);
+   ```python
+   catalog = BlockCatalog()
+   blockstates = catalog.assets["blockstates"]
+   example = blockstates["acacia_stairs"]
    ```
 
    This object shows all variant keys and their corresponding models (e.g. property strings like `facing=east,half=top,shape=outer_left`).
@@ -259,27 +269,28 @@ If you need detailed properties for a specific block that is not covered above:
 
 3. **Use those keys/values as `properties` when constructing a `Block`.**
 
-```js
-const customStairs = new Block("minecraft:acacia_stairs", {
-  catalog,
-  properties: {
-    facing: "west",
-    half: "top",
-    shape: "outer_right",
-  },
-});
+```python
+custom_stairs = Block(
+    "minecraft:acacia_stairs",
+    catalog=catalog,
+    properties={
+        "facing": "west",
+        "half": "top",
+        "shape": "outer_right",
+    },
+)
 ```
 
 This pattern is generic and works for any block present in
-`catalog.assets.blockstates`.
+`catalog.assets["blockstates"]`.
 
 ---
 
 In summary:
 
 - Use **simple blocks** (stone, planks, glass) with no properties or minimal ones.
-- For **logs**, use `axisProperties`.
-- For **slabs**, use `slabProperties`.
-- For **stairs**, use `stairProperties`/`makeStair` and be mindful of `facing`/`half`/`shape`.
+- For **logs**, use `axis_properties`.
+- For **slabs**, use `slab_properties`.
+- For **stairs**, use `stair_properties`/`make_stair` and be mindful of `facing`/`half`/`shape`.
 - For **doors/trapdoors**, set `facing`, `half`, `hinge` (doors), and `open`.
-- When in doubt, inspect `BlockCatalog.assets.blockstates` and mirror the properties shown there.
+- When in doubt, inspect `BlockCatalog.assets["blockstates"]` and mirror the properties shown there.

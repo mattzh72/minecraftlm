@@ -1,95 +1,98 @@
 # Minecraft SDK Overview
 
-This SDK provides a small, Three.js‑style API for composing Minecraft scenes.
+This SDK provides a small, Three.js‑style API for composing Minecraft scenes,
+implemented in Python.
 
 Instead of building a mesh scene graph, you build a graph of **blocks** and
-**objects** and then export a plain JavaScript object with this shape:
+**objects** and then export a plain Python dictionary with this shape:
 
-```js
+```python
 {
-  width: 16,
-  height: 12,
-  depth: 16,
-  blocks: [
-    {
-      start: [0, 0, 0],   // inclusive
-      end:   [16, 1, 16], // exclusive
-      type: "minecraft:grass_block",
-      properties: { snowy: "true" },
-      fill: true,         // solid cuboid
-    },
-  ],
+    "width": 16,
+    "height": 12,
+    "depth": 16,
+    "blocks": [
+        {
+            "start": [0, 0, 0],   # inclusive
+            "end":   [16, 1, 16], # exclusive
+            "type": "minecraft:grass_block",
+            "properties": {"snowy": "true"},
+            "fill": True,         # solid cuboid
+        },
+    ],
 }
 ```
 
 The exported object is called the **structure**. Your script’s job is to
-construct this structure using the SDK and assign it to a top‑level constant
+construct this structure using the SDK and assign it to a top‑level variable
 named `structure`:
 
-```js
-const structure = scene.toStructure({ padding: 0 });
+```python
+structure = scene.to_structure(padding=0)
 ```
 
 ## General script structure (what you should write)
 
 Every script using this SDK should roughly follow this pattern:
 
-1. **Assume core classes are available**
+1. **Use the scaffolded imports**
 
-   You can use these identifiers directly in your script:
+   The initial script already imports the core SDK symbols for you. You can
+   use these identifiers directly:
 
    - `Scene`
    - `Object3D`
    - `Block`
    - `Vector3`
    - `BlockCatalog`
-   - Orientation helpers: `stairProperties`, `axisProperties`, `slabProperties`,
-     `makeStair`, `facingFromVector`
-
-   You do not need to import them or load any files.
+   - Orientation helpers: `stair_properties`, `axis_properties`,
+     `slab_properties`, `make_stair`, `facing_from_vector`
 
 2. **Create a catalog and scene**
 
-   ```js
-   const catalog = new BlockCatalog();
-   const scene = new Scene();
+   ```python
+   catalog = BlockCatalog()
+   scene = Scene()
    ```
 
 3. **Add blocks using a Three.js‑like API**
 
-   ```js
-   // Example ground plane (16×1×16 grass)
+   ```python
+   # Example ground plane (16×1×16 grass)
    scene.add(
-     new Block("minecraft:grass_block", {
-       size: [16, 1, 16],
-       catalog,
-     })
-   );
+       Block(
+           "minecraft:grass_block",
+           size=(16, 1, 16),
+           catalog=catalog,
+       )
+   )
 
-   // Example wall of stone bricks
-   const wall = new Block("minecraft:stone_bricks", {
-     size: [10, 4, 1],
-     catalog,
-   });
-   wall.position.set(3, 1, 5); // x, y, z
-   scene.add(wall);
+   # Example wall of stone bricks
+   wall = Block(
+       "minecraft:stone_bricks",
+       size=(10, 4, 1),
+       catalog=catalog,
+   )
+   wall.position.set(3, 1, 5)  # x, y, z
+   scene.add(wall)
 
-   // Example stair in front of the wall
-   const stair = new Block("minecraft:stone_brick_stairs", {
-     catalog,
-     properties: stairProperties({ facing: "south" }),
-   });
-   stair.position.set(7, 1, 4);
-   scene.add(stair);
+   # Example stair in front of the wall
+   stair = Block(
+       "minecraft:stone_brick_stairs",
+       catalog=catalog,
+       properties=stair_properties(facing="south"),
+   )
+   stair.position.set(7, 1, 4)
+   scene.add(stair)
    ```
 
 4. **Export the structure**
 
-   ```js
-   const structure = scene.toStructure({ padding: 0 });
+   ```python
+   structure = scene.to_structure(padding=0)
    ```
 
-   The agent runtime will read the `structure` constant from your script.
+   The runtime will read the `structure` variable from your script.
 
 ## Core ideas
 
@@ -100,17 +103,19 @@ Every script using this SDK should roughly follow this pattern:
   - `Vector3` mirrors the common Three.js vector API for positions.
 
 - **Exported structure**  
-  - `scene.toStructure()` flattens the graph into `{ width, height, depth, blocks }`.
+  - `scene.to_structure()` flattens the graph into
+    `{"width", "height", "depth", "blocks"}`.
   - Coordinates are 0‑indexed; `start` is inclusive and `end` is exclusive.
 
 - **Block catalog and validation**  
   - `BlockCatalog` knows the full set of valid block ids.
-  - Creating a `Block` with an unknown id throws, which helps catch typos early.
+  - Creating a `Block` with an unknown id raises an error, which helps catch
+    typos early.
 
 - **Orientation helpers**  
   - Many blocks are not simple cubes (stairs, slabs, logs, doors).
-  - Helpers such as `stairProperties`, `axisProperties`, `slabProperties`,
-    and `makeStair` map high‑level intent (e.g. “stair facing south,
+  - Helpers such as `stair_properties`, `axis_properties`, `slab_properties`,
+    and `make_stair` map high‑level intent (e.g. “stair facing south,
     upside‑down”) to the correct blockstate properties.
 
 ## Coordinate system & units
@@ -125,7 +130,8 @@ Every script using this SDK should roughly follow this pattern:
   - `z`: south (+) / north (–)
 
 - **Scene origin and padding**
-  - By default `scene.toStructure({ origin: "min" })` shifts the entire scene so that the minimum coordinates become `(0,0,0)`.
+  - By default `scene.to_structure(origin="min")` shifts the entire scene so
+    that the minimum coordinates become `(0,0,0)`.
   - `padding` adds empty space around the exported structure.
 
 For a deeper look at the API surface, see `02-api-scene.md`. For block ids and

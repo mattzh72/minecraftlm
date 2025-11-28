@@ -6,6 +6,8 @@ import json
 import uuid
 from pathlib import Path
 
+from app.agent.minecraft_sdk.scaffold import DEFAULT_SCAFFOLD
+
 STORAGE_DIR = Path("storage/sessions")
 
 
@@ -19,15 +21,18 @@ class SessionService:
         session_dir = STORAGE_DIR / session_id
         session_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize empty files
+        # Initialize files
         (session_dir / "conversation.json").write_text(json.dumps([]))
-        (session_dir / "code.py").write_text("")  # Start with empty file
+        # Start with a scaffolded Python script that the agent will edit
+        (session_dir / "code.py").write_text(DEFAULT_SCAFFOLD)
         (session_dir / "metadata.json").write_text(
-            json.dumps({
-                "session_id": session_id,
-                "created_at": None,  # TODO: Add timestamp
-                "updated_at": None,
-            })
+            json.dumps(
+                {
+                    "session_id": session_id,
+                    "created_at": None,  # TODO: Add timestamp
+                    "updated_at": None,
+                }
+            )
         )
 
         return session_id
