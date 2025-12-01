@@ -34,7 +34,7 @@ GEMINI_API_KEY=...
 ## Running
 
 ```bash
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --reload-exclude 'storage/*'
 ```
 
 The API will be available at `http://localhost:8000`.

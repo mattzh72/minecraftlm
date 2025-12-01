@@ -8,7 +8,8 @@ from pathlib import Path
 
 from app.agent.minecraft_sdk.scaffold import DEFAULT_SCAFFOLD
 
-STORAGE_DIR = Path("storage/sessions")
+# Store sessions outside backend/ to avoid triggering uvicorn reload
+STORAGE_DIR = Path(__file__).parent.parent.parent.parent / ".storage" / "sessions"
 
 
 class SessionService:
