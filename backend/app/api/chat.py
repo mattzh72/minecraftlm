@@ -6,27 +6,19 @@ import json
 from pathlib import Path
 from typing import AsyncIterator
 
+from app.api.models.chat import SSEPayload, sse_repr
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel
 
 from app.agent.harness import MinecraftSchematicAgent
 from app.services.session import SessionService
+from app.api.models import ChatRequest, SessionResponse
 
 router = APIRouter()
 
 
-class ChatRequest(BaseModel):
-    """Request model for chat"""
-
-    session_id: str
-    message: str
-
-
-class SessionResponse(BaseModel):
-    """Response model for session creation"""
-
-    session_id: str
+CODE_FNAME = "code.json"
+LOCAL_STORAGE_FOLDER = "storage/sessions"
 
 
 @router.post("/sessions", response_model=SessionResponse)
@@ -57,22 +49,23 @@ async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
         # Run agent loop and stream events
         async for event in agent.run(request.message):
             # Format as SSE
-            event_json = json.dumps({"type": event.type, "data": event.data})
-            yield f"data: {event_json}\n\n"
+            yield sse_repr.format(
+                payload=SSEPayload(type=event.type, data=event.data).model_dump_json()
+            )
 
     except FileNotFoundError:
-        error_event = json.dumps(
-            {
-                "type": "error",
-                "data": {"message": f"Session {request.session_id} not found"},
-            }
+        yield sse_repr.format(
+            payload=SSEPayload(
+                type="error",
+                data={"message": f"Session {request.session_id} not found"},
+            ).model_dump_json()
         )
-        yield f"data: {error_event}\n\n"
     except Exception as e:
-        error_event = json.dumps(
-            {"type": "error", "data": {"message": f"Error: {str(e)}"}}
+        yield sse_repr.format(
+            payload=SSEPayload(
+                type="error", data={"message": f"Error: {str(e)}"}
+            ).model_dump_json()
         )
-        yield f"data: {error_event}\n\n"
 
 
 @router.post("/chat")
@@ -99,14 +92,17 @@ async def get_structure(session_id: str):
     Get the generated Minecraft structure JSON for visualization.
     Returns the code.json file which contains the structure data.
     """
-    code_path = Path("storage/sessions") / session_id / "code.json"
-
+    code_path = Path(LOCAL_STORAGE_FOLDER) / session_id / CODE_FNAME
     if not code_path.exists():
-        raise HTTPException(status_code=404, detail=f"Structure not found for session {session_id}")
+        raise HTTPException(
+            status_code=404, detail=f"Structure not found for session {session_id}"
+        )
 
     try:
         with open(code_path, "r") as f:
             structure_data = json.load(f)
         return JSONResponse(content=structure_data)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading structure: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error reading structure: {str(e)}"
+        )

@@ -9,12 +9,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.api import chat
-from app.config import settings
 
 app = FastAPI(
     title="Minecraft Schematic Generator",
     description="Agentic interface for generating Minecraft schematics",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 app.add_middleware(
@@ -38,7 +37,9 @@ async def health():
 frontend_build = Path(__file__).parent.parent.parent / "frontend" / "dist"
 if frontend_build.exists():
     # Mount static assets
-    app.mount("/assets", StaticFiles(directory=frontend_build / "assets"), name="assets")
+    app.mount(
+        "/assets", StaticFiles(directory=frontend_build / "assets"), name="assets"
+    )
 
     # Catch-all route for SPA - must be last
     @app.get("/{full_path:path}")

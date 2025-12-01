@@ -365,4 +365,3 @@ def make_stair(
     """Quick factory for a single-block stair with orientation helpers."""
     props = stair_properties(facing=direction, upside_down=upside_down)
     return Block(block_id, properties=props, catalog=catalog)
-

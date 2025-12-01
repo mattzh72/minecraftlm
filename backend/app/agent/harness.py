@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncIterator, Literal
 
 from google.genai.types import Content, FunctionResponse, Part
 
@@ -16,6 +16,16 @@ from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
+
+
+type ActivityEventType = Literal[
+    "thought",
+    "tool_call",
+    "tool_result",
+    "complete",
+    "turn_start",
+    "error",
+]
 
 
 class TerminateReason(str, Enum):
@@ -40,7 +50,7 @@ class AgentOutput:
 class ActivityEvent:
     """Activity event for streaming to UI"""
 
-    type: str  # "thought", "tool_call", "tool_result", "complete"
+    type: ActivityEventType
     data: dict
 
 
@@ -71,7 +81,9 @@ class MinecraftSchematicAgent:
         replacements = {
             "[[SDK_OVERVIEW]]": (docs_dir / "01-overview.md").read_text(),
             "[[SDK_API_SCENE]]": (docs_dir / "02-api-scene.md").read_text(),
-            "[[SDK_BLOCKS_REFERENCE]]": (docs_dir / "03-blocks-reference.md").read_text(),
+            "[[SDK_BLOCKS_REFERENCE]]": (
+                docs_dir / "03-blocks-reference.md"
+            ).read_text(),
             "[[SDK_BLOCK_LIST]]": (docs_dir / "04-block-list.md").read_text(),
         }
         for marker, text in replacements.items():
@@ -163,7 +175,9 @@ class MinecraftSchematicAgent:
                 else:
                     # Execute tool - inject session_id automatically
                     tool_params = dict(func_call.args) if func_call.args else {}
-                    tool_params["session_id"] = self.session_id  # Inject session context
+                    tool_params["session_id"] = (
+                        self.session_id
+                    )  # Inject session context
 
                     invocation = await self.tool_registry.build_invocation(
                         func_call.name, tool_params
