@@ -9,6 +9,7 @@ sse_repr = "data: {payload}\n\n"
 class ChatRequest(BaseModel):
     """Request model for chat"""
 
+    session_id: str
     message: str
 
 

@@ -4,9 +4,7 @@ Tool registry for managing available tools
 
 from typing import Any
 
-from google.genai.types import FunctionDeclaration
-
-from app.agent.tools.base import BaseDeclarativeTool, BaseToolInvocation
+from app.agent.tools.base import BaseDeclarativeTool, BaseToolInvocation, ToolSchema
 
 
 class ToolRegistry:
@@ -23,8 +21,8 @@ class ToolRegistry:
         """Get list of all tool names"""
         return list(self.tools.keys())
 
-    def get_function_declarations(self) -> list[FunctionDeclaration]:
-        """Get all tool schemas for Gemini function calling"""
+    def get_tool_schemas(self) -> list[ToolSchema]:
+        """Get all tool schemas in OpenAI format"""
         return [tool.schema for tool in self.tools.values()]
 
     async def build_invocation(

@@ -2,11 +2,10 @@
 EditCode tool - Make precise edits to SDK code using old_string/new_string
 """
 
-from google.genai.types import FunctionDeclaration, Type
 from pydantic import BaseModel
 
 from app.services.session import SessionService
-from app.agent.tools.base import BaseDeclarativeTool, BaseToolInvocation, ToolResult
+from app.agent.tools.base import BaseDeclarativeTool, BaseToolInvocation, ToolResult, make_tool_schema
 
 
 class EditCodeParams(BaseModel):
@@ -65,7 +64,7 @@ class EditCodeTool(BaseDeclarativeTool):
     """Tool for making precise edits to SDK code"""
 
     def __init__(self):
-        schema = FunctionDeclaration(
+        schema = make_tool_schema(
             name="edit_code",
             description=(
                 "Make a precise edit to the SDK code by replacing old_string with new_string. "
@@ -73,22 +72,19 @@ class EditCodeTool(BaseDeclarativeTool):
                 "Use read_code first to see the current code with line numbers."
             ),
             parameters={
-                "type": Type.OBJECT,
-                "properties": {
-                    "old_string": {
-                        "type": Type.STRING,
-                        "description": (
-                            "The exact string to replace. Must match exactly including all whitespace. "
-                            "Must be unique (appear only once in the file)."
-                        ),
-                    },
-                    "new_string": {
-                        "type": Type.STRING,
-                        "description": "The new string to replace it with",
-                    },
+                "old_string": {
+                    "type": "string",
+                    "description": (
+                        "The exact string to replace. Must match exactly including all whitespace. "
+                        "Must be unique (appear only once in the file)."
+                    ),
                 },
-                "required": ["old_string", "new_string"],
+                "new_string": {
+                    "type": "string",
+                    "description": "The new string to replace it with",
+                },
             },
+            required=["old_string", "new_string"],
         )
         super().__init__("edit_code", schema)
 

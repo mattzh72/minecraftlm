@@ -5,11 +5,46 @@ Base classes for tools
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
-from google.genai.types import FunctionDeclaration
-
 
 TParams = TypeVar("TParams")
 TResult = TypeVar("TResult")
+
+
+# Type alias for OpenAI-style tool schema
+ToolSchema = dict[str, Any]
+
+
+def make_tool_schema(
+    name: str,
+    description: str,
+    parameters: dict[str, Any] | None = None,
+    required: list[str] | None = None,
+) -> ToolSchema:
+    """
+    Create an OpenAI-compatible tool schema.
+
+    Args:
+        name: Tool name
+        description: Tool description
+        parameters: Dict of parameter definitions (JSON Schema format)
+        required: List of required parameter names
+
+    Returns:
+        Tool schema dict in OpenAI format
+    """
+    schema: ToolSchema = {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": {
+                "type": "object",
+                "properties": parameters or {},
+                "required": required or [],
+            },
+        },
+    }
+    return schema
 
 
 class ToolResult:
@@ -49,7 +84,7 @@ class BaseToolInvocation(ABC, Generic[TParams, TResult]):
 class BaseDeclarativeTool(ABC):
     """Base class for declarative tools that can be called by the LLM"""
 
-    def __init__(self, name: str, schema: FunctionDeclaration):
+    def __init__(self, name: str, schema: ToolSchema):
         self.name = name
         self.schema = schema
 

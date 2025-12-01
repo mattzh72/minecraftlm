@@ -2,12 +2,11 @@
 CompleteTask tool - Submit final SDK code with automatic validation
 """
 
-from google.genai.types import FunctionDeclaration, Type
 from pydantic import BaseModel
 
 from app.services.session import SessionService
 from app.services.validator import CodeValidator
-from app.agent.tools.base import BaseDeclarativeTool, BaseToolInvocation, ToolResult
+from app.agent.tools.base import BaseDeclarativeTool, BaseToolInvocation, ToolResult, make_tool_schema
 
 
 class CompleteTaskParams(BaseModel):
@@ -44,7 +43,11 @@ class CompleteTaskInvocation(BaseToolInvocation[CompleteTaskParams, str]):
                 error_msg += "\n\nUse read_code to review the code and edit_code to fix the errors."
                 return ToolResult(error=error_msg)
 
-            # Code is valid!
+            # Code is valid! Save the structure JSON for the frontend
+            SessionService.save_structure(
+                self.params.session_id, validation_result.structure
+            )
+
             return ToolResult(
                 output="Task completed successfully! The SDK code is valid and ready to use."
             )
@@ -59,7 +62,7 @@ class CompleteTaskTool(BaseDeclarativeTool):
     """Tool for completing the task with automatic validation"""
 
     def __init__(self):
-        schema = FunctionDeclaration(
+        schema = make_tool_schema(
             name="complete_task",
             description=(
                 "Submit the final SDK code and complete the task. "
@@ -67,11 +70,6 @@ class CompleteTaskTool(BaseDeclarativeTool):
                 "If validation fails, you'll get error details and can continue fixing. "
                 "This is the ONLY way to complete your task."
             ),
-            parameters={
-                "type": Type.OBJECT,
-                "properties": {},
-                "required": [],
-            },
         )
         super().__init__("complete_task", schema)
 
