@@ -29,11 +29,27 @@ export default function useDeepslateResources() {
 
     image.onload = () => {
       fetch('/assets/assets.js')
-        .then((res) => res.text())
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`Failed to fetch assets.js: ${res.status}`);
+          }
+          return res.text();
+        })
         .then((code) => {
-          // Execute assets.js to define window.assets
-          eval(code);
-          const loaded = loadDeepslateResources(image, window.assets);
+          // Execute assets.js which defines `const assets = JSON.parse(...)`
+          // Wrap it to return the value and assign to window.assets
+          const wrappedCode = code + '\nwindow.assets = assets; return assets;';
+          const fn = new Function(wrappedCode);
+          const assets = fn();
+
+          if (!assets) {
+            throw new Error('assets.js did not define assets');
+          }
+          if (!assets.blockstates) {
+            throw new Error('assets.js missing blockstates property');
+          }
+
+          const loaded = loadDeepslateResources(image, assets);
           setResources(loaded);
           setIsLoading(false);
         })

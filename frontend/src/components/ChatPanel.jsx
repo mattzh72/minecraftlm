@@ -1,14 +1,33 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import useSessionStore from '../store/sessionStore';
 import useAutoScroll from '../hooks/useAutoScroll';
 
 export default function ChatPanel() {
   const sessionId = useSessionStore((state) => state.sessionId);
+  const conversation = useSessionStore((state) => state.conversation);
   const setStructureData = useSessionStore((state) => state.setStructureData);
 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Ref to accumulate activities during streaming (avoids StrictMode double-invoke issues)
+  const activitiesRef = useRef([]);
+
+  // Restore messages from conversation when session is loaded
+  useEffect(() => {
+    if (conversation && conversation.length > 0) {
+      const restoredMessages = conversation.map(msg => {
+        if (msg.role === 'user') {
+          return { role: 'user', content: msg.content };
+        } else if (msg.role === 'model') {
+          return { role: 'agent', activities: [{ type: 'complete', success: true, message: msg.content }] };
+        }
+        return null;
+      }).filter(Boolean);
+      setMessages(restoredMessages);
+    }
+  }, [conversation]);
 
   const messagesEndRef = useAutoScroll([messages]);
 
@@ -17,8 +36,33 @@ export default function ChatPanel() {
 
     const userMessage = input;
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+
+    // Add user message and empty agent message
+    const newMessages = [
+      ...messages,
+      { role: 'user', content: userMessage },
+      { role: 'agent', activities: [] }
+    ];
+    setMessages(newMessages);
     setIsLoading(true);
+
+    // Reset activities ref for this streaming session
+    activitiesRef.current = [];
+    const agentMessageIndex = newMessages.length - 1;
+
+    // Helper to sync activities from ref to state
+    const syncActivities = () => {
+      setMessages(prev => {
+        const updated = [...prev];
+        if (updated[agentMessageIndex]?.role === 'agent') {
+          updated[agentMessageIndex] = {
+            ...updated[agentMessageIndex],
+            activities: [...activitiesRef.current]
+          };
+        }
+        return updated;
+      });
+    };
 
     try {
       const response = await fetch('/api/chat', {
@@ -35,56 +79,29 @@ export default function ChatPanel() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      // Add empty agent message that we'll update progressively
-      const agentMessageIndex = messages.length + 1; // +1 for user message we just added
-      setMessages(prev => [...prev, { role: 'agent', activities: [] }]);
-
-      // Helper to update the current agent message's activities
-      const addActivity = (activity) => {
-        setMessages(prev => {
-          const updated = [...prev];
-          const agentMsg = updated[agentMessageIndex];
-          if (agentMsg && agentMsg.role === 'agent') {
-            agentMsg.activities = [...agentMsg.activities, activity];
-          }
-          return updated;
-        });
-      };
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
+        let hasNewActivity = false;
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
 
+              let activity = null;
+
               if (data.type === 'thought') {
-                addActivity({
-                  type: 'thought',
-                  content: data.data.text,
-                });
+                activity = { type: 'thought', content: data.data.text };
               } else if (data.type === 'tool_call') {
-                addActivity({
-                  type: 'tool_call',
-                  name: data.data.name,
-                  args: data.data.args,
-                });
+                activity = { type: 'tool_call', name: data.data.name, args: data.data.args };
               } else if (data.type === 'tool_result') {
-                addActivity({
-                  type: 'tool_result',
-                  result: data.data,
-                });
+                activity = { type: 'tool_result', result: data.data };
               } else if (data.type === 'complete') {
-                addActivity({
-                  type: 'complete',
-                  success: data.data.success,
-                  message: data.data.message,
-                });
+                activity = { type: 'complete', success: data.data.success, message: data.data.message };
 
                 // Fetch the updated structure
                 if (data.data.success) {
@@ -99,20 +116,24 @@ export default function ChatPanel() {
                   }
                 }
               } else if (data.type === 'turn_start') {
-                addActivity({
-                  type: 'turn_start',
-                  turn: data.data.turn,
-                });
+                activity = { type: 'turn_start', turn: data.data.turn };
               } else if (data.type === 'error') {
-                addActivity({
-                  type: 'error',
-                  message: data.data.message,
-                });
+                activity = { type: 'error', message: data.data.message };
+              }
+
+              if (activity) {
+                activitiesRef.current.push(activity);
+                hasNewActivity = true;
               }
             } catch (parseErr) {
               console.error('Error parsing SSE data:', parseErr, line);
             }
           }
+        }
+
+        // Batch update: sync to state once per chunk (not per event)
+        if (hasNewActivity) {
+          syncActivities();
         }
       }
     } catch (error) {

@@ -1,12 +1,60 @@
-import useSession from './hooks/useSession';
+import { useState, useEffect } from 'react';
 import useSessionStore from './store/sessionStore';
+import ProjectsPage from './components/ProjectsPage';
 import ChatPanel from './components/ChatPanel';
 import MinecraftViewer from './components/MinecraftViewer';
 import './App.css';
 
 function App() {
-  const { sessionId, isCreatingSession } = useSession();
+  const sessionId = useSessionStore((state) => state.sessionId);
   const structureData = useSessionStore((state) => state.structureData);
+  const isLoading = useSessionStore((state) => state.isLoading);
+  const restoreSession = useSessionStore((state) => state.restoreSession);
+  const createSession = useSessionStore((state) => state.createSession);
+  const resetSession = useSessionStore((state) => state.resetSession);
+
+  const [showProjects, setShowProjects] = useState(true);
+
+  // Check URL on mount
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const sessionFromUrl = url.searchParams.get('session');
+    if (sessionFromUrl) {
+      setShowProjects(false);
+      restoreSession(sessionFromUrl);
+    }
+  }, [restoreSession]);
+
+  const handleSelectSession = (id) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('session', id);
+    window.history.pushState({}, '', url);
+    setShowProjects(false);
+    restoreSession(id);
+  };
+
+  const handleCreateNew = async () => {
+    setShowProjects(false);
+    await createSession();
+  };
+
+  const handleBackToProjects = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('session');
+    window.history.pushState({}, '', url);
+    resetSession();
+    setShowProjects(true);
+  };
+
+  // Show projects page
+  if (showProjects && !sessionId) {
+    return (
+      <ProjectsPage
+        onSelectSession={handleSelectSession}
+        onCreateNew={handleCreateNew}
+      />
+    );
+  }
 
   return (
     <div style={{
@@ -22,6 +70,33 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
       }}>
+        <div style={{
+          padding: '10px 20px',
+          borderBottom: '1px solid #333',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+        }}>
+          <button
+            onClick={handleBackToProjects}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: '#333',
+              color: '#888',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+            }}
+          >
+            ← Projects
+          </button>
+          {sessionId && (
+            <span style={{ fontSize: '11px', color: '#555', fontFamily: 'monospace' }}>
+              {sessionId.slice(0, 8)}...
+            </span>
+          )}
+        </div>
         <ChatPanel />
       </div>
 
@@ -42,11 +117,11 @@ function App() {
           }}>
             <h2>Minecraft Schematic Generator</h2>
             <p>
-              {isCreatingSession
-                ? 'Creating session...'
+              {isLoading
+                ? 'Loading session...'
                 : sessionId
                   ? 'Start chatting to design your Minecraft structure!'
-                  : 'Session initialization failed'}
+                  : 'Initializing...'}
             </p>
             <p style={{ fontSize: '0.9em', marginTop: '20px' }}>
               Controls:<br />

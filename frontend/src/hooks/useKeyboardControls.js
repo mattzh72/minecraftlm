@@ -49,6 +49,11 @@ export default function useKeyboardControls(camera, render) {
     };
 
     const handleKeyDown = (evt) => {
+      // Ignore if typing in an input field
+      if (evt.target.tagName === 'INPUT' || evt.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
       const key = evt.key.toLowerCase();
       if (KEY_MOVES[key] || evt.key === 'Shift') {
         evt.preventDefault();
@@ -60,6 +65,11 @@ export default function useKeyboardControls(camera, render) {
     };
 
     const handleKeyUp = (evt) => {
+      // Ignore if typing in an input field
+      if (evt.target.tagName === 'INPUT' || evt.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
       const key = evt.key.toLowerCase();
       if (KEY_MOVES[key] || evt.key === 'Shift') {
         evt.preventDefault();

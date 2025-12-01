@@ -3,21 +3,21 @@ import useSessionStore from '../store/sessionStore';
 
 /**
  * Hook to initialize session on mount
- * Returns session state from the store
+ * Checks URL for existing session, restores it or creates new one
  */
 export default function useSession() {
   const sessionId = useSessionStore((state) => state.sessionId);
-  const isCreatingSession = useSessionStore((state) => state.isCreatingSession);
-  const createSession = useSessionStore((state) => state.createSession);
+  const isLoading = useSessionStore((state) => state.isLoading);
+  const initializeSession = useSessionStore((state) => state.initializeSession);
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    // Only create session once on mount
+    // Only initialize session once on mount
     if (!initializedRef.current) {
       initializedRef.current = true;
-      createSession();
+      initializeSession();
     }
-  }, [createSession]);
+  }, [initializeSession]);
 
-  return { sessionId, isCreatingSession };
+  return { sessionId, isLoading };
 }
