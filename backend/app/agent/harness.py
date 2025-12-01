@@ -160,29 +160,20 @@ class MinecraftSchematicAgent:
             tool_responses = []
             task_completed = False
 
-            # Deduplicate tool calls (some models return duplicates)
-            seen_calls = set()
-            unique_calls = []
-            for fc in response.function_calls:
-                call_key = (fc.name, json.dumps(fc.args, sort_keys=True))
-                if call_key not in seen_calls:
-                    seen_calls.add(call_key)
-                    unique_calls.append(fc)
-
             # First, add assistant message with tool calls
             assistant_msg = {"role": "assistant", "content": response.text or ""}
-            if unique_calls:
+            if response.function_calls:
                 assistant_msg["tool_calls"] = [
                     {
                         "id": fc.id or f"call_{i}",
                         "type": "function",
                         "function": {"name": fc.name, "arguments": json.dumps(fc.args)},
                     }
-                    for i, fc in enumerate(unique_calls)
+                    for i, fc in enumerate(response.function_calls)
                 ]
             messages.append(assistant_msg)
 
-            for func_call in unique_calls:
+            for func_call in response.function_calls:
                 yield ActivityEvent(
                     type="tool_call",
                     data={"name": func_call.name, "args": func_call.args},
