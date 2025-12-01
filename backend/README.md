@@ -28,9 +28,9 @@ GEMINI_API_KEY=...
 
 | Provider | Models | Default |
 |----------|--------|---------|
-| `openai` | `gpt-5`, `gpt-5.1`, `gpt-4.1`, `gpt-4o`, `gpt-4o-mini` | `gpt-4o` |
-| `anthropic` | `claude-sonnet-4-20250514`, `claude-opus-4-20250514` | `claude-sonnet-4-20250514` |
-| `gemini` | `gemini/gemini-2.5-pro`, `gemini/gemini-2.5-flash`, `gemini/gemini-2.0-flash` | `gemini/gemini-2.5-flash` |
+| `openai` | `gpt-5.1`, `gpt-5`, `gpt-4.1` | `gpt-5` |
+| `anthropic` | `claude-opus-4-5-20251124`, `claude-sonnet-4-5-20250929` | `claude-sonnet-4-5-20250929` |
+| `gemini` | `gemini/gemini-3-pro`, `gemini/gemini-3-flash` | `gemini/gemini-3-flash` |
 
 ## Running
 
