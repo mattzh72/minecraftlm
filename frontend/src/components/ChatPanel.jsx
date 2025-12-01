@@ -1,18 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
+import useSessionStore from '../store/sessionStore';
+import useAutoScroll from '../hooks/useAutoScroll';
 
-export default function ChatPanel({ sessionId, onStructureUpdate }) {
+export default function ChatPanel() {
+  const sessionId = useSessionStore((state) => state.sessionId);
+  const setStructureData = useSessionStore((state) => state.setStructureData);
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  const messagesEndRef = useAutoScroll([messages]);
 
   const handleSend = async () => {
     if (!input.trim() || !sessionId || isLoading) return;
@@ -79,7 +77,7 @@ export default function ChatPanel({ sessionId, onStructureUpdate }) {
                   const structureRes = await fetch(`/api/sessions/${sessionId}/structure`);
                   if (structureRes.ok) {
                     const structureData = await structureRes.json();
-                    onStructureUpdate(structureData);
+                    setStructureData(structureData);
                   }
                 } catch (err) {
                   console.error('Error fetching structure:', err);

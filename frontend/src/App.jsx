@@ -1,37 +1,12 @@
-import { useState, useEffect } from 'react';
+import useSession from './hooks/useSession';
+import useSessionStore from './store/sessionStore';
 import ChatPanel from './components/ChatPanel';
 import MinecraftViewer from './components/MinecraftViewer';
 import './App.css';
 
 function App() {
-  const [sessionId, setSessionId] = useState(null);
-  const [structureData, setStructureData] = useState(null);
-  const [isCreatingSession, setIsCreatingSession] = useState(false);
-
-  useEffect(() => {
-    // Create a session on mount
-    createSession();
-  }, []);
-
-  const createSession = async () => {
-    setIsCreatingSession(true);
-    try {
-      const response = await fetch('/api/sessions', {
-        method: 'POST',
-      });
-      const data = await response.json();
-      setSessionId(data.session_id);
-      console.log('Session created:', data.session_id);
-    } catch (error) {
-      console.error('Error creating session:', error);
-    } finally {
-      setIsCreatingSession(false);
-    }
-  };
-
-  const handleStructureUpdate = (data) => {
-    setStructureData(data);
-  };
+  const { sessionId, isCreatingSession } = useSession();
+  const structureData = useSessionStore((state) => state.structureData);
 
   return (
     <div style={{
@@ -47,10 +22,7 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
       }}>
-        <ChatPanel
-          sessionId={sessionId}
-          onStructureUpdate={handleStructureUpdate}
-        />
+        <ChatPanel />
       </div>
 
       <div style={{
@@ -62,7 +34,7 @@ function App() {
         backgroundColor: '#0a0a0a',
       }}>
         {structureData ? (
-          <MinecraftViewer structureData={structureData} />
+          <MinecraftViewer />
         ) : (
           <div style={{
             textAlign: 'center',
@@ -73,8 +45,8 @@ function App() {
               {isCreatingSession
                 ? 'Creating session...'
                 : sessionId
-                ? 'Start chatting to design your Minecraft structure!'
-                : 'Session initialization failed'}
+                  ? 'Start chatting to design your Minecraft structure!'
+                  : 'Session initialization failed'}
             </p>
             <p style={{ fontSize: '0.9em', marginTop: '20px' }}>
               Controls:<br />
