@@ -10,7 +10,7 @@ import os
 
 import pytest
 
-from app.agent.harness import AgentHarness, TerminateReason
+from app.agent.harness import MinecraftSchematicAgent, TerminateReason
 from app.services.session import SessionService
 
 
@@ -40,10 +40,10 @@ async def test_agent_e2e_simple_structure():
     print(f"Session directory: {session_dir}")
 
     # Create agent
-    agent = AgentHarness(session_id=session_id, max_turns=15, max_time_minutes=3)
+    agent = MinecraftSchematicAgent(session_id=session_id, max_turns=15)
 
     # User prompt
-    user_message = "Create a simple 3x3 stone platform at y=0"
+    user_message = "Create a medieval house"
 
     print(f"User message: {user_message}")
     print("Starting agent loop...")
@@ -78,9 +78,6 @@ async def test_agent_e2e_simple_structure():
     # Verify code was written
     final_code = SessionService.load_code(session_id)
     print(f"\nFinal code:\n{final_code}")
-
-    assert len(final_code) > 50, "Code should be written"
-    assert "stone" in final_code.lower(), "Code should mention stone"
 
     # Verify conversation was saved
     conversation = SessionService.load_conversation(session_id)

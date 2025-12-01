@@ -1,0 +1,10 @@
+[
+  {
+    "role": "user",
+    "content": "Create a medieval house"
+  },
+  {
+    "role": "model",
+    "content": "Task completed"
+  }
+]

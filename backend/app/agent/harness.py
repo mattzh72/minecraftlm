@@ -23,7 +23,6 @@ class TerminateReason(str, Enum):
 
     GOAL = "GOAL"  # Successfully completed
     MAX_TURNS = "MAX_TURNS"  # Hit max turns limit
-    TIMEOUT = "TIMEOUT"  # Hit time limit
     ERROR = "ERROR"  # Unexpected error
     NO_COMPLETE_TASK = "NO_COMPLETE_TASK"  # Protocol violation
 
@@ -45,13 +44,12 @@ class ActivityEvent:
     data: dict
 
 
-class AgentHarness:
+class MinecraftSchematicAgent:
     """Executes the main agentic loop"""
 
-    def __init__(self, session_id: str, max_turns: int = 20, max_time_minutes: int = 5):
+    def __init__(self, session_id: str, max_turns: int = 20):
         self.session_id = session_id
         self.max_turns = max_turns
-        self.max_time_minutes = max_time_minutes
 
         # Initialize services
         self.gemini = GeminiService()
@@ -94,7 +92,6 @@ class AgentHarness:
         Yields:
             ActivityEvent for streaming to UI
         """
-        start_time = time.time()
         turn_count = 0
 
         # Load conversation history
@@ -109,19 +106,6 @@ class AgentHarness:
 
         # Main loop
         while True:
-            # Check termination conditions
-            elapsed_minutes = (time.time() - start_time) / 60
-            if elapsed_minutes >= self.max_time_minutes:
-                yield ActivityEvent(
-                    type="complete",
-                    data={
-                        "success": False,
-                        "reason": TerminateReason.TIMEOUT,
-                        "message": "Agent timed out",
-                    },
-                )
-                return
-
             if turn_count >= self.max_turns:
                 yield ActivityEvent(
                     type="complete",
