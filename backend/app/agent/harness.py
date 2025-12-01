@@ -2,15 +2,14 @@
 Agent executor - main agentic loop
 """
 
+import json
 import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import AsyncIterator, Literal
 
-from google.genai.types import Content, FunctionResponse, Part
-
-from app.services.gemini import GeminiService
+from app.services.llm import LLMService
 from app.services.session import SessionService
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
@@ -62,7 +61,7 @@ class MinecraftSchematicAgent:
         self.max_turns = max_turns
 
         # Initialize services
-        self.gemini = GeminiService()
+        self.llm = LLMService()
         self.session_service = SessionService()
 
         # Initialize tools
@@ -113,8 +112,8 @@ class MinecraftSchematicAgent:
         conversation.append({"role": "user", "content": user_message})
         self.session_service.save_conversation(self.session_id, conversation)
 
-        # Convert to Gemini format
-        contents = self._format_conversation(conversation)
+        # Convert to OpenAI message format
+        messages = self._format_conversation(conversation)
 
         # Main loop
         while True:
@@ -134,10 +133,10 @@ class MinecraftSchematicAgent:
             # Call model with tools
             yield ActivityEvent(type="turn_start", data={"turn": turn_count})
 
-            response = self.gemini.generate_with_tools(
+            response = self.llm.generate_with_tools(
                 self.system_prompt,
-                contents,
-                self.tool_registry.get_function_declarations(),
+                messages,
+                self.tool_registry.get_tool_schemas(),
             )
 
             # Handle response text (thoughts/reasoning)
@@ -158,8 +157,21 @@ class MinecraftSchematicAgent:
                 return
 
             # Process function calls
-            tool_response_parts = []
+            tool_responses = []
             task_completed = False
+
+            # First, add assistant message with tool calls
+            assistant_msg = {"role": "assistant", "content": response.text or ""}
+            if response.function_calls:
+                assistant_msg["tool_calls"] = [
+                    {
+                        "id": fc.id or f"call_{i}",
+                        "type": "function",
+                        "function": {"name": fc.name, "arguments": json.dumps(fc.args)},
+                    }
+                    for i, fc in enumerate(response.function_calls)
+                ]
+            messages.append(assistant_msg)
 
             for func_call in response.function_calls:
                 yield ActivityEvent(
@@ -175,9 +187,7 @@ class MinecraftSchematicAgent:
                 else:
                     # Execute tool - inject session_id automatically
                     tool_params = dict(func_call.args) if func_call.args else {}
-                    tool_params["session_id"] = (
-                        self.session_id
-                    )  # Inject session context
+                    tool_params["session_id"] = self.session_id
 
                     invocation = await self.tool_registry.build_invocation(
                         func_call.name, tool_params
@@ -201,15 +211,13 @@ class MinecraftSchematicAgent:
 
                 yield ActivityEvent(type="tool_result", data=tool_result)
 
-                # Add to response parts
-                tool_response_parts.append(
-                    Part(
-                        function_response=FunctionResponse(
-                            name=func_call.name,
-                            response=tool_result,
-                            id=func_call.id if hasattr(func_call, "id") else None,
-                        )
-                    )
+                # Add tool response in OpenAI format
+                tool_responses.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": func_call.id or f"call_{len(tool_responses)}",
+                        "content": json.dumps(tool_result),
+                    }
                 )
 
             # If task completed successfully, stop
@@ -229,14 +237,14 @@ class MinecraftSchematicAgent:
                 )
                 return
 
-            # Add tool responses to conversation and continue
-            contents.append(Content(role="user", parts=tool_response_parts))
+            # Add tool responses to messages and continue
+            messages.extend(tool_responses)
 
-    def _format_conversation(self, conversation: list[dict]) -> list[Content]:
-        """Convert conversation to Gemini format"""
+    def _format_conversation(self, conversation: list[dict]) -> list[dict]:
+        """Convert conversation to OpenAI message format"""
         formatted = []
         for message in conversation:
-            formatted.append(
-                Content(role=message["role"], parts=[Part(text=message["content"])])
-            )
+            # Map "model" role to "assistant" for OpenAI compatibility
+            role = "assistant" if message["role"] == "model" else message["role"]
+            formatted.append({"role": role, "content": message["content"]})
         return formatted
