@@ -65,3 +65,9 @@ class SessionService:
         if not code_file.exists():
             raise FileNotFoundError(f"Session {session_id} not found")
         return code_file.read_text()
+
+    @staticmethod
+    def save_structure(session_id: str, structure: dict) -> None:
+        """Save the generated structure JSON"""
+        structure_file = STORAGE_DIR / session_id / "code.json"
+        structure_file.write_text(json.dumps(structure, indent=2))

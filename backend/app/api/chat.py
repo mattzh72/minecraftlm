@@ -2,34 +2,16 @@
 Chat API endpoints
 """
 
-import json
-from pathlib import Path
 from typing import AsyncIterator
 
 from app.api.models.chat import SSEPayload, sse_repr
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from app.agent.harness import MinecraftSchematicAgent
-from app.services.session import SessionService
-from app.api.models import ChatRequest, SessionResponse
+from app.api.models import ChatRequest
 
 router = APIRouter()
-
-
-CODE_FNAME = "code.json"
-# Store sessions outside backend/ to avoid triggering uvicorn reload
-LOCAL_STORAGE_FOLDER = Path(__file__).parent.parent.parent.parent / ".storage" / "sessions"
-
-
-@router.post("/sessions", response_model=SessionResponse)
-async def create_session():
-    """
-    Create a new chat session.
-    Returns the session_id which maps to storage/sessions/{session_id}/
-    """
-    session_id = SessionService.create_session()
-    return SessionResponse(session_id=session_id)
 
 
 async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
@@ -93,25 +75,3 @@ async def chat(request: ChatRequest):
             "X-Accel-Buffering": "no",  # Disable nginx buffering
         },
     )
-
-
-@router.get("/sessions/{session_id}/structure")
-async def get_structure(session_id: str):
-    """
-    Get the generated Minecraft structure JSON for visualization.
-    Returns the code.json file which contains the structure data.
-    """
-    code_path = Path(LOCAL_STORAGE_FOLDER) / session_id / CODE_FNAME
-    if not code_path.exists():
-        raise HTTPException(
-            status_code=404, detail=f"Structure not found for session {session_id}"
-        )
-
-    try:
-        with open(code_path, "r") as f:
-            structure_data = json.load(f)
-        return JSONResponse(content=structure_data)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error reading structure: {str(e)}"
-        )

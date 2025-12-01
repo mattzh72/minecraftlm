@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.config import settings
+from app.api import chat, session
 
 # Configure logging before importing modules that use it
 logging.basicConfig(
@@ -19,7 +20,6 @@ logging.basicConfig(
     format="%(levelname)s:     %(name)s - %(message)s",
 )
 
-from app.api import chat
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ app.add_middleware(
 )
 
 app.include_router(chat, prefix="/api", tags=["chat"])
+app.include_router(session, prefix="/api", tags=["sessions"])
 
 
 @app.get("/health")
