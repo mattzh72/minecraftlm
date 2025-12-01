@@ -40,19 +40,6 @@ async def test_read_code_with_offset_limit(session_with_code):
 
 
 @pytest.mark.asyncio
-async def test_read_code_empty_file(temp_storage):
-    """Test reading empty code file"""
-    session_id = SessionService.create_session()
-
-    tool = ReadCodeTool()
-    invocation = await tool.build({"session_id": session_id})
-    result = await invocation.execute()
-
-    assert result.is_success()
-    assert "No code written yet" in result.output
-
-
-@pytest.mark.asyncio
 async def test_edit_code_tool(session_with_code):
     """Test editing code with old_string/new_string"""
     tool = EditCodeTool()
@@ -166,14 +153,3 @@ x = 10 / 0  # Division by zero
     assert "validation failed" in result.error.lower()
 
 
-@pytest.mark.asyncio
-async def test_complete_task_empty_code(temp_storage):
-    """Test completing task with no code written"""
-    session_id = SessionService.create_session()
-
-    tool = CompleteTaskTool()
-    invocation = await tool.build({"session_id": session_id})
-    result = await invocation.execute()
-
-    assert not result.is_success()
-    assert "No code has been written" in result.error

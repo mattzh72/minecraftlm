@@ -51,16 +51,18 @@ def test_get_all_tool_names(registry):
     assert "complete_task" in names
 
 
-def test_get_function_declarations(registry):
-    """Test getting Gemini function declarations"""
-    declarations = registry.get_function_declarations()
-    assert len(declarations) == 3
+def test_get_tool_schemas(registry):
+    """Test getting tool schemas in OpenAI format"""
+    schemas = registry.get_tool_schemas()
+    assert len(schemas) == 3
 
-    # Check that each declaration has required fields
-    for decl in declarations:
-        assert hasattr(decl, "name")
-        assert hasattr(decl, "description")
-        assert hasattr(decl, "parameters")
+    # Check that each schema has required fields (OpenAI format)
+    for schema in schemas:
+        assert schema["type"] == "function"
+        assert "function" in schema
+        assert "name" in schema["function"]
+        assert "description" in schema["function"]
+        assert "parameters" in schema["function"]
 
 
 @pytest.mark.asyncio

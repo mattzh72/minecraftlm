@@ -3,12 +3,15 @@ Provider-agnostic LLM service using LiteLLM
 Supports OpenAI, Anthropic, and Google Gemini
 """
 
+import logging
 import os
 from dataclasses import dataclass
 
 import litellm
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -35,6 +38,7 @@ class LLMService:
     def __init__(self):
         self.model = settings.get_model()
         self._configure_api_keys()
+        logger.info(f"Using model: {self.model}")
 
     def _configure_api_keys(self):
         """Set API keys as environment variables for LiteLLM"""
