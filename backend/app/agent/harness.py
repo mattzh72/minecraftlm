@@ -133,7 +133,7 @@ class MinecraftSchematicAgent:
             # Call model with tools
             yield ActivityEvent(type="turn_start", data={"turn": turn_count})
 
-            response = self.llm.generate_with_tools(
+            response = await self.llm.generate_with_tools(
                 self.system_prompt,
                 messages,
                 self.tool_registry.get_tool_schemas(),

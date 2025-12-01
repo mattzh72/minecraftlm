@@ -36,7 +36,7 @@ class LLMService:
     """Provider-agnostic LLM service using LiteLLM"""
 
     def __init__(self):
-        self.model = settings.get_model()
+        self.model = settings.llm_model
         self._configure_api_keys()
         logger.info(f"Using model: {self.model}")
 
@@ -49,7 +49,7 @@ class LLMService:
         if settings.gemini_api_key:
             os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
 
-    def generate_with_tools(
+    async def generate_with_tools(
         self,
         system_prompt: str,
         messages: list[dict],
@@ -70,8 +70,8 @@ class LLMService:
         # Build messages with system prompt
         full_messages = [{"role": "system", "content": system_prompt}] + messages
 
-        # Call LiteLLM
-        response = litellm.completion(
+        # Call LiteLLM (async version)
+        response = await litellm.acompletion(
             model=self.model,
             messages=full_messages,
             tools=tools,

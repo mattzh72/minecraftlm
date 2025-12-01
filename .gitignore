@@ -216,3 +216,4 @@ __marimo__/
 # Sessions
 core/storage/sessions/*
 !core/storage/sessions/.gitkeep
+.storage/

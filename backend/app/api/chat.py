@@ -18,7 +18,8 @@ router = APIRouter()
 
 
 CODE_FNAME = "code.json"
-LOCAL_STORAGE_FOLDER = "storage/sessions"
+# Store sessions outside backend/ to avoid triggering uvicorn reload
+LOCAL_STORAGE_FOLDER = Path(__file__).parent.parent.parent.parent / ".storage" / "sessions"
 
 
 @router.post("/sessions", response_model=SessionResponse)
@@ -83,7 +84,15 @@ async def chat(request: ChatRequest):
     Streams activity events (thoughts, tool calls, results) back as SSE.
     Frontend can read the final code from storage/sessions/{session_id}/code.py
     """
-    return StreamingResponse(chat_stream(request), media_type="text/event-stream")
+    return StreamingResponse(
+        chat_stream(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        },
+    )
 
 
 @router.get("/sessions/{session_id}/structure")
