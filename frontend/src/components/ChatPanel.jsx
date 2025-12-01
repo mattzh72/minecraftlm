@@ -35,7 +35,21 @@ export default function ChatPanel() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      let agentMessages = [];
+      // Add empty agent message that we'll update progressively
+      const agentMessageIndex = messages.length + 1; // +1 for user message we just added
+      setMessages(prev => [...prev, { role: 'agent', activities: [] }]);
+
+      // Helper to update the current agent message's activities
+      const addActivity = (activity) => {
+        setMessages(prev => {
+          const updated = [...prev];
+          const agentMsg = updated[agentMessageIndex];
+          if (agentMsg && agentMsg.role === 'agent') {
+            agentMsg.activities = [...agentMsg.activities, activity];
+          }
+          return updated;
+        });
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -46,60 +60,61 @@ export default function ChatPanel() {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
+            try {
+              const data = JSON.parse(line.slice(6));
 
-            if (data.type === 'thought') {
-              agentMessages.push({
-                type: 'thought',
-                content: data.data.text,
-              });
-            } else if (data.type === 'tool_call') {
-              agentMessages.push({
-                type: 'tool_call',
-                name: data.data.name,
-                args: data.data.args,
-              });
-            } else if (data.type === 'tool_result') {
-              agentMessages.push({
-                type: 'tool_result',
-                result: data.data,
-              });
-            } else if (data.type === 'complete') {
-              agentMessages.push({
-                type: 'complete',
-                success: data.data.success,
-                message: data.data.message,
-              });
+              if (data.type === 'thought') {
+                addActivity({
+                  type: 'thought',
+                  content: data.data.text,
+                });
+              } else if (data.type === 'tool_call') {
+                addActivity({
+                  type: 'tool_call',
+                  name: data.data.name,
+                  args: data.data.args,
+                });
+              } else if (data.type === 'tool_result') {
+                addActivity({
+                  type: 'tool_result',
+                  result: data.data,
+                });
+              } else if (data.type === 'complete') {
+                addActivity({
+                  type: 'complete',
+                  success: data.data.success,
+                  message: data.data.message,
+                });
 
-              // Fetch the updated structure
-              if (data.data.success) {
-                try {
-                  const structureRes = await fetch(`/api/sessions/${sessionId}/structure`);
-                  if (structureRes.ok) {
-                    const structureData = await structureRes.json();
-                    setStructureData(structureData);
+                // Fetch the updated structure
+                if (data.data.success) {
+                  try {
+                    const structureRes = await fetch(`/api/sessions/${sessionId}/structure`);
+                    if (structureRes.ok) {
+                      const structureData = await structureRes.json();
+                      setStructureData(structureData);
+                    }
+                  } catch (err) {
+                    console.error('Error fetching structure:', err);
                   }
-                } catch (err) {
-                  console.error('Error fetching structure:', err);
                 }
+              } else if (data.type === 'turn_start') {
+                addActivity({
+                  type: 'turn_start',
+                  turn: data.data.turn,
+                });
+              } else if (data.type === 'error') {
+                addActivity({
+                  type: 'error',
+                  message: data.data.message,
+                });
               }
-            } else if (data.type === 'turn_start') {
-              agentMessages.push({
-                type: 'turn_start',
-                turn: data.data.turn,
-              });
-            } else if (data.type === 'error') {
-              agentMessages.push({
-                type: 'error',
-                message: data.data.message,
-              });
+            } catch (parseErr) {
+              console.error('Error parsing SSE data:', parseErr, line);
             }
           }
         }
       }
-
-      // Add all agent messages
-      setMessages(prev => [...prev, { role: 'agent', activities: agentMessages }]);
     } catch (error) {
       console.error('Chat error:', error);
       setMessages(prev => [...prev, {
