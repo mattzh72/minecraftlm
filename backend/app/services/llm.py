@@ -82,6 +82,12 @@ class LLMService:
         choice = response.choices[0]
         message = choice.message
 
+        # Log raw tool calls to detect duplicates at source
+        if message.tool_calls:
+            logger.info(f"Raw tool_calls from model: {len(message.tool_calls)} calls")
+            for i, tc in enumerate(message.tool_calls):
+                logger.info(f"  [{i}] {tc.function.name}: {tc.function.arguments[:100] if tc.function.arguments else 'no args'}...")
+
         # Extract text
         text = message.content
 

@@ -13,6 +13,7 @@ class ValidationResult:
     is_valid: bool
     error: str | None = None
     error_line: int | None = None
+    structure: dict | None = None  # The generated structure if valid
 
 
 class CodeValidator:
@@ -41,12 +42,26 @@ class CodeValidator:
         except Exception as e:
             return ValidationResult(is_valid=False, error=f"Compilation error: {str(e)}")
 
-        # Try to execute (basic check)
+        # Try to execute and capture the structure
         try:
             # Create a minimal execution environment
             exec_globals = {}
             exec(code, exec_globals)
-            return ValidationResult(is_valid=True)
+
+            # Get the structure variable from the executed code
+            structure = exec_globals.get("structure")
+            if structure is None:
+                return ValidationResult(
+                    is_valid=False,
+                    error="Code must define a 'structure' variable at module level",
+                )
+            if not isinstance(structure, dict):
+                return ValidationResult(
+                    is_valid=False,
+                    error=f"'structure' must be a dict, got {type(structure).__name__}",
+                )
+
+            return ValidationResult(is_valid=True, structure=structure)
         except Exception as e:
             # Get line number if available
             import traceback

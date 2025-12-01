@@ -43,7 +43,11 @@ class CompleteTaskInvocation(BaseToolInvocation[CompleteTaskParams, str]):
                 error_msg += "\n\nUse read_code to review the code and edit_code to fix the errors."
                 return ToolResult(error=error_msg)
 
-            # Code is valid!
+            # Code is valid! Save the structure JSON for the frontend
+            SessionService.save_structure(
+                self.params.session_id, validation_result.structure
+            )
+
             return ToolResult(
                 output="Task completed successfully! The SDK code is valid and ready to use."
             )
