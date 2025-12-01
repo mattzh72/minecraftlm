@@ -2,19 +2,43 @@
 FastAPI application entry point
 """
 
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from app.config import settings
+
+# Configure logging before importing modules that use it
+logging.basicConfig(
+    level=settings.log_level,
+    format="%(levelname)s:     %(name)s - %(message)s",
+)
+
 from app.api import chat
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info(f"LLM Model: {settings.llm_model} ({settings.get_provider()})")
+    yield
+    # Shutdown (nothing to clean up)
+
 
 app = FastAPI(
     title="Minecraft Schematic Generator",
     description="Agentic interface for generating Minecraft schematics",
     version="0.1.0",
+    lifespan=lifespan,
 )
+
 
 app.add_middleware(
     CORSMiddleware,
