@@ -2,13 +2,14 @@
 Agent executor - main agentic loop
 """
 
+import base64
 import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import AsyncIterator
 
-from google.genai.types import Content, FunctionResponse, Part
+from google.genai.types import Content, FunctionCall, FunctionResponse, Part
 
 from app.services.gemini import GeminiService
 from app.services.session import SessionService
@@ -97,8 +98,8 @@ class MinecraftSchematicAgent:
         # Load conversation history
         conversation = self.session_service.load_conversation(self.session_id)
 
-        # Add user message
-        conversation.append({"role": "user", "content": user_message})
+        # Add user message with structured parts so it can be replayed
+        conversation.append({"role": "user", "parts": [{"text": user_message}]})
         self.session_service.save_conversation(self.session_id, conversation)
 
         # Convert to Gemini format
@@ -128,9 +129,35 @@ class MinecraftSchematicAgent:
                 self.tool_registry.get_function_declarations(),
             )
 
+            model_message_parts = []
+
             # Handle response text (thoughts/reasoning)
             if response.text:
+                model_message_parts.append({"text": response.text})
                 yield ActivityEvent(type="thought", data={"text": response.text})
+
+            # Capture function calls for persistence + next turn replay
+            if response.function_calls:
+                for i, func_call in enumerate(response.function_calls):
+                    part_data = {
+                        "function_call": {
+                            "name": func_call.name,
+                            "args": dict(func_call.args) if func_call.args else {},
+                            "id": getattr(func_call, "id", None),
+                        }
+                    }
+                    # Add thought signature if present (needed for Gemini 3)
+                    if response.thought_signatures and i < len(response.thought_signatures):
+                        encoded_sig = self._encode_thought_signature(response.thought_signatures[i])
+                        if encoded_sig:
+                            part_data["thought_signature"] = encoded_sig
+                
+                    model_message_parts.append(part_data)
+
+            if model_message_parts:
+                conversation.append({"role": "model", "parts": model_message_parts})
+                self.session_service.save_conversation(self.session_id, conversation)
+                contents = self._format_conversation(conversation)
 
             # No function calls - check if task was completed
             if not response.function_calls:
@@ -146,8 +173,8 @@ class MinecraftSchematicAgent:
                 return
 
             # Process function calls
-            tool_response_parts = []
             task_completed = False
+            serialized_responses = []
 
             for func_call in response.function_calls:
                 yield ActivityEvent(
@@ -187,24 +214,23 @@ class MinecraftSchematicAgent:
 
                 yield ActivityEvent(type="tool_result", data=tool_result)
 
-                # Add to response parts
-                tool_response_parts.append(
-                    Part(
-                        function_response=FunctionResponse(
-                            name=func_call.name,
-                            response=tool_result,
-                            id=func_call.id if hasattr(func_call, "id") else None,
-                        )
-                    )
+                serialized_responses.append(
+                    {
+                        "function_response": {
+                            "name": func_call.name,
+                            "response": tool_result,
+                            "id": getattr(func_call, "id", None),
+                        }
+                    }
                 )
+
+            if serialized_responses:
+                conversation.append({"role": "user", "parts": serialized_responses})
+                self.session_service.save_conversation(self.session_id, conversation)
+                contents = self._format_conversation(conversation)
 
             # If task completed successfully, stop
             if task_completed:
-                # Save assistant response to conversation
-                assistant_text = response.text or "Task completed"
-                conversation.append({"role": "model", "content": assistant_text})
-                self.session_service.save_conversation(self.session_id, conversation)
-
                 yield ActivityEvent(
                     type="complete",
                     data={
@@ -215,14 +241,68 @@ class MinecraftSchematicAgent:
                 )
                 return
 
-            # Add tool responses to conversation and continue
-            contents.append(Content(role="user", parts=tool_response_parts))
-
     def _format_conversation(self, conversation: list[dict]) -> list[Content]:
         """Convert conversation to Gemini format"""
         formatted = []
         for message in conversation:
-            formatted.append(
-                Content(role=message["role"], parts=[Part(text=message["content"])])
-            )
+            parts: list[Part] = []
+            if "parts" in message:
+                for part in message["parts"]:
+                    if "text" in part:
+                        parts.append(Part(text=part["text"]))
+                    elif "function_call" in part:
+                        call = part["function_call"]
+                        # Include thought_signature if present
+                        thought_sig = self._decode_thought_signature(part.get("thought_signature"))
+                        parts.append(
+                            Part(
+                                function_call=FunctionCall(
+                                    name=call.get("name"),
+                                    args=call.get("args") or {},
+                                    id=call.get("id"),
+                                ),
+                                thought_signature=thought_sig
+                            )
+                        )
+                    elif "function_response" in part:
+                        response = part["function_response"]
+                        parts.append(
+                            Part(
+                                function_response=FunctionResponse(
+                                    name=response.get("name"),
+                                    response=response.get("response"),
+                                    id=response.get("id"),
+                                )
+                            )
+                        )
+            elif "content" in message:
+                parts.append(Part(text=message["content"]))
+
+            if parts:
+                formatted.append(Content(role=message["role"], parts=parts))
         return formatted
+
+    @staticmethod
+    def _encode_thought_signature(sig) -> str | None:
+        """Store thought signatures as base64 strings for JSON compatibility"""
+        if sig is None:
+            return None
+        try:
+            raw: bytes
+            if isinstance(sig, bytes):
+                raw = sig
+            else:
+                raw = str(sig).encode("utf-8")
+            return base64.b64encode(raw).decode("ascii")
+        except Exception:
+            return None
+
+    @staticmethod
+    def _decode_thought_signature(encoded: str | None):
+        """Decode base64 thought signatures back to bytes for Gemini"""
+        if not encoded:
+            return None
+        try:
+            return base64.b64decode(encoded)
+        except Exception:
+            return None

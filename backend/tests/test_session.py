@@ -27,6 +27,26 @@ def test_create_session(temp_storage):
     assert (session_dir / "metadata.json").exists()
 
 
+def test_metadata_timestamps_update_on_save(temp_storage):
+    """created_at/updated_at should be present and updated when state changes"""
+    session_id = SessionService.create_session()
+    session_dir = temp_storage / session_id
+    metadata_path = session_dir / "metadata.json"
+
+    metadata = json.loads(metadata_path.read_text())
+    assert metadata["created_at"] is not None
+    assert metadata["updated_at"] is not None
+
+    original_updated = metadata["updated_at"]
+
+    # Saving conversation should advance updated_at
+    SessionService.save_conversation(
+        session_id, [{"role": "user", "content": "hello"}]
+    )
+    updated_meta = json.loads(metadata_path.read_text())
+    assert updated_meta["updated_at"] != original_updated
+
+
 def test_load_conversation(temp_storage):
     """Test loading conversation from session"""
     session_id = SessionService.create_session()

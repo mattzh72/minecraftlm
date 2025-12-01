@@ -19,6 +19,7 @@ class ModelResponse:
     text: str | None
     function_calls: list[FunctionCall] | None
     finish_reason: str | None
+    thought_signatures: list[bytes | None] | None = None
 
 
 class GeminiService:
@@ -63,6 +64,7 @@ class GeminiService:
         # Extract response parts
         text_parts = []
         function_calls = []
+        thought_signatures = []
 
         if response.candidates and len(response.candidates) > 0:
             candidate = response.candidates[0]
@@ -73,6 +75,11 @@ class GeminiService:
                         text_parts.append(part.text)
                     if hasattr(part, "function_call") and part.function_call:
                         function_calls.append(part.function_call)
+                        # Extract thought signature if present (needed for Gemini 3)
+                        if hasattr(part, "thought_signature") and part.thought_signature:
+                            thought_signatures.append(part.thought_signature)
+                        else:
+                            thought_signatures.append(None)
 
             finish_reason = candidate.finish_reason if hasattr(candidate, "finish_reason") else None
         else:
@@ -82,6 +89,7 @@ class GeminiService:
             text="".join(text_parts) if text_parts else None,
             function_calls=function_calls if function_calls else None,
             finish_reason=finish_reason,
+            thought_signatures=thought_signatures if thought_signatures else None,
         )
 
     async def generate_stream(
