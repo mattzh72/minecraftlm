@@ -2,11 +2,10 @@
 ReadCode tool - Read current SDK code from session with line numbers
 """
 
-from google.genai.types import FunctionDeclaration, Type
 from pydantic import BaseModel
 
 from app.services.session import SessionService
-from app.agent.tools.base import BaseDeclarativeTool, BaseToolInvocation, ToolResult
+from app.agent.tools.base import BaseDeclarativeTool, BaseToolInvocation, ToolResult, make_tool_schema
 
 
 class ReadCodeParams(BaseModel):
@@ -74,22 +73,18 @@ class ReadCodeTool(BaseDeclarativeTool):
     """Tool for reading current SDK code with line numbers"""
 
     def __init__(self):
-        schema = FunctionDeclaration(
+        schema = make_tool_schema(
             name="read_code",
             description="Read the current SDK code with line numbers. Supports reading specific line ranges.",
             parameters={
-                "type": Type.OBJECT,
-                "properties": {
-                    "offset": {
-                        "type": Type.INTEGER,
-                        "description": "Starting line number (1-indexed). Optional - defaults to beginning of file.",
-                    },
-                    "limit": {
-                        "type": Type.INTEGER,
-                        "description": "Number of lines to read. Optional - defaults to reading entire file.",
-                    },
+                "offset": {
+                    "type": "integer",
+                    "description": "Starting line number (1-indexed). Optional - defaults to beginning of file.",
                 },
-                "required": [],
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of lines to read. Optional - defaults to reading entire file.",
+                },
             },
         )
         super().__init__("read_code", schema)

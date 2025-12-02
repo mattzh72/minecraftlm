@@ -2,20 +2,43 @@
 FastAPI application entry point
 """
 
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.api import chat
 from app.config import settings
+from app.api import chat, session
+
+# Configure logging before importing modules that use it
+logging.basicConfig(
+    level=settings.log_level,
+    format="%(levelname)s:     %(name)s - %(message)s",
+)
+
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info(f"LLM Model: {settings.llm_model} ({settings.get_provider()})")
+    yield
+    # Shutdown (nothing to clean up)
+
 
 app = FastAPI(
     title="Minecraft Schematic Generator",
     description="Agentic interface for generating Minecraft schematics",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,7 +48,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(chat.router, prefix="/api", tags=["chat"])
+app.include_router(chat, prefix="/api", tags=["chat"])
+app.include_router(session, prefix="/api", tags=["sessions"])
 
 
 @app.get("/health")
@@ -38,7 +62,9 @@ async def health():
 frontend_build = Path(__file__).parent.parent.parent / "frontend" / "dist"
 if frontend_build.exists():
     # Mount static assets
-    app.mount("/assets", StaticFiles(directory=frontend_build / "assets"), name="assets")
+    app.mount(
+        "/assets", StaticFiles(directory=frontend_build / "assets"), name="assets"
+    )
 
     # Catch-all route for SPA - must be last
     @app.get("/{full_path:path}")

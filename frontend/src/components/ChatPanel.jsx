@@ -1,26 +1,68 @@
 import { useState, useRef, useEffect } from 'react';
+import useSessionStore from '../store/sessionStore';
+import useAutoScroll from '../hooks/useAutoScroll';
 
-export default function ChatPanel({ sessionId, onStructureUpdate }) {
+export default function ChatPanel() {
+  const sessionId = useSessionStore((state) => state.sessionId);
+  const conversation = useSessionStore((state) => state.conversation);
+  const setStructureData = useSessionStore((state) => state.setStructureData);
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // Ref to accumulate activities during streaming (avoids StrictMode double-invoke issues)
+  const activitiesRef = useRef([]);
 
+  // Restore messages from conversation when session is loaded
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (conversation && conversation.length > 0) {
+      const restoredMessages = conversation.map(msg => {
+        if (msg.role === 'user') {
+          return { role: 'user', content: msg.content };
+        } else if (msg.role === 'model') {
+          return { role: 'agent', activities: [{ type: 'complete', success: true, message: msg.content }] };
+        }
+        return null;
+      }).filter(Boolean);
+      setMessages(restoredMessages);
+    }
+  }, [conversation]);
+
+  const messagesEndRef = useAutoScroll([messages]);
 
   const handleSend = async () => {
     if (!input.trim() || !sessionId || isLoading) return;
 
     const userMessage = input;
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+
+    // Add user message and empty agent message
+    const newMessages = [
+      ...messages,
+      { role: 'user', content: userMessage },
+      { role: 'agent', activities: [] }
+    ];
+    setMessages(newMessages);
     setIsLoading(true);
+
+    // Reset activities ref for this streaming session
+    activitiesRef.current = [];
+    const agentMessageIndex = newMessages.length - 1;
+
+    // Helper to sync activities from ref to state
+    const syncActivities = () => {
+      setMessages(prev => {
+        const updated = [...prev];
+        if (updated[agentMessageIndex]?.role === 'agent') {
+          updated[agentMessageIndex] = {
+            ...updated[agentMessageIndex],
+            activities: [...activitiesRef.current]
+          };
+        }
+        return updated;
+      });
+    };
 
     try {
       const response = await fetch('/api/chat', {
@@ -37,71 +79,63 @@ export default function ChatPanel({ sessionId, onStructureUpdate }) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      let agentMessages = [];
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
+        let hasNewActivity = false;
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
+            try {
+              const data = JSON.parse(line.slice(6));
 
-            if (data.type === 'thought') {
-              agentMessages.push({
-                type: 'thought',
-                content: data.data.text,
-              });
-            } else if (data.type === 'tool_call') {
-              agentMessages.push({
-                type: 'tool_call',
-                name: data.data.name,
-                args: data.data.args,
-              });
-            } else if (data.type === 'tool_result') {
-              agentMessages.push({
-                type: 'tool_result',
-                result: data.data,
-              });
-            } else if (data.type === 'complete') {
-              agentMessages.push({
-                type: 'complete',
-                success: data.data.success,
-                message: data.data.message,
-              });
+              let activity = null;
 
-              // Fetch the updated structure
-              if (data.data.success) {
-                try {
-                  const structureRes = await fetch(`/api/sessions/${sessionId}/structure`);
-                  if (structureRes.ok) {
-                    const structureData = await structureRes.json();
-                    onStructureUpdate(structureData);
+              if (data.type === 'thought') {
+                activity = { type: 'thought', content: data.data.text };
+              } else if (data.type === 'tool_call') {
+                activity = { type: 'tool_call', name: data.data.name, args: data.data.args };
+              } else if (data.type === 'tool_result') {
+                activity = { type: 'tool_result', result: data.data };
+              } else if (data.type === 'complete') {
+                activity = { type: 'complete', success: data.data.success, message: data.data.message };
+
+                // Fetch the updated structure
+                if (data.data.success) {
+                  try {
+                    const structureRes = await fetch(`/api/sessions/${sessionId}/structure`);
+                    if (structureRes.ok) {
+                      const structureData = await structureRes.json();
+                      setStructureData(structureData);
+                    }
+                  } catch (err) {
+                    console.error('Error fetching structure:', err);
                   }
-                } catch (err) {
-                  console.error('Error fetching structure:', err);
                 }
+              } else if (data.type === 'turn_start') {
+                activity = { type: 'turn_start', turn: data.data.turn };
+              } else if (data.type === 'error') {
+                activity = { type: 'error', message: data.data.message };
               }
-            } else if (data.type === 'turn_start') {
-              agentMessages.push({
-                type: 'turn_start',
-                turn: data.data.turn,
-              });
-            } else if (data.type === 'error') {
-              agentMessages.push({
-                type: 'error',
-                message: data.data.message,
-              });
+
+              if (activity) {
+                activitiesRef.current.push(activity);
+                hasNewActivity = true;
+              }
+            } catch (parseErr) {
+              console.error('Error parsing SSE data:', parseErr, line);
             }
           }
         }
-      }
 
-      // Add all agent messages
-      setMessages(prev => [...prev, { role: 'agent', activities: agentMessages }]);
+        // Batch update: sync to state once per chunk (not per event)
+        if (hasNewActivity) {
+          syncActivities();
+        }
+      }
     } catch (error) {
       console.error('Chat error:', error);
       setMessages(prev => [...prev, {

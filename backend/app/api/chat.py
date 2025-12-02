@@ -2,41 +2,16 @@
 Chat API endpoints
 """
 
-import json
-from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel
+from app.api.models.chat import SSEPayload, sse_repr
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from app.agent.harness import MinecraftSchematicAgent
-from app.services.session import SessionService
+from app.api.models import ChatRequest
 
 router = APIRouter()
-
-
-class ChatRequest(BaseModel):
-    """Request model for chat"""
-
-    session_id: str
-    message: str
-
-
-class SessionResponse(BaseModel):
-    """Response model for session creation"""
-
-    session_id: str
-
-
-@router.post("/sessions", response_model=SessionResponse)
-async def create_session():
-    """
-    Create a new chat session.
-    Returns the session_id which maps to storage/sessions/{session_id}/
-    """
-    session_id = SessionService.create_session()
-    return SessionResponse(session_id=session_id)
 
 
 async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
@@ -57,22 +32,23 @@ async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
         # Run agent loop and stream events
         async for event in agent.run(request.message):
             # Format as SSE
-            event_json = json.dumps({"type": event.type, "data": event.data})
-            yield f"data: {event_json}\n\n"
+            yield sse_repr.format(
+                payload=SSEPayload(type=event.type, data=event.data).model_dump_json()
+            )
 
     except FileNotFoundError:
-        error_event = json.dumps(
-            {
-                "type": "error",
-                "data": {"message": f"Session {request.session_id} not found"},
-            }
+        yield sse_repr.format(
+            payload=SSEPayload(
+                type="error",
+                data={"message": f"Session {request.session_id} not found"},
+            ).model_dump_json()
         )
-        yield f"data: {error_event}\n\n"
     except Exception as e:
-        error_event = json.dumps(
-            {"type": "error", "data": {"message": f"Error: {str(e)}"}}
+        yield sse_repr.format(
+            payload=SSEPayload(
+                type="error", data={"message": f"Error: {str(e)}"}
+            ).model_dump_json()
         )
-        yield f"data: {error_event}\n\n"
 
 
 @router.post("/chat")
@@ -90,23 +66,12 @@ async def chat(request: ChatRequest):
     Streams activity events (thoughts, tool calls, results) back as SSE.
     Frontend can read the final code from storage/sessions/{session_id}/code.py
     """
-    return StreamingResponse(chat_stream(request), media_type="text/event-stream")
-
-
-@router.get("/sessions/{session_id}/structure")
-async def get_structure(session_id: str):
-    """
-    Get the generated Minecraft structure JSON for visualization.
-    Returns the code.json file which contains the structure data.
-    """
-    code_path = Path("storage/sessions") / session_id / "code.json"
-
-    if not code_path.exists():
-        raise HTTPException(status_code=404, detail=f"Structure not found for session {session_id}")
-
-    try:
-        with open(code_path, "r") as f:
-            structure_data = json.load(f)
-        return JSONResponse(content=structure_data)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading structure: {str(e)}")
+    return StreamingResponse(
+        chat_stream(request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        },
+    )
