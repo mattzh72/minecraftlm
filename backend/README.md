@@ -15,7 +15,7 @@ Create a `.env` file in the backend directory:
 
 ```bash
 # LLM Model (provider is inferred from model name)
-LLM_MODEL=gemini/gemini-3-flash
+LLM_MODEL=gemini/gemini-3-pro-preview
 
 # API Keys (only need the one for your model's provider)
 OPENAI_API_KEY=sk-...
@@ -29,7 +29,7 @@ GEMINI_API_KEY=...
 |----------|--------|
 | OpenAI | `gpt-5.1`, `gpt-5`, `gpt-4.1` |
 | Anthropic | `claude-opus-4-5-20251124`, `claude-sonnet-4-5-20250929` |
-| Gemini | `gemini/gemini-3-pro`, `gemini/gemini-3-flash` |
+| Gemini | `gemini/gemini-3-pro`, `gemini/gemini-3-pro-preview` |
 
 ## Running
 

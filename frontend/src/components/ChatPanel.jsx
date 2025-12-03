@@ -17,14 +17,58 @@ export default function ChatPanel() {
   // Restore messages from conversation when session is loaded
   useEffect(() => {
     if (conversation && conversation.length > 0) {
-      const restoredMessages = conversation.map(msg => {
+      const restoredMessages = [];
+      let currentAgentMessage = null;
+
+      for (const msg of conversation) {
         if (msg.role === 'user') {
-          return { role: 'user', content: msg.content };
-        } else if (msg.role === 'model') {
-          return { role: 'agent', activities: [{ type: 'complete', success: true, message: msg.content }] };
+          // Flush any pending agent message
+          if (currentAgentMessage && currentAgentMessage.activities.length > 0) {
+            restoredMessages.push(currentAgentMessage);
+            currentAgentMessage = null;
+          }
+          restoredMessages.push({ role: 'user', content: msg.content });
+        } else if (msg.role === 'assistant') {
+          // Start new agent message if needed
+          if (!currentAgentMessage) {
+            currentAgentMessage = { role: 'agent', activities: [] };
+          }
+
+          // Add thought if there's text content
+          if (msg.content && msg.content.trim()) {
+            currentAgentMessage.activities.push({ type: 'thought', content: msg.content });
+          }
+
+          // Add tool calls
+          if (msg.tool_calls) {
+            for (const toolCall of msg.tool_calls) {
+              const args = JSON.parse(toolCall.function.arguments);
+              currentAgentMessage.activities.push({
+                type: 'tool_call',
+                name: toolCall.function.name,
+                args: args
+              });
+            }
+          }
+        } else if (msg.role === 'tool') {
+          // Tool result
+          if (!currentAgentMessage) {
+            currentAgentMessage = { role: 'agent', activities: [] };
+          }
+
+          const result = JSON.parse(msg.content);
+          currentAgentMessage.activities.push({
+            type: 'tool_result',
+            result: result
+          });
         }
-        return null;
-      }).filter(Boolean);
+      }
+
+      // Flush any remaining agent message
+      if (currentAgentMessage && currentAgentMessage.activities.length > 0) {
+        restoredMessages.push(currentAgentMessage);
+      }
+
       setMessages(restoredMessages);
     }
   }, [conversation]);

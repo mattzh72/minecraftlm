@@ -1,9 +1,8 @@
 """
-End-to-end integration test with live Gemini API
+End-to-end integration test with a live LLM (via LiteLLM).
 
 Run with: pytest tests/test_integration_e2e.py -v -s
-
-Requires GEMINI_API_KEY environment variable set
+Requires the appropriate API key for the configured model (see app.config).
 """
 
 import os
@@ -11,6 +10,7 @@ import os
 import pytest
 
 from app.agent.harness import MinecraftSchematicAgent, TerminateReason
+from app.config import settings
 from app.services.session import SessionService
 
 
@@ -20,12 +20,22 @@ async def test_agent_e2e_simple_structure():
     """
     End-to-end test: Agent builds a simple structure.
 
-    This test runs the full agent loop with real Gemini API calls.
+    This test runs the full agent loop with real LLM API calls.
     Uses real storage (not temp) so you can inspect the session afterward.
     """
-    # Check for API key
-    if not os.getenv("GEMINI_API_KEY"):
-        pytest.skip("GEMINI_API_KEY not set - skipping E2E test")
+    provider = settings.get_provider()
+
+    def has_key(env_name: str, cfg_value: str | None) -> bool:
+        return bool(cfg_value) or bool(os.getenv(env_name))
+
+    if provider == "gemini" and not has_key("GEMINI_API_KEY", settings.gemini_api_key):
+        pytest.skip("GEMINI_API_KEY not set - skipping E2E test for Gemini provider")
+    if provider == "openai" and not has_key("OPENAI_API_KEY", settings.openai_api_key):
+        pytest.skip("OPENAI_API_KEY not set - skipping E2E test for OpenAI provider")
+    if provider == "anthropic" and not has_key(
+        "ANTHROPIC_API_KEY", settings.anthropic_api_key
+    ):
+        pytest.skip("ANTHROPIC_API_KEY not set - skipping E2E test for Anthropic provider")
 
     # Create session (uses real storage)
     session_id = SessionService.create_session()

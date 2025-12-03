@@ -2,7 +2,6 @@
 Agent executor - main agentic loop
 """
 
-import base64
 import json
 from dataclasses import dataclass
 from enum import Enum
@@ -108,12 +107,12 @@ class MinecraftSchematicAgent:
         # Load conversation history
         conversation = self.session_service.load_conversation(self.session_id)
 
-        # Add user message with structured parts so it can be replayed
-        conversation.append({"role": "user", "parts": [{"text": user_message}]})
+        # Add user message
+        conversation.append({"role": "user", "content": user_message})
         self.session_service.save_conversation(self.session_id, conversation)
 
-        # Convert to OpenAI message format
-        messages = self._format_conversation(conversation)
+        # Conversation is already in OpenAI format
+        messages = list(conversation)
 
         # Main loop
         while True:
@@ -139,37 +138,31 @@ class MinecraftSchematicAgent:
                 self.tool_registry.get_tool_schemas(),
             )
 
-            model_message_parts = []
+            # Build assistant message in OpenAI format
+            assistant_message = {"role": "assistant", "content": response.text or ""}
 
             # Handle response text (thoughts/reasoning)
             if response.text:
-                model_message_parts.append({"text": response.text})
                 yield ActivityEvent(type="thought", data={"text": response.text})
 
-            # Capture function calls for persistence + next turn replay
+            # Add tool calls to message
             if response.function_calls:
-                thought_signatures = getattr(response, "thought_signatures", None)
-                for i, func_call in enumerate(response.function_calls):
-                    part_data = {
-                        "function_call": {
+                tool_calls = []
+                for idx, func_call in enumerate(response.function_calls):
+                    tool_calls.append({
+                        "id": getattr(func_call, "id", None) or f"call_{idx}",
+                        "type": "function",
+                        "function": {
                             "name": func_call.name,
-                            "args": dict(func_call.args) if func_call.args else {},
-                            "id": getattr(func_call, "id", None),
-                        }
-                    }
-                    if thought_signatures and i < len(thought_signatures):
-                        encoded_sig = self._encode_thought_signature(
-                            thought_signatures[i]
-                        )
-                        if encoded_sig:
-                            part_data["thought_signature"] = encoded_sig
+                            "arguments": json.dumps(dict(func_call.args) if func_call.args else {}),
+                        },
+                    })
+                assistant_message["tool_calls"] = tool_calls
 
-                    model_message_parts.append(part_data)
-
-            if model_message_parts:
-                conversation.append({"role": "assistant", "parts": model_message_parts})
-                self.session_service.save_conversation(self.session_id, conversation)
-                messages = self._format_conversation(conversation)
+            # Save assistant message
+            conversation.append(assistant_message)
+            self.session_service.save_conversation(self.session_id, conversation)
+            messages.append(assistant_message)
 
             # No function calls - check if task was completed
             if not response.function_calls:
@@ -226,21 +219,20 @@ class MinecraftSchematicAgent:
 
                 yield ActivityEvent(type="tool_result", data=tool_result)
 
-                serialized_responses.append(
-                    {
-                        "function_response": {
-                            "name": func_call.name,
-                            "response": tool_result,
-                            "id": getattr(func_call, "id", None)
-                            or f"call_{idx}",
-                        }
-                    }
-                )
+                # Build tool response in OpenAI format
+                tool_response = {
+                    "role": "tool",
+                    "tool_call_id": getattr(func_call, "id", None) or f"call_{idx}",
+                    "content": json.dumps(tool_result),
+                    "name": func_call.name,
+                }
+                serialized_responses.append(tool_response)
 
             if serialized_responses:
-                conversation.append({"role": "user", "parts": serialized_responses})
+                # Save tool responses
+                conversation.extend(serialized_responses)
                 self.session_service.save_conversation(self.session_id, conversation)
-                messages = self._format_conversation(conversation)
+                messages.extend(serialized_responses)
 
             # If task completed successfully, stop
             if task_completed:
@@ -253,86 +245,3 @@ class MinecraftSchematicAgent:
                     },
                 )
                 return
-
-    def _format_conversation(self, conversation: list[dict]) -> list[dict]:
-        """Convert stored conversation to OpenAI message format"""
-        messages: list[dict] = []
-        for message in conversation:
-            role = message.get("role")
-            role = "assistant" if role == "model" else role
-            parts = message.get("parts")
-
-            if not parts:
-                content = message.get("content", "")
-                if content:
-                    messages.append({"role": role, "content": content})
-                continue
-
-            if role == "assistant":
-                text_parts = [p["text"] for p in parts if "text" in p]
-                content = "\n".join(text_parts)
-                tool_calls = []
-                for idx, part in enumerate(parts):
-                    if "function_call" in part:
-                        call = part["function_call"]
-                        tool_calls.append(
-                            {
-                                "id": call.get("id") or f"call_{idx}",
-                                "type": "function",
-                                "function": {
-                                    "name": call.get("name"),
-                                    "arguments": json.dumps(call.get("args") or {}),
-                                },
-                            }
-                        )
-                msg = {"role": "assistant", "content": content}
-                if tool_calls:
-                    msg["tool_calls"] = tool_calls
-                if msg.get("content") or tool_calls:
-                    messages.append(msg)
-            elif role == "user":
-                for idx, part in enumerate(parts):
-                    if "text" in part:
-                        messages.append({"role": "user", "content": part["text"]})
-                    elif "function_response" in part:
-                        response = part["function_response"]
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": response.get("id")
-                                or f"call_{idx}",
-                                "content": json.dumps(response.get("response")),
-                                "name": response.get("name"),
-                            }
-                        )
-            else:
-                text_parts = [p["text"] for p in parts if "text" in p]
-                if text_parts:
-                    messages.append({"role": role, "content": "\n".join(text_parts)})
-
-        return messages
-
-    @staticmethod
-    def _encode_thought_signature(sig) -> str | None:
-        """Store thought signatures as base64 strings for JSON compatibility"""
-        if sig is None:
-            return None
-        try:
-            raw: bytes
-            if isinstance(sig, bytes):
-                raw = sig
-            else:
-                raw = str(sig).encode("utf-8")
-            return base64.b64encode(raw).decode("ascii")
-        except Exception:
-            return None
-
-    @staticmethod
-    def _decode_thought_signature(encoded: str | None):
-        """Decode base64 thought signatures back to bytes for Gemini"""
-        if not encoded:
-            return None
-        try:
-            return base64.b64decode(encoded)
-        except Exception:
-            return None
