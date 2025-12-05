@@ -41,12 +41,10 @@ Every script using this SDK should roughly follow this pattern:
    use these identifiers directly:
 
    - `Scene`
-   - `Group` / `Object3D`
+   - `Object3D`
    - `Block`
    - `Vector3`
    - `BlockCatalog`
-   - Composition helpers: `instantiate`, `box`, `hollow_box`, `column`,
-     `platform`, `stair_run`
    - Orientation helpers: `stair_properties`, `axis_properties`,
      `slab_properties`, `make_stair`, `facing_from_vector`
 
@@ -70,23 +68,23 @@ Every script using this SDK should roughly follow this pattern:
    )
    )
 
-   # Example wall of stone bricks (hollow box)
-   wall = hollow_box(
+   # Example wall of stone bricks
+   wall = Block(
        "minecraft:stone_bricks",
        size=(10, 4, 1),
        catalog=catalog,
    )
-   wall.translate(3, 1, 5)  # x, y, z
+   wall.position.set(3, 1, 5)  # x, y, z
    scene.add(wall)
 
-   # Example stair in front of the wall (prefab)
-   stairs = stair_run(
+   # Example stair in front of the wall
+   stair = Block(
        "minecraft:stone_brick_stairs",
-       length=1,
-       direction="south",
        catalog=catalog,
+       properties=stair_properties(facing="south"),
    )
-   scene.add(instantiate(stairs, offset=(7, 1, 4)))
+   stair.position.set(7, 1, 4)
+   scene.add(stair)
    ```
 
 4. **Export the structure**
@@ -103,10 +101,7 @@ Every script using this SDK should roughly follow this pattern:
 ## Core ideas
 
 - **Three.js‑flavored API**  
-  - `Scene`, `Group`, and `Object3D` support `position` and `add(…)`
-    (like Three.js).
-  - `Object3D` also supports `translate*`, `rotate_y` (90° steps), `mirror_x/z`,
-    `remove`, and `clone`.
+  - `Scene` and `Object3D` support `position` and `add(…)` (like Three.js).
   - `Block` represents a cuboid of one Minecraft block type, with a `size`
     (in blocks) and optional blockstate `properties`.
   - `Vector3` mirrors the common Three.js vector API for positions.
@@ -117,15 +112,12 @@ Every script using this SDK should roughly follow this pattern:
   - Coordinates are 0‑indexed; `start` is inclusive and `end` is exclusive.
 
 - **Block catalog and validation**  
-  - `BlockCatalog` knows the full set of valid block ids.
-  - `BlockCatalog` exposes allowed/required properties per block id and
-    validates every `Block` on construction.
+  - `BlockCatalog` knows the full set of valid block ids and validates every
+    `Block` on construction (including required properties).
   - Creating a `Block` with an unknown id raises an error, which helps catch
     typos early.
 
-- **Composition & orientation helpers**  
-  - Shape builders: `box`, `hollow_box`, `column`, `platform`, `stair_run`.
-  - `instantiate(obj, offset)` deep‑clones an Object3D hierarchy and offsets it.
+- **Orientation helpers**  
   - Many blocks are not simple cubes (stairs, slabs, logs, doors).
   - Helpers such as `stair_properties`, `axis_properties`, `slab_properties`,
     and `make_stair` map high‑level intent (e.g. “stair facing south,

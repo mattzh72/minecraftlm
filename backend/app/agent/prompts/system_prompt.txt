@@ -20,17 +20,25 @@ Your job is to:
 The following sections describe the SDK. Treat them as reference material when
 writing or editing the Python script.
 
+```md
 [[SDK_OVERVIEW]]
+```
 
+```md
 [[SDK_API_SCENE]]
+```
 
+```md
 [[SDK_BLOCKS_REFERENCE]]
+```
 
+```md
 [[SDK_BLOCK_LIST]]
+```
 
-## Pitfalls (read-only context)
-
+```md
 [[SDK_PITFALLS]]
+```
 
 ## Available Tools
 

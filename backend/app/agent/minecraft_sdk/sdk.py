@@ -204,88 +204,24 @@ class Object3D:
         self.children.extend(objects)
         return self
 
-    def remove(self, *objects: "Object3D") -> "Object3D":
-        for obj in objects:
-            if obj in self.children:
-                self.children.remove(obj)
-        return self
-
-    def translate(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> "Object3D":
-        self.position.translate(x, y, z)
-        return self
-
-    def translate_x(self, x: float) -> "Object3D":
-        return self.translate(x=x)
-
-    def translate_y(self, y: float) -> "Object3D":
-        return self.translate(y=y)
-
-    def translate_z(self, z: float) -> "Object3D":
-        return self.translate(z=z)
-
-    def _rotate_vec_y(self, vec: Vector3, quarters: int) -> Vector3:
-        q = quarters % 4
-        x, y, z = vec.x, vec.y, vec.z
-        for _ in range(q):
-            x, z = -z, x  # 90° CCW around Y
-        return Vector3(x, y, z)
-
-    def rotate_y(self, quarters: int = 1) -> "Object3D":
+    def _flatten_blocks(
+        self,
+        parent_offset: Optional[Vector3] = None,
+    ) -> List[Tuple["Block", Vector3]]:
         """
-        Rotate children positions around the Y axis in 90° steps.
-
-        Note: This adjusts positions only; it does not alter block-facing
-        properties. Use in combination with block-state helpers for full
-        orientation control.
+        Recursively collect all ``Block`` instances under this node, applying
+        hierarchical positions as world offsets.
         """
+        world_offset = (parent_offset or Vector3()).clone().add(self.position)
+        placements: List[Tuple["Block", Vector3]] = []
+
         for child in self.children:
-            child.position = self._rotate_vec_y(child.position, quarters)
-            if isinstance(child, Object3D):
-                child.rotate_y(quarters)
-        return self
+            if isinstance(child, Block):
+                placements.append((child, world_offset.added(child.position)))
+            elif isinstance(child, Object3D):
+                placements.extend(child._flatten_blocks(world_offset))
 
-    def mirror_x(self) -> "Object3D":
-        """Mirror children across the X=0 plane (negate X)."""
-        for child in self.children:
-            child.position.x *= -1
-            if isinstance(child, Object3D):
-                child.mirror_x()
-        return self
-
-    def mirror_z(self) -> "Object3D":
-        """Mirror children across the Z=0 plane (negate Z)."""
-        for child in self.children:
-            child.position.z *= -1
-            if isinstance(child, Object3D):
-                child.mirror_z()
-        return self
-
-    def traverse(self, fn) -> None:
-        """
-        Depth-first traversal. ``fn(obj)`` is called for this object and all
-        descendants.
-        """
-        fn(self)
-        for child in self.children:
-            if isinstance(child, Object3D):
-                child.traverse(fn)
-
-    def clone(self, deep: bool = True) -> "Object3D":
-        """
-        Shallow clone position; deep-clone children when requested.
-        """
-        new_obj = self.__class__()  # type: ignore[call-arg]
-        new_obj.position = self.position.clone()
-        if deep:
-            for child in self.children:
-                if isinstance(child, Object3D):
-                    new_obj.add(child.clone(deep=True))
-        return new_obj
-
-
-class Group(Object3D):
-    """Alias for grouping objects (keeps parity with Three.js)."""
-    pass
+        return placements
 
 
 class Block(Object3D):
@@ -350,30 +286,6 @@ class Scene(Object3D):
 
     def __init__(self) -> None:
         super().__init__()
-
-    def _flatten_blocks(
-        self,
-        parent_offset: Optional[Vector3] = None,
-    ) -> List[Tuple[Block, Vector3]]:
-        world_offset = (parent_offset or Vector3()).clone().add(self.position)
-        placements: List[Tuple[Block, Vector3]] = []
-
-        for child in self.children:
-            if isinstance(child, Block):
-                placements.append((child, world_offset.added(child.position)))
-            elif isinstance(child, Object3D):
-                if hasattr(child, "_flatten_blocks"):
-                    # Child is another Scene-like object
-                    placements.extend(child._flatten_blocks(world_offset))  # type: ignore[arg-type]
-                else:
-                    # Generic Object3D: descend manually
-                    for grandchild in child.children:
-                        if isinstance(grandchild, Block):
-                            placements.append(
-                                (grandchild, world_offset.added(grandchild.position))
-                            )
-
-        return placements
 
     def to_structure(
         self,
@@ -547,124 +459,3 @@ def make_stair(
 
 
 # --- Composition helpers ---
-
-def instantiate(obj: Object3D, offset: Sequence[float] = (0.0, 0.0, 0.0)) -> Object3D:
-    """
-    Deep-clone an Object3D hierarchy and optionally translate it by ``offset``.
-    """
-    clone = obj.clone(deep=True)
-    if offset and len(offset) == 3:
-        clone.translate(float(offset[0]), float(offset[1]), float(offset[2]))
-    return clone
-
-
-def box(
-    block_id: str,
-    *,
-    size: Sequence[int],
-    properties: Optional[Dict[str, str]] = None,
-    fill: bool = True,
-    catalog: Optional[BlockCatalog] = None,
-) -> Group:
-    """
-    Create a solid or hollow cuboid of a single block type as a Group.
-    """
-    grp = Group()
-    grp.add(
-        Block(
-            block_id,
-            size=size,
-            properties=properties,
-            fill=fill,
-            catalog=catalog,
-        )
-    )
-    return grp
-
-
-def hollow_box(
-    block_id: str,
-    *,
-    size: Sequence[int],
-    properties: Optional[Dict[str, str]] = None,
-    catalog: Optional[BlockCatalog] = None,
-) -> Group:
-    """
-    Shortcut for a hollow cuboid (i.e., faces only).
-    """
-    return box(
-        block_id,
-        size=size,
-        properties=properties,
-        fill=False,
-        catalog=catalog,
-    )
-
-
-def column(
-    block_id: str,
-    *,
-    height: int,
-    properties: Optional[Dict[str, str]] = None,
-    catalog: Optional[BlockCatalog] = None,
-) -> Group:
-    """Create a 1xH column."""
-    return box(
-        block_id,
-        size=(1, int(height), 1),
-        properties=properties,
-        fill=True,
-        catalog=catalog,
-    )
-
-
-def platform(
-    block_id: str,
-    *,
-    width: int,
-    depth: int,
-    properties: Optional[Dict[str, str]] = None,
-    catalog: Optional[BlockCatalog] = None,
-) -> Group:
-    """Create a 1-block-thick platform."""
-    return box(
-        block_id,
-        size=(int(width), 1, int(depth)),
-        properties=properties,
-        fill=True,
-        catalog=catalog,
-    )
-
-
-def stair_run(
-    block_id: str,
-    *,
-    length: int,
-    direction: str = "north",
-    upside_down: bool = False,
-    catalog: Optional[BlockCatalog] = None,
-) -> Group:
-    """
-    Create a straight run of stairs of the given length.
-
-    Note: rotates positions only; adjust block facing with ``direction``.
-    """
-    grp = Group()
-    facing = direction
-    for i in range(int(length)):
-        stair = make_stair(
-            block_id,
-            direction=facing,
-            upside_down=upside_down,
-            catalog=catalog,
-        )
-        if facing == "north":
-            stair.position.set(0, i, -i)
-        elif facing == "south":
-            stair.position.set(0, i, i)
-        elif facing == "east":
-            stair.position.set(i, i, 0)
-        else:  # west
-            stair.position.set(-i, i, 0)
-        grp.add(stair)
-    return grp

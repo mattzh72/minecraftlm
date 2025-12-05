@@ -78,13 +78,11 @@ class MinecraftSchematicAgent:
 
         docs_dir = Path(__file__).parent / "minecraft_sdk" / "docs"
         replacements = {
-            "[[SDK_OVERVIEW]]": (docs_dir / "01-overview.md").read_text(),
-            "[[SDK_API_SCENE]]": (docs_dir / "02-api-scene.md").read_text(),
-            "[[SDK_BLOCKS_REFERENCE]]": (
-                docs_dir / "03-blocks-reference.md"
-            ).read_text(),
-            "[[SDK_BLOCK_LIST]]": (docs_dir / "04-block-list.md").read_text(),
-            "[[SDK_PITFALLS]]": (docs_dir / "05-pitfalls.md").read_text(),
+            "[[SDK_OVERVIEW]]": f"01-overview.md\n\n{(docs_dir / '01-overview.md').read_text()}",
+            "[[SDK_API_SCENE]]": f"02-api-scene.md\n\n{(docs_dir / '02-api-scene.md').read_text()}",
+            "[[SDK_BLOCKS_REFERENCE]]": f"03-blocks-reference.md\n\n{(docs_dir / '03-blocks-reference.md').read_text()}",
+            "[[SDK_BLOCK_LIST]]": f"04-block-list.md\n\n{(docs_dir / '04-block-list.md').read_text()}",
+            "[[SDK_PITFALLS]]": f"05-pitfalls.md\n\n{(docs_dir / '05-pitfalls.md').read_text()}",
         }
         for marker, text in replacements.items():
             template = template.replace(marker, text)

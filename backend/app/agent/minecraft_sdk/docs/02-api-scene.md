@@ -70,20 +70,8 @@ obj.add(child)
   - `children: Object3D[]` – list of children.
 - Methods:
   - `add(...objects: Object3D[])` – append children, returns `this`.
-  - `remove(...objects: Object3D[])` – remove children if present.
-  - `translate(x=0, y=0, z=0)` / `translateX` / `translateY` / `translateZ`.
-  - `rotate_y(quarters=1)` – rotate children positions around Y in 90° steps.
-  - `mirror_x()` / `mirror_z()` – mirror children across the given plane.
-  - `clone(deep=True)` – deep-clone the node and descendants.
-  - `traverse(fn)` – depth‑first traversal (`fn(obj)` for each node).
 
 `Scene` and `Block` both extend `Object3D`.
-
-## `Group`
-
-`Group` is an alias of `Object3D` meant for reusable subassemblies. Clone and
-offset groups with `instantiate(...)` to stamp patterns (e.g., a tower, a
-stair run, or a decorative module) across your scene.
 
 ## `Block`
 
@@ -136,26 +124,6 @@ wall = Block(
 wall.position = Vector3(3, 1, 5)
 scene.add(wall)
 ```
-
-- Cloning: `block.clone()` copies size/properties/fill/position.
-
-## Composition helpers (Three.js-style building blocks)
-
-Use these helpers to assemble reusable shapes and stamp them around your scene:
-
-- `instantiate(obj, offset=(0,0,0))` – deep‑clone any `Object3D` (or `Group`)
-  and translate the clone by `offset`.
-- `box(block_id, size=(w,h,d), fill=True, ...)` – solid cuboid as a `Group`.
-- `hollow_box(block_id, size=(w,h,d), ...)` – faces‑only cuboid as a `Group`.
-- `column(block_id, height=H, ...)` – 1×H column.
-- `platform(block_id, width=W, depth=D, ...)` – 1‑thick platform.
-- `stair_run(block_id, length=N, direction="north", upside_down=False, ...)` –
-  straight staircase built from oriented stair blocks.
-
-Transforms such as `rotate_y` and `mirror_x/z` adjust child positions only;
-they do not change blockstate properties. Combine them with orientation
-helpers (e.g., `stair_properties`) when you need both position and facing to
-change.
 
 ## `Scene`
 
