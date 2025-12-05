@@ -33,9 +33,14 @@ function App() {
     restoreSession(id);
   };
 
-  const handleCreateNew = async () => {
+  const handleCreateNew = async (initialMessage = null) => {
     setShowProjects(false);
-    await createSession();
+    const newSessionId = await createSession();
+
+    // Store initial message in sessionStorage if provided
+    if (initialMessage && newSessionId) {
+      sessionStorage.setItem(`initial_message_${newSessionId}`, initialMessage);
+    }
   };
 
   const handleBackToProjects = () => {
@@ -115,7 +120,7 @@ function App() {
             textAlign: 'center',
             color: '#666',
           }}>
-            <h2>Minecraft Schematic Generator</h2>
+            <h2>MinecraftLM</h2>
             <p>
               {isLoading
                 ? 'Loading session...'

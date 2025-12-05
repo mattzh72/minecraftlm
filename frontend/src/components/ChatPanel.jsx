@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import useSessionStore from '../store/sessionStore';
 import useAutoScroll from '../hooks/useAutoScroll';
+import useInitialMessage from '../hooks/useInitialMessage';
 
 export default function ChatPanel() {
   const sessionId = useSessionStore((state) => state.sessionId);
@@ -13,6 +14,18 @@ export default function ChatPanel() {
 
   // Ref to accumulate activities during streaming (avoids StrictMode double-invoke issues)
   const activitiesRef = useRef([]);
+  const abortControllerRef = useRef(null);
+  const requestIdRef = useRef(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Restore messages from conversation when session is loaded
   useEffect(() => {
@@ -75,10 +88,12 @@ export default function ChatPanel() {
 
   const messagesEndRef = useAutoScroll([messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || !sessionId || isLoading) return;
+  const handleSend = useCallback(async (messageText = null) => {
+    // Use provided message or input state
+    const userMessage = messageText || input;
 
-    const userMessage = input;
+    if (!userMessage.trim() || !sessionId || isLoading) return;
+
     setInput('');
 
     // Add user message and empty agent message
@@ -88,7 +103,15 @@ export default function ChatPanel() {
       { role: 'agent', activities: [] }
     ];
     setMessages(newMessages);
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     setIsLoading(true);
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     // Reset activities ref for this streaming session
     activitiesRef.current = [];
@@ -118,7 +141,12 @@ export default function ChatPanel() {
           session_id: sessionId,
           message: userMessage,
         }),
+        signal: abortController.signal,
       });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`Chat request failed: ${response.status}`);
+      }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -191,16 +219,25 @@ export default function ChatPanel() {
       }
     } catch (error) {
       console.error('Chat error:', error);
-      setMessages(prev => [...prev, {
-        role: 'error',
-        content: `Error: ${error.message}`
-      }]);
+      if (isMountedRef.current && requestIdRef.current === requestId) {
+        setMessages(prev => [...prev, {
+          role: 'error',
+          content: error.name === 'AbortError'
+            ? 'Request was cancelled.'
+            : `Error: ${error.message}`
+        }]);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current && requestIdRef.current === requestId) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [sessionId, isLoading, input, messages, setStructureData]);
 
-  const handleKeyPress = (e) => {
+  // Handle initial message from homepage chat bar
+  useInitialMessage(sessionId, messages.length, isLoading, handleSend);
+
+  const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -329,7 +366,7 @@ export default function ChatPanel() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyDown}
           placeholder="Describe your Minecraft structure..."
           disabled={isLoading || !sessionId}
           style={{

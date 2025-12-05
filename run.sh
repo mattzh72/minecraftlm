@@ -1,13 +1,23 @@
 #!/bin/bash
-# Build and run the Minecraft Schematic Generator
+# Run the Minecraft Schematic Generator in development mode with hot reload
 
 set -e
 
-echo "Building frontend..."
+# Cleanup function to kill background processes
+cleanup() {
+    echo "Shutting down..."
+    kill $FRONTEND_PID 2>/dev/null || true
+    exit 0
+}
+
+trap cleanup SIGINT SIGTERM
+
+echo "Starting frontend dev server..."
 cd frontend
-npm run build
+npm run dev &
+FRONTEND_PID=$!
 cd ..
 
-echo "Starting server..."
+echo "Starting backend dev server..."
 cd backend
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --reload --reload-exclude 'storage/*' --host 0.0.0.0 --port 8000

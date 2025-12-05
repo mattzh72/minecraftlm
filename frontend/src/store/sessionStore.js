@@ -14,6 +14,9 @@ const useSessionStore = create((set, get) => ({
       const response = await fetch('/api/sessions', {
         method: 'POST',
       });
+      if (!response.ok) {
+        throw new Error(`Failed to create session: ${response.status}`);
+      }
       const data = await response.json();
       set({ sessionId: data.session_id, conversation: [] });
 

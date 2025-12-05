@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import useSessionStore from '../store/sessionStore';
 import useDeepslateResources from '../hooks/useDeepslateResources';
 import useCamera from '../hooks/useCamera';
@@ -36,6 +36,27 @@ export default function MinecraftViewer() {
   // Keyboard controls (WASD/arrows to move)
   useKeyboardControls(camera, render);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const resizeCanvas = () => {
+      const { clientWidth, clientHeight } = canvas;
+      if (clientWidth > 0 && clientHeight > 0) {
+        canvas.width = clientWidth;
+        canvas.height = clientHeight;
+        requestRender();
+      }
+    };
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, [canvasRef, requestRender]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -71,8 +92,6 @@ export default function MinecraftViewer() {
   return (
     <canvas
       ref={canvasRef}
-      width={window.innerWidth * 0.7}
-      height={window.innerHeight}
       style={{ width: '100%', height: '100%', display: 'block' }}
     />
   );

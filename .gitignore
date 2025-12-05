@@ -13,6 +13,8 @@ __pycache__/
 CLAUDE.md
 AGENTS.md
 
+deepslate/
+
 # Distribution / packaging
 .Python
 build/

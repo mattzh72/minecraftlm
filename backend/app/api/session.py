@@ -43,13 +43,31 @@ async def list_sessions():
                     except (json.JSONDecodeError, IOError):
                         pass
 
+                # Load metadata for timestamps
+                metadata_path = session_dir / "metadata.json"
+                created_at = None
+                updated_at = None
+                if metadata_path.exists():
+                    try:
+                        with open(metadata_path, "r") as f:
+                            metadata = json.load(f)
+                            created_at = metadata.get("created_at")
+                            updated_at = metadata.get("updated_at")
+                    except (json.JSONDecodeError, IOError):
+                        pass
+
                 sessions.append(
                     {
                         "session_id": session_id,
                         "has_structure": has_structure,
                         "message_count": message_count,
+                        "created_at": created_at,
+                        "updated_at": updated_at,
                     }
                 )
+
+    # Sort by updated_at (most recent first)
+    sessions.sort(key=lambda s: s.get("updated_at") or "", reverse=True)
 
     return JSONResponse(content={"sessions": sessions})
 
