@@ -18,6 +18,7 @@ from app.agent.tools.registry import ToolRegistry
 
 ActivityEventType = Literal[
     "thought",
+    "text_delta",
     "tool_call",
     "tool_result",
     "complete",
@@ -83,6 +84,7 @@ class MinecraftSchematicAgent:
                 docs_dir / "03-blocks-reference.md"
             ).read_text(),
             "[[SDK_BLOCK_LIST]]": (docs_dir / "04-block-list.md").read_text(),
+            "[[SDK_PITFALLS]]": (docs_dir / "05-pitfalls.md").read_text(),
         }
         for marker, text in replacements.items():
             template = template.replace(marker, text)
@@ -129,92 +131,137 @@ class MinecraftSchematicAgent:
 
             turn_count += 1
 
-            # Call model with tools
+            # Call model with tools (streaming)
             yield ActivityEvent(type="turn_start", data={"turn": turn_count})
 
-            response = await self.llm.generate_with_tools(
+            # Accumulators for streaming response
+            accumulated_text = ""
+            accumulated_tool_calls = {}  # index -> tool call dict
+
+            # Stream response chunks
+            async for chunk in self.llm.generate_with_tools_streaming(
                 self.system_prompt,
                 messages,
                 self.tool_registry.get_tool_schemas(),
-            )
+            ):
+                # Handle text delta
+                if chunk.text_delta:
+                    accumulated_text += chunk.text_delta
+                    yield ActivityEvent(
+                        type="text_delta", data={"delta": chunk.text_delta}
+                    )
 
-            # Build assistant message in OpenAI format
-            assistant_message = {"role": "assistant", "content": response.text or ""}
+                # Handle tool calls delta
+                if chunk.tool_calls_delta:
+                    for tc_delta in chunk.tool_calls_delta:
+                        idx = tc_delta.get("index", 0)
+                        if idx not in accumulated_tool_calls:
+                            accumulated_tool_calls[idx] = {
+                                "id": tc_delta.get("id", ""),
+                                "type": tc_delta.get("type", "function"),
+                                "function": {"name": "", "arguments": ""},
+                            }
 
-            # Handle response text (thoughts/reasoning)
-            if response.text:
-                yield ActivityEvent(type="thought", data={"text": response.text})
+                        # Accumulate function name
+                        if tc_delta.get("function", {}).get("name"):
+                            accumulated_tool_calls[idx]["function"][
+                                "name"
+                            ] = tc_delta["function"]["name"]
+
+                        # Accumulate function arguments
+                        if tc_delta.get("function", {}).get("arguments"):
+                            accumulated_tool_calls[idx]["function"][
+                                "arguments"
+                            ] += tc_delta["function"]["arguments"]
+
+                        # Update ID if provided
+                        if tc_delta.get("id"):
+                            accumulated_tool_calls[idx]["id"] = tc_delta["id"]
+
+            # Build assistant message from accumulated data
+            assistant_message = {"role": "assistant", "content": accumulated_text}
+
+            # Note: We don't yield a final 'thought' event here since we've been
+            # streaming text_delta events. The frontend accumulates those into a thought.
 
             # Add tool calls to message
-            if response.function_calls:
-                tool_calls = []
-                for idx, func_call in enumerate(response.function_calls):
-                    tool_calls.append({
-                        "id": getattr(func_call, "id", None) or f"call_{idx}",
-                        "type": "function",
-                        "function": {
-                            "name": func_call.name,
-                            "arguments": json.dumps(dict(func_call.args) if func_call.args else {}),
-                        },
-                    })
-                assistant_message["tool_calls"] = tool_calls
+            tool_calls_list = list(accumulated_tool_calls.values())
+            if tool_calls_list:
+                assistant_message["tool_calls"] = tool_calls_list
 
             # Save assistant message
             conversation.append(assistant_message)
             self.session_service.save_conversation(self.session_id, conversation)
             messages.append(assistant_message)
 
-            # No function calls - check if task was completed
-            if not response.function_calls:
-                # Protocol violation - agent should call complete_task
-                yield ActivityEvent(
-                    type="complete",
-                    data={
-                        "success": False,
-                        "reason": TerminateReason.NO_COMPLETE_TASK,
-                        "message": "Agent stopped without calling complete_task",
-                    },
-                )
-                return
+            # No function calls - agent responded with content only
+            if not tool_calls_list:
+                # If agent responds with content only (no tool calls), treat this as
+                # a conversational response and end the loop successfully
+                if accumulated_text.strip():
+                    yield ActivityEvent(
+                        type="complete",
+                        data={
+                            "success": True,
+                            "reason": TerminateReason.GOAL,
+                            "message": "Agent responded with message",
+                        },
+                    )
+                    return
+                else:
+                    # No content and no tool calls - protocol violation
+                    yield ActivityEvent(
+                        type="complete",
+                        data={
+                            "success": False,
+                            "reason": TerminateReason.NO_COMPLETE_TASK,
+                            "message": "Agent stopped without content or tool calls",
+                        },
+                    )
+                    return
 
             # Process function calls
             task_completed = False
             serialized_responses = []
 
-            for idx, func_call in enumerate(response.function_calls):
+            for tool_call in tool_calls_list:
+                # Parse tool call
+                func_name = tool_call["function"]["name"]
+                func_args = json.loads(tool_call["function"]["arguments"])
+
                 yield ActivityEvent(
                     type="tool_call",
-                    data={"name": func_call.name, "args": func_call.args},
+                    data={"name": func_name, "args": func_args},
                 )
 
                 # Check if edit_code requires prior read
-                if func_call.name == "edit_code" and not self.code_read_since_edit:
+                if func_name == "edit_code" and not self.code_read_since_edit:
                     tool_result = {
                         "error": "You must read the code first before editing. Use read_code to see the current file contents."
                     }
                 else:
                     # Execute tool - inject session_id automatically
-                    tool_params = dict(func_call.args) if func_call.args else {}
+                    tool_params = dict(func_args) if func_args else {}
                     tool_params["session_id"] = self.session_id
 
                     invocation = await self.tool_registry.build_invocation(
-                        func_call.name, tool_params
+                        func_name, tool_params
                     )
 
                     if not invocation:
-                        tool_result = {"error": f"Tool {func_call.name} not found"}
+                        tool_result = {"error": f"Tool {func_name} not found"}
                     else:
                         result = await invocation.execute()
                         tool_result = result.to_dict()
 
                         # Update read/edit tracking
-                        if func_call.name == "read_code" and result.is_success():
+                        if func_name == "read_code" and result.is_success():
                             self.code_read_since_edit = True
-                        elif func_call.name == "edit_code" and result.is_success():
+                        elif func_name == "edit_code" and result.is_success():
                             self.code_read_since_edit = False
 
                         # Check if this is complete_task
-                        if func_call.name == "complete_task" and result.is_success():
+                        if func_name == "complete_task" and result.is_success():
                             task_completed = True
 
                 yield ActivityEvent(type="tool_result", data=tool_result)
@@ -222,9 +269,9 @@ class MinecraftSchematicAgent:
                 # Build tool response in OpenAI format
                 tool_response = {
                     "role": "tool",
-                    "tool_call_id": getattr(func_call, "id", None) or f"call_{idx}",
+                    "tool_call_id": tool_call.get("id", ""),
                     "content": json.dumps(tool_result),
-                    "name": func_call.name,
+                    "name": func_name,
                 }
                 serialized_responses.append(tool_response)
 

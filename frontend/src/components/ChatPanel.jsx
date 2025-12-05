@@ -138,7 +138,16 @@ export default function ChatPanel() {
 
               let activity = null;
 
-              if (data.type === 'thought') {
+              if (data.type === 'text_delta') {
+                // Append to the last thought activity or create new one
+                const lastActivity = activitiesRef.current[activitiesRef.current.length - 1];
+                if (lastActivity && lastActivity.type === 'thought') {
+                  lastActivity.content += data.data.delta;
+                } else {
+                  activitiesRef.current.push({ type: 'thought', content: data.data.delta });
+                }
+                hasNewActivity = true;
+              } else if (data.type === 'thought') {
                 activity = { type: 'thought', content: data.data.text };
               } else if (data.type === 'tool_call') {
                 activity = { type: 'tool_call', name: data.data.name, args: data.data.args };

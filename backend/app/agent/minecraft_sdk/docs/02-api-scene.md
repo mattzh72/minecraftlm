@@ -196,6 +196,7 @@ scene.add(
     Block(
         "minecraft:grass_block",
         size=(16, 1, 16),
+        properties={"snowy": "false"},  # grass needs explicit snowy state
         catalog=catalog,
     )
 )
@@ -231,5 +232,8 @@ scene.add(stair)
 # Export and assign to top-level variable
 structure = scene.to_structure(padding=0)
 ```
+
+Note: `minecraft:grass_block` has only `snowy=true|false` variants in the assets;
+set `snowy` explicitly (usually `"false"`) or the renderer may drop the block.
 
 For block‑specific configuration (stairs, slabs, logs, doors, etc.) see `03-blocks-reference.md`.

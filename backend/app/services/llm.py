@@ -32,6 +32,15 @@ class ModelResponse:
     finish_reason: str | None
 
 
+@dataclass
+class StreamChunk:
+    """A single streaming chunk"""
+
+    text_delta: str | None = None
+    tool_calls_delta: list[dict] | None = None
+    finish_reason: str | None = None
+
+
 class LLMService:
     """Provider-agnostic LLM service using LiteLLM"""
 
@@ -49,14 +58,14 @@ class LLMService:
         if settings.gemini_api_key:
             os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
 
-    async def generate_with_tools(
+    async def generate_with_tools_streaming(
         self,
         system_prompt: str,
         messages: list[dict],
         tools: list[dict],
-    ) -> ModelResponse:
+    ):
         """
-        Call LLM with function/tool calling enabled.
+        Call LLM with function/tool calling enabled, streaming response.
 
         Args:
             system_prompt: System instructions
@@ -64,53 +73,59 @@ class LLMService:
                 [{"role": "user"|"assistant"|"tool", "content": str, ...}]
             tools: Available tools in OpenAI function calling format
 
-        Returns:
-            ModelResponse with text and/or function_calls
+        Yields:
+            StreamChunk with text deltas, tool call deltas, or finish reason
         """
+        import json
+
         # Build messages with system prompt
         full_messages = [{"role": "system", "content": system_prompt}] + messages
 
-        # Call LiteLLM (async version)
+        # Call LiteLLM with streaming enabled
         response = await litellm.acompletion(
             model=self.model,
             messages=full_messages,
             tools=tools,
             temperature=1.0,
+            stream=True,
         )
 
-        # Extract response
-        choice = response.choices[0]
-        message = choice.message
+        # Stream chunks
+        async for chunk in response:
+            if not chunk.choices:
+                continue
 
-        # Log raw tool calls to detect duplicates at source
-        if message.tool_calls:
-            logger.info(f"Raw tool_calls from model: {len(message.tool_calls)} calls")
-            for i, tc in enumerate(message.tool_calls):
-                logger.info(f"  [{i}] {tc.function.name}: {tc.function.arguments[:100] if tc.function.arguments else 'no args'}...")
+            delta = chunk.choices[0].delta
+            finish_reason = chunk.choices[0].finish_reason
 
-        # Extract text
-        text = message.content
+            # Extract text delta
+            text_delta = delta.content if hasattr(delta, "content") else None
 
-        # Extract function calls
-        function_calls = None
-        if message.tool_calls:
-            function_calls = []
-            for tool_call in message.tool_calls:
-                func = tool_call.function
-                # Parse args from JSON string
-                import json
-
-                args = json.loads(func.arguments) if func.arguments else {}
-                function_calls.append(
-                    FunctionCall(
-                        name=func.name,
-                        args=args,
-                        id=tool_call.id,
+            # Extract tool calls delta
+            tool_calls_delta = None
+            if hasattr(delta, "tool_calls") and delta.tool_calls:
+                tool_calls_delta = []
+                for tc_delta in delta.tool_calls:
+                    tool_calls_delta.append(
+                        {
+                            "index": tc_delta.index if hasattr(tc_delta, "index") else None,
+                            "id": tc_delta.id if hasattr(tc_delta, "id") else None,
+                            "type": tc_delta.type if hasattr(tc_delta, "type") else None,
+                            "function": {
+                                "name": tc_delta.function.name
+                                if hasattr(tc_delta, "function")
+                                and hasattr(tc_delta.function, "name")
+                                else None,
+                                "arguments": tc_delta.function.arguments
+                                if hasattr(tc_delta, "function")
+                                and hasattr(tc_delta.function, "arguments")
+                                else None,
+                            },
+                        }
                     )
-                )
 
-        return ModelResponse(
-            text=text,
-            function_calls=function_calls,
-            finish_reason=choice.finish_reason,
-        )
+            yield StreamChunk(
+                text_delta=text_delta,
+                tool_calls_delta=tool_calls_delta,
+                finish_reason=finish_reason,
+            )

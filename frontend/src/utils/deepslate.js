@@ -15,11 +15,17 @@ function upperPowerOfTwo(x) {
   return x + 1;
 }
 
-export function loadDeepslateResources(textureImage, assets) {
+const normalizeId = (id) => {
+  if (!id) return "";
+  if (typeof id === "string") return id;
+  if (typeof id.toString === "function") return id.toString();
+  return String(id);
+};
+
+export function loadDeepslateResources(textureImage, assets, blockFlags = {}) {
   const blockDefinitions = {};
   Object.keys(assets.blockstates).forEach((id) => {
     blockDefinitions["minecraft:" + id] = window.deepslate.BlockDefinition.fromJson(
-      id,
       assets.blockstates[id]
     );
   });
@@ -27,13 +33,16 @@ export function loadDeepslateResources(textureImage, assets) {
   const blockModels = {};
   Object.keys(assets.models).forEach((id) => {
     blockModels["minecraft:" + id] = window.deepslate.BlockModel.fromJson(
-      id,
       assets.models[id]
     );
   });
-  Object.values(blockModels).forEach((m) =>
-    m.flatten({ getBlockModel: (id) => blockModels[id] })
-  );
+  const blockModelAccessor = {
+    getBlockModel(identifier) {
+      const key = normalizeId(identifier);
+      return blockModels[key] ?? null;
+    },
+  };
+  Object.values(blockModels).forEach((m) => m.flatten(blockModelAccessor));
 
   const atlasCanvas = document.createElement("canvas");
   const atlasSize = upperPowerOfTwo(
@@ -60,12 +69,16 @@ export function loadDeepslateResources(textureImage, assets) {
 
   const textureAtlas = new window.deepslate.TextureAtlas(atlasData, idMap);
 
+  const opaqueBlocks = blockFlags.opaque ?? new Set();
+  const transparentBlocks = blockFlags.transparent ?? new Set();
+  const nonSelfCullingBlocks = blockFlags.nonSelfCulling ?? new Set();
+
   deepslateResources = {
     getBlockDefinition(id) {
-      return blockDefinitions[id];
+      return blockDefinitions[normalizeId(id)];
     },
     getBlockModel(id) {
-      return blockModels[id];
+      return blockModels[normalizeId(id)];
     },
     getTextureUV(id) {
       return textureAtlas.getTextureUV(id);
@@ -74,7 +87,16 @@ export function loadDeepslateResources(textureImage, assets) {
       return textureAtlas.getTextureAtlas();
     },
     getBlockFlags(id) {
-      return { opaque: false };
+      const key = normalizeId(id);
+      const isTransparent = transparentBlocks.has(key);
+      const isOpaque = !isTransparent && opaqueBlocks.has(key);
+      const isNonSelfCulling = nonSelfCullingBlocks.has(key);
+
+      return {
+        opaque: isOpaque,
+        semi_transparent: isTransparent,
+        self_culling: !isNonSelfCulling,
+      };
     },
     getBlockProperties(id) {
       return null;

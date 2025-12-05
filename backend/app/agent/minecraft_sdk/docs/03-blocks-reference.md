@@ -40,7 +40,7 @@ Many blocks are simple cubes that look the same from all directions (planks, sto
   - `minecraft:oak_planks`
   - `minecraft:glass`
   - `minecraft:bricks`
-  - `minecraft:grass_block` (may have a `snowy` property)
+  - `minecraft:grass_block` (requires a `snowy` property)
 
 Use them directly:
 
@@ -48,7 +48,18 @@ Use them directly:
 Block("minecraft:stone", size=(4, 1, 4), catalog=catalog)
 ```
 
-Some “simple” blocks still expose minor properties (e.g. `grass_block` has `snowy=true|false`). In most cases you can ignore these unless you specifically want a variant.
+Some “simple” blocks still expose minor properties. `minecraft:grass_block`
+has only the `snowy=true|false` variants in the assets, so you **must** set it
+explicitly—use `snowy="false"` for normal green grass:
+
+```python
+Block(
+    "minecraft:grass_block",
+    size=(16, 1, 16),
+    properties={"snowy": "false"},
+    catalog=catalog,
+)
+```
 
 ## Logs and pillars (`axis` property)
 

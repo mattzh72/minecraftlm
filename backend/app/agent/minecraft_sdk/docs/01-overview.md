@@ -60,11 +60,12 @@ Every script using this SDK should roughly follow this pattern:
    ```python
    # Example ground plane (16×1×16 grass)
    scene.add(
-       Block(
-           "minecraft:grass_block",
-           size=(16, 1, 16),
-           catalog=catalog,
-       )
+   Block(
+       "minecraft:grass_block",
+       size=(16, 1, 16),
+       properties={"snowy": "false"},  # grass_block requires snowy=true|false
+       catalog=catalog,
+   )
    )
 
    # Example wall of stone bricks
@@ -93,6 +94,9 @@ Every script using this SDK should roughly follow this pattern:
    ```
 
    The runtime will read the `structure` variable from your script.
+
+   Note: `minecraft:grass_block` requires a `snowy` blockstate. Use
+   `properties={"snowy": "false"}` for normal green grass.
 
 ## Core ideas
 
