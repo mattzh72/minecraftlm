@@ -15,11 +15,18 @@ structure using the Minecraft SDK.
 from app.agent.minecraft_sdk import (
     Scene,
     Block,
+    Group,
     Vector3,
     BlockCatalog,
     stair_properties,
     axis_properties,
     slab_properties,
+    instantiate,
+    box,
+    hollow_box,
+    column,
+    platform,
+    stair_run,
     make_stair,
     facing_from_vector,
 )
@@ -36,28 +43,28 @@ def build_structure() -> dict:
     """
     catalog = BlockCatalog()
     scene = Scene()
+    # group = Group()  # Use Group for reusable subassemblies
 
     # TODO: Add Block instances to the scene, e.g.:
     #
-    # ground = Block("minecraft:grass_block", size=(16, 1, 16), catalog=catalog)
+    # ground = platform("minecraft:grass_block", width=16, depth=16, catalog=catalog)
     # scene.add(ground)
     #
-    # walls = Block(
+    # walls = hollow_box(
     #     "minecraft:oak_planks",
     #     size=(12, 4, 12),
-    #     fill=False,
     #     catalog=catalog,
     # )
-    # walls.position.set(2, 1, 2)
+    # walls.translate(2, 1, 2)
     # scene.add(walls)
     #
-    # stair = Block(
+    # stairs = stair_run(
     #     "minecraft:oak_stairs",
+    #     length=4,
+    #     direction="south",
     #     catalog=catalog,
-    #     properties=stair_properties(facing="south"),
     # )
-    # stair.position.set(8, 1, 1)
-    # scene.add(stair)
+    # scene.add(instantiate(stairs, offset=(8, 1, 1)))
 
     structure = scene.to_structure(padding=0)
     return structure

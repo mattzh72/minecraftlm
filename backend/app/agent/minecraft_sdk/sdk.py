@@ -31,7 +31,7 @@ The exported structure dictionary has the form::
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from app.agent.minecraft_sdk.assets import LegacyAssets, _normalize_block_id
 
@@ -48,14 +48,28 @@ class BlockCatalog:
         return self._assets.block_ids
 
     @property
-    def opaque_blocks(self) -> set[str]:
-        """Block ids that should be treated as opaque for rendering."""
-        return self._assets.opaque_blocks
-
-    @property
     def assets(self) -> dict[str, Any]:
         """Raw decoded ``assets`` object (blockstates, models, textures)."""
         return self._assets.assets
+
+    @property
+    def block_properties(self) -> Dict[str, Dict[str, Tuple[str, ...]]]:
+        """
+        Mapping of block id -> property name -> allowed values.
+
+        Example::
+
+            catalog.block_properties["minecraft:oak_log"] == {"axis": ("x", "y", "z")}
+        """
+        return self._assets.block_properties
+
+    @property
+    def required_properties(self) -> Dict[str, Tuple[str, ...]]:
+        """
+        Mapping of block id -> tuple of property names that are inferred to be
+        required / intrinsic for that block's state.
+        """
+        return self._assets.required_properties
 
     def assert_valid(self, block_id: str) -> str:
         """
@@ -72,9 +86,59 @@ class BlockCatalog:
             )
         return normalized
 
-    def is_opaque(self, block_id: str) -> bool:
-        return self._assets.is_opaque(block_id)
+    def assert_properties(
+        self,
+        block_id: str,
+        properties: Mapping[str, str],
+    ) -> Dict[str, str]:
+        """
+        Validate properties for a given block id.
 
+        - Ensures all provided property names are known for that block.
+        - Ensures all values are among the allowed discrete values.
+        - Ensures all required properties (inferred from blockstate variants)
+          are present.
+        """
+        normalized = _normalize_block_id(block_id)
+        schema = self.block_properties.get(normalized, {})
+        required = set(self.required_properties.get(normalized, ()))
+
+        # Blocks with no schema should not receive any properties.
+        if not schema and properties:
+            raise ValueError(
+                f'Block "{normalized}" does not take any properties, '
+                f"but got: {', '.join(sorted(properties.keys()))}."
+            )
+
+        unknown = [name for name in properties.keys() if name not in schema]
+        if unknown:
+            allowed = ", ".join(sorted(schema.keys()))
+            detail = f"Allowed properties: {allowed}." if allowed else "This block takes no properties."
+            raise ValueError(
+                f'Invalid properties for "{normalized}": {", ".join(sorted(unknown))}. {detail}'
+            )
+
+        invalid_values: List[str] = []
+        for name, value in properties.items():
+            allowed_values = schema.get(name)
+            if allowed_values and value not in allowed_values:
+                invalid_values.append(
+                    f'{name}="{value}" (expected one of: {", ".join(allowed_values)})'
+                )
+        if invalid_values:
+            raise ValueError(
+                f'Invalid property values for "{normalized}": '
+                + "; ".join(invalid_values)
+            )
+
+        missing = [name for name in sorted(required) if name not in properties]
+        if missing:
+            raise ValueError(
+                f'Block "{normalized}" is missing required properties: '
+                f"{', '.join(missing)}."
+            )
+
+        return dict(properties)
 
 @dataclass
 class Vector3:
@@ -105,6 +169,21 @@ class Vector3:
     def to_tuple(self) -> Tuple[float, float, float]:
         return (self.x, self.y, self.z)
 
+    def translate(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> "Vector3":
+        self.x += x
+        self.y += y
+        self.z += z
+        return self
+
+    def translate_x(self, x: float) -> "Vector3":
+        return self.translate(x=x)
+
+    def translate_y(self, y: float) -> "Vector3":
+        return self.translate(y=y)
+
+    def translate_z(self, z: float) -> "Vector3":
+        return self.translate(z=z)
+
 
 class Object3D:
     """
@@ -124,6 +203,89 @@ class Object3D:
     def add(self, *objects: "Object3D") -> "Object3D":
         self.children.extend(objects)
         return self
+
+    def remove(self, *objects: "Object3D") -> "Object3D":
+        for obj in objects:
+            if obj in self.children:
+                self.children.remove(obj)
+        return self
+
+    def translate(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> "Object3D":
+        self.position.translate(x, y, z)
+        return self
+
+    def translate_x(self, x: float) -> "Object3D":
+        return self.translate(x=x)
+
+    def translate_y(self, y: float) -> "Object3D":
+        return self.translate(y=y)
+
+    def translate_z(self, z: float) -> "Object3D":
+        return self.translate(z=z)
+
+    def _rotate_vec_y(self, vec: Vector3, quarters: int) -> Vector3:
+        q = quarters % 4
+        x, y, z = vec.x, vec.y, vec.z
+        for _ in range(q):
+            x, z = -z, x  # 90° CCW around Y
+        return Vector3(x, y, z)
+
+    def rotate_y(self, quarters: int = 1) -> "Object3D":
+        """
+        Rotate children positions around the Y axis in 90° steps.
+
+        Note: This adjusts positions only; it does not alter block-facing
+        properties. Use in combination with block-state helpers for full
+        orientation control.
+        """
+        for child in self.children:
+            child.position = self._rotate_vec_y(child.position, quarters)
+            if isinstance(child, Object3D):
+                child.rotate_y(quarters)
+        return self
+
+    def mirror_x(self) -> "Object3D":
+        """Mirror children across the X=0 plane (negate X)."""
+        for child in self.children:
+            child.position.x *= -1
+            if isinstance(child, Object3D):
+                child.mirror_x()
+        return self
+
+    def mirror_z(self) -> "Object3D":
+        """Mirror children across the Z=0 plane (negate Z)."""
+        for child in self.children:
+            child.position.z *= -1
+            if isinstance(child, Object3D):
+                child.mirror_z()
+        return self
+
+    def traverse(self, fn) -> None:
+        """
+        Depth-first traversal. ``fn(obj)`` is called for this object and all
+        descendants.
+        """
+        fn(self)
+        for child in self.children:
+            if isinstance(child, Object3D):
+                child.traverse(fn)
+
+    def clone(self, deep: bool = True) -> "Object3D":
+        """
+        Shallow clone position; deep-clone children when requested.
+        """
+        new_obj = self.__class__()  # type: ignore[call-arg]
+        new_obj.position = self.position.clone()
+        if deep:
+            for child in self.children:
+                if isinstance(child, Object3D):
+                    new_obj.add(child.clone(deep=True))
+        return new_obj
+
+
+class Group(Object3D):
+    """Alias for grouping objects (keeps parity with Three.js)."""
+    pass
 
 
 class Block(Object3D):
@@ -149,17 +311,34 @@ class Block(Object3D):
             raise ValueError("size must be a sequence of three integers")
         self.size: Tuple[int, int, int] = (int(size[0]), int(size[1]), int(size[2]))
         self.properties: Dict[str, str] = dict(properties) if properties else {}
+        self.properties = self._catalog.assert_properties(
+            self.block_id, self.properties
+        )
         self.fill: bool = bool(fill)
 
     def set_properties(self, properties: Dict[str, str]) -> "Block":
-        self.properties = dict(properties)
+        self.properties = self._catalog.assert_properties(
+            self.block_id, dict(properties)
+        )
         return self
 
     def merge_properties(self, extra: Dict[str, str]) -> "Block":
         merged = dict(self.properties)
         merged.update(extra)
-        self.properties = merged
+        self.properties = self._catalog.assert_properties(self.block_id, merged)
         return self
+
+    def clone(self, deep: bool = True) -> "Block":
+        new_block = Block(
+            self.block_id,
+            size=self.size,
+            properties=self.properties,
+            fill=self.fill,
+            catalog=self._catalog,
+        )
+        new_block.position = self.position.clone()
+        # Blocks don't carry children, but honor the signature.
+        return new_block
 
 
 class Scene(Object3D):
@@ -365,3 +544,127 @@ def make_stair(
     """Quick factory for a single-block stair with orientation helpers."""
     props = stair_properties(facing=direction, upside_down=upside_down)
     return Block(block_id, properties=props, catalog=catalog)
+
+
+# --- Composition helpers ---
+
+def instantiate(obj: Object3D, offset: Sequence[float] = (0.0, 0.0, 0.0)) -> Object3D:
+    """
+    Deep-clone an Object3D hierarchy and optionally translate it by ``offset``.
+    """
+    clone = obj.clone(deep=True)
+    if offset and len(offset) == 3:
+        clone.translate(float(offset[0]), float(offset[1]), float(offset[2]))
+    return clone
+
+
+def box(
+    block_id: str,
+    *,
+    size: Sequence[int],
+    properties: Optional[Dict[str, str]] = None,
+    fill: bool = True,
+    catalog: Optional[BlockCatalog] = None,
+) -> Group:
+    """
+    Create a solid or hollow cuboid of a single block type as a Group.
+    """
+    grp = Group()
+    grp.add(
+        Block(
+            block_id,
+            size=size,
+            properties=properties,
+            fill=fill,
+            catalog=catalog,
+        )
+    )
+    return grp
+
+
+def hollow_box(
+    block_id: str,
+    *,
+    size: Sequence[int],
+    properties: Optional[Dict[str, str]] = None,
+    catalog: Optional[BlockCatalog] = None,
+) -> Group:
+    """
+    Shortcut for a hollow cuboid (i.e., faces only).
+    """
+    return box(
+        block_id,
+        size=size,
+        properties=properties,
+        fill=False,
+        catalog=catalog,
+    )
+
+
+def column(
+    block_id: str,
+    *,
+    height: int,
+    properties: Optional[Dict[str, str]] = None,
+    catalog: Optional[BlockCatalog] = None,
+) -> Group:
+    """Create a 1xH column."""
+    return box(
+        block_id,
+        size=(1, int(height), 1),
+        properties=properties,
+        fill=True,
+        catalog=catalog,
+    )
+
+
+def platform(
+    block_id: str,
+    *,
+    width: int,
+    depth: int,
+    properties: Optional[Dict[str, str]] = None,
+    catalog: Optional[BlockCatalog] = None,
+) -> Group:
+    """Create a 1-block-thick platform."""
+    return box(
+        block_id,
+        size=(int(width), 1, int(depth)),
+        properties=properties,
+        fill=True,
+        catalog=catalog,
+    )
+
+
+def stair_run(
+    block_id: str,
+    *,
+    length: int,
+    direction: str = "north",
+    upside_down: bool = False,
+    catalog: Optional[BlockCatalog] = None,
+) -> Group:
+    """
+    Create a straight run of stairs of the given length.
+
+    Note: rotates positions only; adjust block facing with ``direction``.
+    """
+    grp = Group()
+    facing = direction
+    for i in range(int(length)):
+        stair = make_stair(
+            block_id,
+            direction=facing,
+            upside_down=upside_down,
+            catalog=catalog,
+        )
+        if facing == "north":
+            stair.position.set(0, i, -i)
+        elif facing == "south":
+            stair.position.set(0, i, i)
+        elif facing == "east":
+            stair.position.set(i, i, 0)
+        else:  # west
+            stair.position.set(-i, i, 0)
+        grp.add(stair)
+    return grp
