@@ -35,12 +35,7 @@ function App() {
 
   const handleCreateNew = async (initialMessage = null) => {
     setShowProjects(false);
-    const newSessionId = await createSession();
-
-    // Store initial message in sessionStorage if provided
-    if (initialMessage && newSessionId) {
-      sessionStorage.setItem(`initial_message_${newSessionId}`, initialMessage);
-    }
+    await createSession(initialMessage || undefined);
   };
 
   const handleBackToProjects = () => {
@@ -51,92 +46,126 @@ function App() {
     setShowProjects(true);
   };
 
-  // Show projects page
-  if (showProjects && !sessionId) {
-    return (
-      <ProjectsPage
-        onSelectSession={handleSelectSession}
-        onCreateNew={handleCreateNew}
-      />
-    );
-  }
-
   return (
     <div style={{
-      display: 'flex',
       height: '100vh',
-      backgroundColor: '#1a1a1a',
-      color: '#e0e0e0',
       overflow: 'hidden',
+      backgroundColor: '#fafafa',
+      color: '#1a1a1a',
     }}>
       <div style={{
-        width: '400px',
-        borderRight: '1px solid #333',
-        display: 'flex',
-        flexDirection: 'column',
+        position: 'relative',
+        height: '100%',
+        overflow: 'hidden',
       }}>
+        {/* Landing / Projects view */}
         <div style={{
-          padding: '10px 20px',
-          borderBottom: '1px solid #333',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
+          position: 'absolute',
+          inset: 0,
+          opacity: showProjects ? 1 : 0,
+          pointerEvents: showProjects ? 'auto' : 'none',
+          transform: showProjects ? 'translateY(0px)' : 'translateY(-16px)',
+          transition: 'opacity 0.4s ease, transform 0.4s ease',
         }}>
-          <button
-            onClick={handleBackToProjects}
-            style={{
-              padding: '6px 12px',
-              backgroundColor: '#333',
-              color: '#888',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px',
-            }}
-          >
-            ← Projects
-          </button>
-          {sessionId && (
-            <span style={{ fontSize: '11px', color: '#555', fontFamily: 'monospace' }}>
-              {sessionId.slice(0, 8)}...
-            </span>
-          )}
+          <ProjectsPage
+            onSelectSession={handleSelectSession}
+            onCreateNew={handleCreateNew}
+          />
         </div>
-        <ChatPanel />
-      </div>
 
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#0a0a0a',
-      }}>
-        {structureData ? (
-          <MinecraftViewer />
-        ) : (
+        {/* Chat + Viewer view */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          height: '100%',
+          display: 'flex',
+          opacity: showProjects ? 0 : 1,
+          pointerEvents: showProjects ? 'none' : 'auto',
+          transition: 'opacity 0.4s ease',
+        }}>
           <div style={{
-            textAlign: 'center',
-            color: '#666',
+            width: '420px',
+            borderRight: '1px solid #e5e5e5',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            minHeight: 0,
+            backgroundColor: '#fafafa',
           }}>
-            <h2>MinecraftLM</h2>
-            <p>
-              {isLoading
-                ? 'Loading session...'
-                : sessionId
-                  ? 'Start chatting to design your Minecraft structure!'
-                  : 'Initializing...'}
-            </p>
-            <p style={{ fontSize: '0.9em', marginTop: '20px' }}>
-              Controls:<br />
-              • Mouse drag: Rotate view<br />
-              • Scroll: Zoom in/out<br />
-              • WASD: Move camera<br />
-              • Shift/Space: Move up/down
-            </p>
+            <div style={{
+              padding: '10px 20px',
+              borderBottom: '1px solid #e5e5e5',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+            }}>
+              <button
+                onClick={handleBackToProjects}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: '#ffffff',
+                  color: '#4b5563',
+                  border: '1px solid #e5e5e5',
+                  borderRadius: '999px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                }}
+              >
+                ← Projects
+              </button>
+              {sessionId && (
+                <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace' }}>
+                  {sessionId.slice(0, 8)}...
+                </span>
+              )}
+            </div>
+            <ChatPanel />
           </div>
-        )}
+
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            backgroundColor: '#fafafa',
+          }}>
+            <div style={{ flex: 1, width: '100%', height: '100%', position: 'relative', minHeight: 0 }}>
+              {structureData ? (
+                <div style={{ position: 'absolute', inset: 0 }}>
+                  <MinecraftViewer />
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '100%',
+                  textAlign: 'center',
+                  color: '#6b7280',
+                  padding: '24px',
+                }}>
+                  <div>
+                    <h2 style={{ marginBottom: '8px' }}>MinecraftLM</h2>
+                    <p style={{ marginBottom: '16px' }}>
+                      {isLoading
+                        ? 'Loading session...'
+                        : sessionId
+                          ? 'Start chatting to design your Minecraft structure!'
+                          : 'Initializing...'}
+                    </p>
+                    <p style={{ fontSize: '0.9em', lineHeight: 1.6 }}>
+                      Controls:<br />
+                      • Mouse drag: Rotate view<br />
+                      • Scroll: Zoom in/out<br />
+                      • WASD: Move camera<br />
+                      • Shift/Space: Move up/down
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

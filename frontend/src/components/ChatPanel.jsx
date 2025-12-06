@@ -249,32 +249,33 @@ export default function ChatPanel() {
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      padding: '20px',
-      backgroundColor: '#1e1e1e',
-      color: '#e0e0e0',
+      padding: '16px 20px 20px',
+      backgroundColor: 'transparent',
+      color: '#1f2933',
     }}>
-      <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#4CAF50' }}>
+      <h2 style={{ marginTop: 0, marginBottom: '16px', color: '#111827', fontSize: '18px' }}>
         Minecraft Builder
       </h2>
 
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        marginBottom: '20px',
+        marginBottom: '16px',
         padding: '10px',
-        backgroundColor: '#2d2d2d',
-        borderRadius: '8px',
+        backgroundColor: '#ffffff',
+        borderRadius: '12px',
+        border: '1px solid #e5e7eb',
       }}>
         {messages.map((msg, idx) => (
           <div key={idx} style={{ marginBottom: '15px' }}>
             {msg.role === 'user' && (
               <div style={{
                 padding: '10px',
-                backgroundColor: '#3a3a3a',
+                backgroundColor: '#f3f4f6',
                 borderRadius: '8px',
                 borderLeft: '3px solid #4CAF50',
               }}>
-                <strong style={{ color: '#4CAF50' }}>You:</strong>
+                <strong style={{ color: '#16a34a' }}>You:</strong>
                 <div style={{ marginTop: '5px' }}>{msg.content}</div>
               </div>
             )}
@@ -282,27 +283,27 @@ export default function ChatPanel() {
             {msg.role === 'agent' && (
               <div style={{
                 padding: '10px',
-                backgroundColor: '#2a2a2a',
+                backgroundColor: '#f9fafb',
                 borderRadius: '8px',
                 borderLeft: '3px solid #2196F3',
               }}>
-                <strong style={{ color: '#2196F3' }}>Agent:</strong>
+                <strong style={{ color: '#1d4ed8' }}>Agent:</strong>
                 {msg.activities.map((activity, actIdx) => (
                   <div key={actIdx} style={{ marginTop: '8px', fontSize: '0.9em' }}>
                     {activity.type === 'thought' && (
-                      <div style={{ color: '#aaa', fontStyle: 'italic' }}>
+                      <div style={{ color: '#4b5563', fontStyle: 'italic' }}>
                         💭 {activity.content}
                       </div>
                     )}
                     {activity.type === 'tool_call' && (
-                      <div style={{ color: '#FFA726' }}>
+                      <div style={{ color: '#ea580c' }}>
                         🔧 Calling {activity.name}
                         {Object.keys(activity.args || {}).length > 0 && (
                           <pre style={{
                             marginTop: '5px',
-                            padding: '5px',
-                            backgroundColor: '#1a1a1a',
-                            borderRadius: '4px',
+                            padding: '6px',
+                            backgroundColor: '#f3f4f6',
+                            borderRadius: '6px',
                             fontSize: '0.85em',
                             overflow: 'auto',
                           }}>
@@ -312,13 +313,13 @@ export default function ChatPanel() {
                       </div>
                     )}
                     {activity.type === 'tool_result' && (
-                      <div style={{ color: '#66BB6A' }}>
+                      <div style={{ color: '#16a34a' }}>
                         ✓ Result:
                         <pre style={{
                           marginTop: '5px',
-                          padding: '5px',
-                          backgroundColor: '#1a1a1a',
-                          borderRadius: '4px',
+                          padding: '6px',
+                          backgroundColor: '#f3f4f6',
+                          borderRadius: '6px',
                           fontSize: '0.85em',
                           overflow: 'auto',
                         }}>
@@ -328,7 +329,7 @@ export default function ChatPanel() {
                     )}
                     {activity.type === 'complete' && (
                       <div style={{
-                        color: activity.success ? '#66BB6A' : '#EF5350',
+                        color: activity.success ? '#16a34a' : '#ef4444',
                         fontWeight: 'bold',
                         marginTop: '8px',
                       }}>
@@ -336,7 +337,7 @@ export default function ChatPanel() {
                       </div>
                     )}
                     {activity.type === 'error' && (
-                      <div style={{ color: '#EF5350' }}>
+                      <div style={{ color: '#b91c1c' }}>
                         ⚠ Error: {activity.message}
                       </div>
                     )}
@@ -348,10 +349,10 @@ export default function ChatPanel() {
             {msg.role === 'error' && (
               <div style={{
                 padding: '10px',
-                backgroundColor: '#3a1e1e',
+                backgroundColor: '#fef2f2',
                 borderRadius: '8px',
-                borderLeft: '3px solid #EF5350',
-                color: '#EF5350',
+                borderLeft: '3px solid #ef4444',
+                color: '#b91c1c',
               }}>
                 {msg.content}
               </div>
@@ -372,10 +373,10 @@ export default function ChatPanel() {
           style={{
             flex: 1,
             padding: '12px',
-            backgroundColor: '#2d2d2d',
-            border: '1px solid #444',
+            backgroundColor: '#ffffff',
+            border: '1px solid #d1d5db',
             borderRadius: '8px',
-            color: '#e0e0e0',
+            color: '#111827',
             fontSize: '14px',
           }}
         />
@@ -384,7 +385,7 @@ export default function ChatPanel() {
           disabled={isLoading || !sessionId || !input.trim()}
           style={{
             padding: '12px 24px',
-            backgroundColor: isLoading || !sessionId || !input.trim() ? '#555' : '#4CAF50',
+            backgroundColor: isLoading || !sessionId || !input.trim() ? '#e5e7eb' : '#16a34a',
             color: 'white',
             border: 'none',
             borderRadius: '8px',

@@ -32,7 +32,10 @@ export default function useMouseControls(canvasRef, camera, requestRender) {
 
     const handleWheel = (evt) => {
       evt.preventDefault();
-      camera.move3d([0, 0, -evt.deltaY / 200]);
+      // Use zoom instead of moving the camera position so we always
+      // orbit around the structure center.
+      const zoomDelta = evt.deltaY * 0.02;
+      camera.zoom(zoomDelta);
       requestRender();
     };
 

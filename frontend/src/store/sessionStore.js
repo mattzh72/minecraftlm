@@ -8,7 +8,7 @@ const useSessionStore = create((set, get) => ({
   isLoading: false,
 
   // Actions
-  createSession: async () => {
+  createSession: async (initialMessage) => {
     set({ isLoading: true });
     try {
       const response = await fetch('/api/sessions', {
@@ -18,6 +18,16 @@ const useSessionStore = create((set, get) => ({
         throw new Error(`Failed to create session: ${response.status}`);
       }
       const data = await response.json();
+
+      if (initialMessage) {
+        try {
+          const initialMessageKey = `initial_message_${data.session_id}`;
+          sessionStorage.setItem(initialMessageKey, initialMessage);
+        } catch (err) {
+          console.error('Error storing initial message:', err);
+        }
+      }
+
       set({ sessionId: data.session_id, conversation: [] });
 
       // Update URL with new session ID
@@ -66,9 +76,8 @@ const useSessionStore = create((set, get) => ({
 
     if (sessionFromUrl) {
       return get().restoreSession(sessionFromUrl);
-    } else {
-      return get().createSession();
     }
+    return get().createSession();
   },
 
   setStructureData: (data) => set({ structureData: data }),

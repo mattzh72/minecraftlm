@@ -64,7 +64,7 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
         animationFrameRef.current = null;
       }
     };
-  }, [structureData, resources, canvasRef, render]);
+  }, [structureData, resources, render]);
 
   return {
     rendererRef,
