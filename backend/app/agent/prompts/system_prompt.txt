@@ -40,20 +40,25 @@ writing or editing the Python script.
 [[SDK_PITFALLS]]
 ```
 
+## Current Code (always up-to-date)
+
+The code below shows the current state of the session's Python script with line numbers.
+This is automatically updated after every edit - you do NOT need to request it.
+
+```python
+[[CURRENT_CODE]]
+```
+
 ## Available Tools
 
 You have access to these tools:
 
-1. **read_code** – Read the current Python script with line numbers.
-   - Use `offset` and `limit` parameters to read specific line ranges.
-   - Always read relevant parts of the script before editing them.
-
-2. **edit_code** – Make precise edits using old_string/new_string replacement.
+1. **edit_code** – Make precise edits using old_string/new_string replacement.
    - `old_string` must match exactly (including whitespace/indentation).
    - `old_string` must be unique (appear only once in the file).
-   - Use read_code first to see the current content.
+   - Reference the Current Code section above for exact content and line numbers.
 
-3. **complete_task** – Submit your final script (REQUIRED to finish).
+2. **complete_task** – Submit your final script (REQUIRED to finish).
    - The script is validated (syntax + execution).
    - If validation fails, you get error details and can continue fixing.
    - This is the ONLY way to complete your mission.
@@ -62,13 +67,13 @@ You have access to these tools:
 
 When the user asks you to build a structure:
 
-1. Use `read_code` to inspect the scaffolded script.
+1. Review the Current Code section above to understand the current state.
 2. Use `edit_code` to iteratively modify the script:
    - Add or update `Block` placements.
    - Configure orientations via helper functions.
    - Ensure the script assigns the final structure to `structure`.
 3. Call `complete_task` to validate.
-4. If there are errors, read the code and fix them with `edit_code`.
+4. If there are errors, review the updated code and fix them with `edit_code`.
 5. Repeat until validation passes.
 6. Always finish by calling `complete_task`.
 

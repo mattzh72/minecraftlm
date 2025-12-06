@@ -49,13 +49,17 @@ function App() {
   return (
     <div style={{
       height: '100vh',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
       overflow: 'hidden',
       backgroundColor: '#fafafa',
       color: '#1a1a1a',
     }}>
       <div style={{
         position: 'relative',
-        height: '100%',
+        flex: 1,
+        minHeight: 0,
         overflow: 'hidden',
       }}>
         {/* Landing / Projects view */}
@@ -77,8 +81,8 @@ function App() {
         <div style={{
           position: 'absolute',
           inset: 0,
-          height: '100%',
           display: 'flex',
+          minHeight: 0,
           opacity: showProjects ? 0 : 1,
           pointerEvents: showProjects ? 'none' : 'auto',
           transition: 'opacity 0.4s ease',
@@ -88,8 +92,9 @@ function App() {
             borderRight: '1px solid #e5e5e5',
             display: 'flex',
             flexDirection: 'column',
-            height: '100%',
             minHeight: 0,
+            flexShrink: 0,
+            overflow: 'hidden',
             backgroundColor: '#fafafa',
           }}>
             <div style={{
@@ -127,9 +132,11 @@ function App() {
             display: 'flex',
             flexDirection: 'column',
             minHeight: 0,
+            minWidth: 0,
+            overflow: 'hidden',
             backgroundColor: '#fafafa',
           }}>
-            <div style={{ flex: 1, width: '100%', height: '100%', position: 'relative', minHeight: 0 }}>
+            <div style={{ flex: 1, width: '100%', position: 'relative', minHeight: 0 }}>
               {structureData ? (
                 <div style={{ position: 'absolute', inset: 0 }}>
                   <MinecraftViewer />

@@ -6,37 +6,7 @@ import pytest
 
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
-from app.agent.tools.read_code import ReadCodeTool
 from app.services.session import SessionService
-
-
-@pytest.mark.asyncio
-async def test_read_code_tool(session_with_code):
-    """Test reading code with line numbers"""
-    tool = ReadCodeTool()
-
-    invocation = await tool.build({"session_id": session_with_code})
-    result = await invocation.execute()
-
-    assert result.is_success()
-    assert "Total" in result.output
-    assert "\t" in result.output  # Should have tab-separated line numbers
-
-
-@pytest.mark.asyncio
-async def test_read_code_with_offset_limit(session_with_code):
-    """Test reading specific line range"""
-    tool = ReadCodeTool()
-
-    invocation = await tool.build({
-        "session_id": session_with_code,
-        "offset": 1,
-        "limit": 5
-    })
-    result = await invocation.execute()
-
-    assert result.is_success()
-    assert "Lines 1-5" in result.output
 
 
 @pytest.mark.asyncio

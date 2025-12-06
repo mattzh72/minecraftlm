@@ -248,19 +248,19 @@ export default function ChatPanel() {
     <div style={{
       display: 'flex',
       flexDirection: 'column',
+      flex: 1,
+      minHeight: 0,
       height: '100%',
-      padding: '16px 20px 20px',
+      overflow: 'hidden',
+      padding: '12px 16px 16px',
       backgroundColor: 'transparent',
       color: '#1f2933',
+      gap: '12px',
     }}>
-      <h2 style={{ marginTop: 0, marginBottom: '16px', color: '#111827', fontSize: '18px' }}>
-        Minecraft Builder
-      </h2>
-
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        marginBottom: '16px',
+        minHeight: 0,
         padding: '10px',
         backgroundColor: '#ffffff',
         borderRadius: '12px',

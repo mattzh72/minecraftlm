@@ -12,7 +12,6 @@ from app.services.llm import LLMService
 from app.services.session import SessionService
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
-from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
 
 
@@ -66,31 +65,45 @@ class MinecraftSchematicAgent:
 
         # Initialize tools
         tools = [
-            ReadCodeTool(),
             EditCodeTool(),
             CompleteTaskTool(),
         ]
         self.tool_registry = ToolRegistry(tools)
 
-        # Load system prompt and inject SDK docs
+        # Load system prompt template and SDK docs (code will be injected per-call)
         prompt_path = Path(__file__).parent / "prompts" / "system_prompt.txt"
-        template = prompt_path.read_text()
+        self.prompt_template = prompt_path.read_text()
 
         docs_dir = Path(__file__).parent / "minecraft_sdk" / "docs"
-        replacements = {
+        self.sdk_replacements = {
             "[[SDK_OVERVIEW]]": f"01-overview.md\n\n{(docs_dir / '01-overview.md').read_text()}",
             "[[SDK_API_SCENE]]": f"02-api-scene.md\n\n{(docs_dir / '02-api-scene.md').read_text()}",
             "[[SDK_BLOCKS_REFERENCE]]": f"03-blocks-reference.md\n\n{(docs_dir / '03-blocks-reference.md').read_text()}",
             "[[SDK_BLOCK_LIST]]": f"04-block-list.md\n\n{(docs_dir / '04-block-list.md').read_text()}",
             "[[SDK_PITFALLS]]": f"05-pitfalls.md\n\n{(docs_dir / '05-pitfalls.md').read_text()}",
         }
-        for marker, text in replacements.items():
+
+    def _format_code_with_line_numbers(self, code: str) -> str:
+        """Format code with line numbers (cat -n style)."""
+        if not code or not code.strip():
+            return "(empty file)"
+        lines = code.split('\n')
+        return '\n'.join(f"{i+1:6d}\t{line}" for i, line in enumerate(lines))
+
+    def _build_system_prompt(self) -> str:
+        """Build system prompt with current code embedded."""
+        template = self.prompt_template
+
+        # Inject SDK docs
+        for marker, text in self.sdk_replacements.items():
             template = template.replace(marker, text)
 
-        self.system_prompt = template
+        # Inject current code with line numbers
+        code = self.session_service.load_code(self.session_id)
+        formatted_code = self._format_code_with_line_numbers(code)
+        template = template.replace("[[CURRENT_CODE]]", formatted_code)
 
-        # Track whether code has been read (for edit safety)
-        self.code_read_since_edit = True  # Start True for initial empty file
+        return template
 
     async def run(self, user_message: str) -> AsyncIterator[ActivityEvent]:
         """
@@ -136,9 +149,9 @@ class MinecraftSchematicAgent:
             accumulated_text = ""
             accumulated_tool_calls = {}  # index -> tool call dict
 
-            # Stream response chunks
+            # Stream response chunks (rebuild system prompt to include latest code)
             async for chunk in self.llm.generate_with_tools_streaming(
-                self.system_prompt,
+                self._build_system_prompt(),
                 messages,
                 self.tool_registry.get_tool_schemas(),
             ):
@@ -232,35 +245,23 @@ class MinecraftSchematicAgent:
                     data={"name": func_name, "args": func_args},
                 )
 
-                # Check if edit_code requires prior read
-                if func_name == "edit_code" and not self.code_read_since_edit:
-                    tool_result = {
-                        "error": "You must read the code first before editing. Use read_code to see the current file contents."
-                    }
+                # Execute tool - inject session_id automatically
+                tool_params = dict(func_args) if func_args else {}
+                tool_params["session_id"] = self.session_id
+
+                invocation = await self.tool_registry.build_invocation(
+                    func_name, tool_params
+                )
+
+                if not invocation:
+                    tool_result = {"error": f"Tool {func_name} not found"}
                 else:
-                    # Execute tool - inject session_id automatically
-                    tool_params = dict(func_args) if func_args else {}
-                    tool_params["session_id"] = self.session_id
+                    result = await invocation.execute()
+                    tool_result = result.to_dict()
 
-                    invocation = await self.tool_registry.build_invocation(
-                        func_name, tool_params
-                    )
-
-                    if not invocation:
-                        tool_result = {"error": f"Tool {func_name} not found"}
-                    else:
-                        result = await invocation.execute()
-                        tool_result = result.to_dict()
-
-                        # Update read/edit tracking
-                        if func_name == "read_code" and result.is_success():
-                            self.code_read_since_edit = True
-                        elif func_name == "edit_code" and result.is_success():
-                            self.code_read_since_edit = False
-
-                        # Check if this is complete_task
-                        if func_name == "complete_task" and result.is_success():
-                            task_completed = True
+                    # Check if this is complete_task
+                    if func_name == "complete_task" and result.is_success():
+                        task_completed = True
 
                 yield ActivityEvent(type="tool_result", data=tool_result)
 

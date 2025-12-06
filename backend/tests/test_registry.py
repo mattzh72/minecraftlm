@@ -6,7 +6,6 @@ import pytest
 
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
-from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
 
 
@@ -14,7 +13,6 @@ from app.agent.tools.registry import ToolRegistry
 def registry():
     """Create a tool registry with standard tools"""
     tools = [
-        ReadCodeTool(),
         EditCodeTool(),
         CompleteTaskTool(),
     ]
@@ -23,17 +21,16 @@ def registry():
 
 def test_registry_initialization(registry):
     """Test that registry initializes with tools"""
-    assert len(registry.tools) == 3
-    assert "read_code" in registry.tools
+    assert len(registry.tools) == 2
     assert "edit_code" in registry.tools
     assert "complete_task" in registry.tools
 
 
 def test_get_tool(registry):
     """Test getting a tool by name"""
-    tool = registry.get_tool("read_code")
+    tool = registry.get_tool("edit_code")
     assert tool is not None
-    assert isinstance(tool, ReadCodeTool)
+    assert isinstance(tool, EditCodeTool)
 
 
 def test_get_nonexistent_tool(registry):
@@ -45,8 +42,7 @@ def test_get_nonexistent_tool(registry):
 def test_get_all_tool_names(registry):
     """Test getting all tool names"""
     names = registry.get_all_tool_names()
-    assert len(names) == 3
-    assert "read_code" in names
+    assert len(names) == 2
     assert "edit_code" in names
     assert "complete_task" in names
 
@@ -54,7 +50,7 @@ def test_get_all_tool_names(registry):
 def test_get_tool_schemas(registry):
     """Test getting tool schemas in OpenAI format"""
     schemas = registry.get_tool_schemas()
-    assert len(schemas) == 3
+    assert len(schemas) == 2
 
     # Check that each schema has required fields (OpenAI format)
     for schema in schemas:
@@ -73,7 +69,7 @@ async def test_build_invocation(registry, temp_storage):
     session_id = SessionService.create_session()
 
     invocation = await registry.build_invocation(
-        "read_code", {"session_id": session_id}
+        "edit_code", {"session_id": session_id, "old_string": "x", "new_string": "y"}
     )
 
     assert invocation is not None
@@ -95,4 +91,4 @@ async def test_build_invocation_invalid_params(registry):
     """Test building invocation with invalid parameters"""
     # Missing required parameter
     with pytest.raises(Exception):  # Pydantic validation error
-        await registry.build_invocation("read_code", {})
+        await registry.build_invocation("edit_code", {})
