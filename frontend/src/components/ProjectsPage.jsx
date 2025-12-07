@@ -1,16 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import ThumbnailViewer from './ThumbnailViewer';
-
-const PLACEHOLDERS = [
-  'Build a medieval castle...',
-  'Build a modern house...',
-  'Build a treehouse...',
-  'Build a pyramid...',
-  'Build a spaceship...',
-  'Build a lighthouse...',
-];
-
-const COMMON_PREFIX = 'Build a ';
+import { SuggestionButtons } from './SuggestionButton';
 
 export default function ProjectsPage({ onSelectSession, onCreateNew }) {
   const [sessions, setSessions] = useState([]);
@@ -18,62 +8,6 @@ export default function ProjectsPage({ onSelectSession, onCreateNew }) {
   const [isLoading, setIsLoading] = useState(true);
   const [inputValue, setInputValue] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [placeholderText, setPlaceholderText] = useState(COMMON_PREFIX);
-  const placeholderIndexRef = useRef(0);
-  const isDeletingRef = useRef(false);
-  const timeoutRef = useRef(null);
-  const placeholderTextRef = useRef(COMMON_PREFIX);
-
-  // Typewriter effect for placeholder
-  useEffect(() => {
-    const typingSpeed = 80;
-    const deletingSpeed = 30;
-    const pauseAfterComplete = 2000;
-
-    const runTypewriter = () => {
-      const currentFullText = PLACEHOLDERS[placeholderIndexRef.current];
-      const currentText = placeholderTextRef.current;
-
-      let nextText = currentText;
-      let nextIsDeleting = isDeletingRef.current;
-      let nextIndex = placeholderIndexRef.current;
-      let delay;
-
-      if (!isDeletingRef.current) {
-        if (currentText.length < currentFullText.length) {
-          nextText = currentFullText.slice(0, currentText.length + 1);
-          delay = typingSpeed;
-        } else {
-          nextIsDeleting = true;
-          delay = pauseAfterComplete;
-        }
-      } else {
-        if (currentText.length > COMMON_PREFIX.length) {
-          nextText = currentText.slice(0, -1);
-          delay = deletingSpeed;
-        } else {
-          nextIsDeleting = false;
-          nextIndex = (placeholderIndexRef.current + 1) % PLACEHOLDERS.length;
-          delay = typingSpeed;
-        }
-      }
-
-      isDeletingRef.current = nextIsDeleting;
-      placeholderIndexRef.current = nextIndex;
-      placeholderTextRef.current = nextText;
-      setPlaceholderText(nextText);
-
-      timeoutRef.current = setTimeout(runTypewriter, delay);
-    };
-
-    timeoutRef.current = setTimeout(runTypewriter, typingSpeed);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     // Fetch all sessions
@@ -167,89 +101,96 @@ export default function ProjectsPage({ onSelectSession, onCreateNew }) {
 
           {/* Chat Input */}
           <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: '700px' }}>
-          <div style={{
-            position: 'relative',
-            width: '100%',
-          }}>
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={placeholderText}
-              disabled={isCreating}
-              style={{
-                width: '100%',
-                padding: '18px 64px 18px 20px',
-                fontSize: '16px',
-                border: '1px solid #d1d1d1',
-                borderRadius: '26px',
-                outline: 'none',
-                backgroundColor: '#ffffff',
-                color: '#1a1a1a',
-                boxShadow: '0 0 0 1px rgba(0,0,0,0.02), 0 2px 8px rgba(0,0,0,0.06)',
-                transition: 'all 0.15s ease',
-                fontFamily: 'inherit',
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#a0a0a0';
-                e.target.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.08)';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#d1d1d1';
-                e.target.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.02), 0 2px 8px rgba(0,0,0,0.06)';
-              }}
-            />
-            <button
-              type="submit"
-              disabled={!inputValue.trim() || isCreating}
-              style={{
-                position: 'absolute',
-                right: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                border: 'none',
-                backgroundColor: inputValue.trim() && !isCreating ? '#1a1a1a' : '#e5e5e5',
-                color: 'white',
-                cursor: inputValue.trim() && !isCreating ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-                padding: '0',
-              }}
-              onMouseEnter={(e) => {
-                if (inputValue.trim() && !isCreating) {
-                  e.currentTarget.style.backgroundColor = '#2f2f2f';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (inputValue.trim() && !isCreating) {
-                  e.currentTarget.style.backgroundColor = '#1a1a1a';
-                }
-              }}
-            >
-              {isCreating ? (
-                <span style={{ fontSize: '12px', color: '#999' }}>...</span>
-              ) : (
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
-              )}
-            </button>
-          </div>
-        </form>
+            <div style={{
+              position: 'relative',
+              width: '100%',
+            }}>
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Describe what you want to build..."
+                disabled={isCreating}
+                style={{
+                  width: '100%',
+                  padding: '18px 64px 18px 20px',
+                  fontSize: '16px',
+                  border: '1px solid #d1d1d1',
+                  borderRadius: '26px',
+                  outline: 'none',
+                  backgroundColor: '#ffffff',
+                  color: '#1a1a1a',
+                  boxShadow: '0 0 0 1px rgba(0,0,0,0.02), 0 2px 8px rgba(0,0,0,0.06)',
+                  transition: 'all 0.15s ease',
+                  fontFamily: 'inherit',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#a0a0a0';
+                  e.target.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.08)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#d1d1d1';
+                  e.target.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.02), 0 2px 8px rgba(0,0,0,0.06)';
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!inputValue.trim() || isCreating}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  backgroundColor: inputValue.trim() && !isCreating ? '#1a1a1a' : '#e5e5e5',
+                  color: 'white',
+                  cursor: inputValue.trim() && !isCreating ? 'pointer' : 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                  padding: '0',
+                }}
+                onMouseEnter={(e) => {
+                  if (inputValue.trim() && !isCreating) {
+                    e.currentTarget.style.backgroundColor = '#2f2f2f';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (inputValue.trim() && !isCreating) {
+                    e.currentTarget.style.backgroundColor = '#1a1a1a';
+                  }
+                }}
+              >
+                {isCreating ? (
+                  <span style={{ fontSize: '12px', color: '#999' }}>...</span>
+                ) : (
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </form>
+
+          <SuggestionButtons
+            onSelect={(prompt) => {
+              setInputValue(prompt);
+            }}
+            disabled={isCreating}
+          />
         </div>
       </div>
 
