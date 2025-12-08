@@ -3,7 +3,6 @@ import useSessionStore from './store/sessionStore';
 import ProjectsPage from './components/ProjectsPage';
 import ChatPanel from './components/ChatPanel';
 import MinecraftViewer from './components/MinecraftViewer';
-import './App.css';
 
 function App() {
   const sessionId = useSessionStore((state) => state.sessionId);
@@ -47,30 +46,15 @@ function App() {
   };
 
   return (
-    <div style={{
-      height: '100vh',
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      backgroundColor: '#fafafa',
-      color: '#1a1a1a',
-    }}>
-      <div style={{
-        position: 'relative',
-        flex: 1,
-        minHeight: 0,
-        overflow: 'hidden',
-      }}>
+    <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
+      <div className="relative flex-1">
         {/* Landing / Projects view */}
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          opacity: showProjects ? 1 : 0,
-          pointerEvents: showProjects ? 'auto' : 'none',
-          transform: showProjects ? 'translateY(0px)' : 'translateY(-16px)',
-          transition: 'opacity 0.4s ease, transform 0.4s ease',
-        }}>
+        <div
+          className={`absolute inset-0 transition-all duration-400 ease-out ${showProjects
+            ? 'opacity-100 pointer-events-auto translate-y-0'
+            : 'opacity-0 pointer-events-none -translate-y-4'
+            }`}
+        >
           <ProjectsPage
             onSelectSession={handleSelectSession}
             onCreateNew={handleCreateNew}
@@ -78,48 +62,22 @@ function App() {
         </div>
 
         {/* Chat + Viewer view */}
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          minHeight: 0,
-          opacity: showProjects ? 0 : 1,
-          pointerEvents: showProjects ? 'none' : 'auto',
-          transition: 'opacity 0.4s ease',
-        }}>
-          <div style={{
-            width: '420px',
-            borderRight: '1px solid #e5e5e5',
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 0,
-            flexShrink: 0,
-            overflow: 'hidden',
-            backgroundColor: '#fafafa',
-          }}>
-            <div style={{
-              padding: '10px 20px',
-              borderBottom: '1px solid #e5e5e5',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-            }}>
+        <div
+          className={`absolute inset-0 flex min-h-0 transition-opacity duration-400 ease-out ${showProjects ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            }`}
+        >
+          {/* Chat Panel Sidebar */}
+          <div className="w-[420px] border-r border-gray-200 flex flex-col min-h-0 shrink-0 bg-gray-50">
+            {/* Header with back button */}
+            <div className="px-5 py-2.5 border-b border-gray-200 flex items-center gap-2.5">
               <button
                 onClick={handleBackToProjects}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: '#ffffff',
-                  color: '#4b5563',
-                  border: '1px solid #e5e5e5',
-                  borderRadius: '999px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                }}
+                className="px-3 py-1.5 bg-white text-gray-600 border border-gray-200 rounded-full cursor-pointer text-xs hover:bg-gray-50"
               >
                 ← Projects
               </button>
               {sessionId && (
-                <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace' }}>
+                <span className="text-xs text-gray-400 font-mono">
                   {sessionId.slice(0, 8)}...
                 </span>
               )}
@@ -127,40 +85,25 @@ function App() {
             <ChatPanel />
           </div>
 
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 0,
-            minWidth: 0,
-            overflow: 'hidden',
-            backgroundColor: '#fafafa',
-          }}>
-            <div style={{ flex: 1, width: '100%', position: 'relative', minHeight: 0 }}>
+          {/* 3D Viewer Panel */}
+          <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-gray-50">
+            <div className="flex-1 w-full relative min-h-0">
               {structureData ? (
-                <div style={{ position: 'absolute', inset: 0 }}>
+                <div className="absolute inset-0">
                   <MinecraftViewer />
                 </div>
               ) : (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  textAlign: 'center',
-                  color: '#6b7280',
-                  padding: '24px',
-                }}>
+                <div className="flex items-center justify-center h-full text-center text-gray-500 p-6">
                   <div>
-                    <h2 style={{ marginBottom: '8px' }}>MinecraftLM</h2>
-                    <p style={{ marginBottom: '16px' }}>
+                    <h2 className="mb-2">MinecraftLM</h2>
+                    <p className="mb-4">
                       {isLoading
                         ? 'Loading session...'
                         : sessionId
                           ? 'Start chatting to design your Minecraft structure!'
                           : 'Initializing...'}
                     </p>
-                    <p style={{ fontSize: '0.9em', lineHeight: 1.6 }}>
+                    <p className="text-sm leading-relaxed">
                       Controls:<br />
                       • Mouse drag: Rotate view<br />
                       • Scroll: Zoom in/out<br />

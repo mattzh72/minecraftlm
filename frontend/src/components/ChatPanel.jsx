@@ -1,7 +1,31 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { cva } from 'class-variance-authority';
 import useSessionStore from '../store/sessionStore';
 import useAutoScroll from '../hooks/useAutoScroll';
 import useInitialMessage from '../hooks/useInitialMessage';
+
+// Message bubble variants
+const messageBubble = cva('p-2.5 rounded-lg', {
+  variants: {
+    role: {
+      user: 'bg-gray-100',
+      agent: 'bg-gray-50',
+      error: 'bg-red-50 text-red-700',
+    },
+  },
+});
+
+// Activity type variants
+const activityText = cva('', {
+  variants: {
+    type: {
+      thought: 'text-gray-600 italic',
+      tool_call: 'text-orange-600',
+      tool_result: 'text-green-600',
+      error: 'text-red-700',
+    },
+  },
+});
 
 export default function ChatPanel() {
   const sessionId = useSessionStore((state) => state.sessionId);
@@ -245,99 +269,53 @@ export default function ChatPanel() {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      flex: 1,
-      minHeight: 0,
-      height: '100%',
-      overflow: 'hidden',
-      padding: '12px 16px 16px',
-      backgroundColor: 'transparent',
-      color: '#1f2933',
-      gap: '12px',
-    }}>
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        minHeight: 0,
-        padding: '10px',
-        backgroundColor: '#ffffff',
-        borderRadius: '12px',
-        border: '1px solid #e5e7eb',
-      }}>
+    <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden p-3 pb-4 bg-transparent text-gray-800 gap-3">
+      {/* Messages container */}
+      <div className="flex-1 overflow-y-auto min-h-0 p-2.5 bg-white rounded-xl border border-gray-200">
         {messages.map((msg, idx) => (
-          <div key={idx} style={{ marginBottom: '15px' }}>
+          <div key={idx} className="mb-4">
             {msg.role === 'user' && (
-              <div style={{
-                padding: '10px',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '8px',
-                borderLeft: '3px solid #4CAF50',
-              }}>
-                <strong style={{ color: '#16a34a' }}>You:</strong>
-                <div style={{ marginTop: '5px' }}>{msg.content}</div>
+              <div className={messageBubble({ role: 'user' })}>
+                <strong className="text-green-600">You:</strong>
+                <div className="mt-1">{msg.content}</div>
               </div>
             )}
 
             {msg.role === 'agent' && (
-              <div style={{
-                padding: '10px',
-                backgroundColor: '#f9fafb',
-                borderRadius: '8px',
-                borderLeft: '3px solid #2196F3',
-              }}>
-                <strong style={{ color: '#1d4ed8' }}>Agent:</strong>
+              <div className={messageBubble({ role: 'agent' })}>
+                <strong className="text-blue-700">Agent:</strong>
                 {msg.activities.map((activity, actIdx) => (
-                  <div key={actIdx} style={{ marginTop: '8px', fontSize: '0.9em' }}>
+                  <div key={actIdx} className="mt-2 text-sm">
                     {activity.type === 'thought' && (
-                      <div style={{ color: '#4b5563', fontStyle: 'italic' }}>
+                      <div className={activityText({ type: 'thought' })}>
                         💭 {activity.content}
                       </div>
                     )}
                     {activity.type === 'tool_call' && (
-                      <div style={{ color: '#ea580c' }}>
+                      <div className={activityText({ type: 'tool_call' })}>
                         🔧 Calling {activity.name}
                         {Object.keys(activity.args || {}).length > 0 && (
-                          <pre style={{
-                            marginTop: '5px',
-                            padding: '6px',
-                            backgroundColor: '#f3f4f6',
-                            borderRadius: '6px',
-                            fontSize: '0.85em',
-                            overflow: 'auto',
-                          }}>
+                          <pre className="mt-1 p-1.5 bg-gray-100 rounded-md text-xs overflow-auto">
                             {JSON.stringify(activity.args, null, 2)}
                           </pre>
                         )}
                       </div>
                     )}
                     {activity.type === 'tool_result' && (
-                      <div style={{ color: '#16a34a' }}>
+                      <div className={activityText({ type: 'tool_result' })}>
                         ✓ Result:
-                        <pre style={{
-                          marginTop: '5px',
-                          padding: '6px',
-                          backgroundColor: '#f3f4f6',
-                          borderRadius: '6px',
-                          fontSize: '0.85em',
-                          overflow: 'auto',
-                        }}>
+                        <pre className="mt-1 p-1.5 bg-gray-100 rounded-md text-xs overflow-auto">
                           {JSON.stringify(activity.result, null, 2)}
                         </pre>
                       </div>
                     )}
                     {activity.type === 'complete' && (
-                      <div style={{
-                        color: activity.success ? '#16a34a' : '#ef4444',
-                        fontWeight: 'bold',
-                        marginTop: '8px',
-                      }}>
+                      <div className={`font-bold mt-2 ${activity.success ? 'text-green-600' : 'text-red-500'}`}>
                         {activity.success ? '✓' : '✗'} {activity.message}
                       </div>
                     )}
                     {activity.type === 'error' && (
-                      <div style={{ color: '#b91c1c' }}>
+                      <div className={activityText({ type: 'error' })}>
                         ⚠ Error: {activity.message}
                       </div>
                     )}
@@ -347,13 +325,7 @@ export default function ChatPanel() {
             )}
 
             {msg.role === 'error' && (
-              <div style={{
-                padding: '10px',
-                backgroundColor: '#fef2f2',
-                borderRadius: '8px',
-                borderLeft: '3px solid #ef4444',
-                color: '#b91c1c',
-              }}>
+              <div className={messageBubble({ role: 'error' })}>
                 {msg.content}
               </div>
             )}
@@ -362,7 +334,8 @@ export default function ChatPanel() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div style={{ display: 'flex', gap: '10px' }}>
+      {/* Input area */}
+      <div className="flex gap-2.5">
         <input
           type="text"
           value={input}
@@ -370,29 +343,12 @@ export default function ChatPanel() {
           onKeyDown={handleKeyDown}
           placeholder="Describe your Minecraft structure..."
           disabled={isLoading || !sessionId}
-          style={{
-            flex: 1,
-            padding: '12px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #d1d5db',
-            borderRadius: '8px',
-            color: '#111827',
-            fontSize: '14px',
-          }}
+          className="flex-1 p-3 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50"
         />
         <button
           onClick={handleSend}
           disabled={isLoading || !sessionId || !input.trim()}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: isLoading || !sessionId || !input.trim() ? '#e5e7eb' : '#16a34a',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: isLoading || !sessionId || !input.trim() ? 'not-allowed' : 'pointer',
-            fontSize: '14px',
-            fontWeight: 'bold',
-          }}
+          className="px-6 py-3 bg-green-600 text-white border-none rounded-lg cursor-pointer text-sm font-bold hover:bg-green-700 disabled:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-400"
         >
           {isLoading ? 'Sending...' : 'Send'}
         </button>

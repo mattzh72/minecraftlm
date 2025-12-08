@@ -62,60 +62,36 @@ export default function ThumbnailViewer({ structureData, size = 200 }) {
     }
   }, [structureData, resources]);
 
+  // Loading state
   if (isLoading) {
     return (
       <div
-        style={{
-          width: size,
-          height: size,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#f5f5f5',
-          borderRadius: '8px',
-          color: '#999',
-          fontSize: '12px',
-        }}
+        className="flex items-center justify-center bg-gray-100 rounded-lg text-gray-400 text-xs"
+        style={{ width: size, height: size }}
       >
         Loading...
       </div>
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div
-        style={{
-          width: size,
-          height: size,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#f5f5f5',
-          borderRadius: '8px',
-          color: '#ef5350',
-          fontSize: '12px',
-        }}
+        className="flex items-center justify-center bg-gray-100 rounded-lg text-red-400 text-xs"
+        style={{ width: size, height: size }}
       >
         Error
       </div>
     );
   }
 
+  // No structure state
   if (!structureData) {
     return (
       <div
-        style={{
-          width: size,
-          height: size,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#f5f5f5',
-          borderRadius: '8px',
-          color: '#999',
-          fontSize: '12px',
-        }}
+        className="flex items-center justify-center bg-gray-100 rounded-lg text-gray-400 text-xs"
+        style={{ width: size, height: size }}
       >
         No structure
       </div>
@@ -127,12 +103,8 @@ export default function ThumbnailViewer({ structureData, size = 200 }) {
       ref={canvasRef}
       width={size}
       height={size}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '8px',
-        display: 'block',
-      }}
+      className="rounded-lg block"
+      style={{ width: size, height: size }}
     />
   );
 }

@@ -39,14 +39,7 @@ export default function MinecraftViewer() {
   // Loading state
   if (isLoading) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        height: '100%',
-        color: '#666',
-      }}>
+      <div className="flex items-center justify-center w-full h-full text-gray-500">
         Loading resources...
       </div>
     );
@@ -55,14 +48,7 @@ export default function MinecraftViewer() {
   // Error state
   if (error) {
     return (
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        height: '100%',
-        color: '#EF5350',
-      }}>
+      <div className="flex items-center justify-center w-full h-full text-red-500">
         Error: {error}
       </div>
     );
@@ -73,7 +59,7 @@ export default function MinecraftViewer() {
       ref={canvasRef}
       width={window.innerWidth}
       height={window.innerHeight}
-      style={{ width: '100%', height: '100%', display: 'block' }}
+      className="w-full h-full block"
     />
   );
 }

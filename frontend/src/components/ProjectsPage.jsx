@@ -1,6 +1,30 @@
 import { useState, useEffect } from 'react';
+import { cva } from 'class-variance-authority';
 import ThumbnailViewer from './ThumbnailViewer';
 import { SuggestionButtons } from './SuggestionButton';
+
+// Submit button variant based on input state
+const submitButton = cva([
+  'absolute right-2.5 top-1/2 -translate-y-1/2',
+  'w-10 h-10 rounded-full border-none',
+  'flex items-center justify-center',
+  'transition-all duration-150',
+], {
+  variants: {
+    active: {
+      true: 'bg-gray-900 text-white cursor-pointer hover:bg-gray-700',
+      false: 'bg-gray-200 text-gray-400 cursor-not-allowed',
+    },
+  },
+});
+
+// Session card style
+const sessionCard = cva([
+  'bg-white rounded-2xl overflow-hidden cursor-pointer',
+  'transition-all duration-200',
+  'border border-gray-200 shadow-sm',
+  'hover:-translate-y-1 hover:shadow-lg hover:border-gray-300',
+]);
 
 export default function ProjectsPage({ onSelectSession, onCreateNew }) {
   const [sessions, setSessions] = useState([]);
@@ -9,8 +33,8 @@ export default function ProjectsPage({ onSelectSession, onCreateNew }) {
   const [inputValue, setInputValue] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
+  // Fetch all sessions on mount
   useEffect(() => {
-    // Fetch all sessions
     fetch('/api/sessions')
       .then(res => res.json())
       .then(data => {
@@ -61,112 +85,39 @@ export default function ProjectsPage({ onSelectSession, onCreateNew }) {
     });
   };
 
+  const hasSessions = sessions.length > 0;
+  const isInputActive = inputValue.trim() && !isCreating;
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#fafafa',
-      display: 'grid',
-      gridTemplateRows: sessions.length === 0 ? '1fr' : 'auto 1fr',
-      padding: '0',
-    }}>
+    <div className={`min-h-screen bg-gray-50 grid ${hasSessions ? 'grid-rows-[auto_1fr]' : 'grid-rows-1'}`}>
       {/* Hero Section with Chat Bar */}
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: sessions.length === 0 ? 'clamp(40px, 10vh, 80px)' : 'clamp(80px, 15vh, 140px) clamp(24px, 5vw, 80px) clamp(40px, 8vh, 80px)',
-        minHeight: sessions.length === 0 ? '100vh' : '0',
-      }}>
-        <div style={{ width: '100%', maxWidth: '1200px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <h1 style={{
-            fontSize: '52px',
-            fontWeight: '600',
-            color: '#1a1a1a',
-            marginBottom: '16px',
-            letterSpacing: '-1px',
-          }}>
+      <div className={`flex flex-col items-center justify-center px-6 ${hasSessions ? 'py-20 pb-10' : 'min-h-screen py-10'}`}>
+        <div className="w-full max-w-5xl flex flex-col items-center">
+          <h1 className="text-5xl font-semibold text-gray-900 mb-4 tracking-tight">
             MinecraftLM
           </h1>
-          <p style={{
-            fontSize: '17px',
-            color: '#6b6b6b',
-            marginBottom: '48px',
-            fontWeight: '400',
-            textAlign: 'center',
-            maxWidth: '500px',
-          }}>
+          <p className="text-lg text-gray-500 mb-12 font-normal text-center max-w-md">
             Design and export Minecraft schematics with natural language
           </p>
 
           {/* Chat Input */}
-          <form onSubmit={handleSubmit} style={{ width: '100%', maxWidth: '700px' }}>
-            <div style={{
-              position: 'relative',
-              width: '100%',
-            }}>
+          <form onSubmit={handleSubmit} className="w-full max-w-2xl">
+            <div className="relative w-full">
               <input
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Describe what you want to build..."
                 disabled={isCreating}
-                style={{
-                  width: '100%',
-                  padding: '18px 64px 18px 20px',
-                  fontSize: '16px',
-                  border: '1px solid #d1d1d1',
-                  borderRadius: '26px',
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                  color: '#1a1a1a',
-                  boxShadow: '0 0 0 1px rgba(0,0,0,0.02), 0 2px 8px rgba(0,0,0,0.06)',
-                  transition: 'all 0.15s ease',
-                  fontFamily: 'inherit',
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#a0a0a0';
-                  e.target.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.08)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = '#d1d1d1';
-                  e.target.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.02), 0 2px 8px rgba(0,0,0,0.06)';
-                }}
+                className="w-full py-4 pl-5 pr-16 text-base border border-gray-300 rounded-3xl outline-none bg-white text-gray-900 shadow-sm transition-all duration-150 focus:border-gray-400 focus:shadow-md disabled:opacity-50"
               />
               <button
                 type="submit"
-                disabled={!inputValue.trim() || isCreating}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '50%',
-                  border: 'none',
-                  backgroundColor: inputValue.trim() && !isCreating ? '#1a1a1a' : '#e5e5e5',
-                  color: 'white',
-                  cursor: inputValue.trim() && !isCreating ? 'pointer' : 'not-allowed',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.15s ease',
-                  padding: '0',
-                }}
-                onMouseEnter={(e) => {
-                  if (inputValue.trim() && !isCreating) {
-                    e.currentTarget.style.backgroundColor = '#2f2f2f';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (inputValue.trim() && !isCreating) {
-                    e.currentTarget.style.backgroundColor = '#1a1a1a';
-                  }
-                }}
+                disabled={!isInputActive}
+                className={submitButton({ active: isInputActive })}
               >
                 {isCreating ? (
-                  <span style={{ fontSize: '12px', color: '#999' }}>...</span>
+                  <span className="text-xs text-gray-400">...</span>
                 ) : (
                   <svg
                     width="20"
@@ -195,106 +146,44 @@ export default function ProjectsPage({ onSelectSession, onCreateNew }) {
       </div>
 
       {/* Previous Sessions Section */}
-      {!isLoading && sessions.length > 0 && (
-        <div style={{
-          padding: `0 clamp(24px, 5vw, 80px) clamp(60px, 10vh, 100px)`,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'flex-start',
-        }}>
-          <div style={{ width: '100%', maxWidth: '1200px' }}>
-            <h2 style={{
-              fontSize: '13px',
-              fontWeight: '600',
-              color: '#a0a0a0',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-              marginBottom: '24px',
-              textAlign: 'center',
-            }}>
+      {!isLoading && hasSessions && (
+        <div className="px-6 pb-16 flex justify-center items-start">
+          <div className="w-full max-w-5xl">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-6 text-center">
               Recent Projects
             </h2>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-              gap: '20px',
-            }}>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-5">
               {sessions.map(session => (
                 <div
                   key={session.session_id}
                   onClick={() => onSelectSession(session.session_id)}
-                  style={{
-                    backgroundColor: 'white',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    border: '1px solid #e8e8e8',
-                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(0, 0, 0, 0.08)';
-                    e.currentTarget.style.borderColor = '#d0d0d0';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
-                    e.currentTarget.style.borderColor = '#e8e8e8';
-                  }}
+                  className={sessionCard()}
                 >
                   {/* Thumbnail */}
-                  <div style={{
-                    width: '100%',
-                    height: '180px',
-                    backgroundColor: '#f8f8f8',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderBottom: '1px solid #ececec',
-                  }}>
+                  <div className="w-full h-44 bg-gray-100 flex items-center justify-center border-b border-gray-200">
                     {session.has_structure && sessionStructures[session.session_id] ? (
                       <ThumbnailViewer
                         structureData={sessionStructures[session.session_id]}
                         size={180}
                       />
                     ) : (
-                      <div style={{
-                        color: '#d0d0d0',
-                        fontSize: '48px',
-                        textAlign: 'center',
-                      }}>
+                      <div className="text-gray-300 text-5xl text-center">
                         📦
                       </div>
                     )}
                   </div>
 
                   {/* Metadata */}
-                  <div style={{ padding: '14px' }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontSize: '13px',
-                      color: '#6b6b6b',
-                      marginBottom: '6px',
-                    }}>
+                  <div className="p-3.5">
+                    <div className="flex justify-between items-center text-sm text-gray-500 mb-1.5">
                       <span>{session.message_count} messages</span>
                       {session.has_structure && (
-                        <span style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          backgroundColor: '#10b981',
-                        }}></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       )}
                     </div>
 
-                    <div style={{
-                      fontSize: '11px',
-                      color: '#a0a0a0',
-                    }}>
+                    <div className="text-xs text-gray-400">
                       {formatDate(session.updated_at)}
                     </div>
                   </div>
@@ -306,16 +195,8 @@ export default function ProjectsPage({ onSelectSession, onCreateNew }) {
       )}
 
       {/* Empty State */}
-      {!isLoading && sessions.length === 0 && (
-        <div style={{
-          flex: '1',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '48px 24px',
-          color: '#a0a0a0',
-          fontSize: '14px',
-        }}>
+      {!isLoading && !hasSessions && (
+        <div className="flex-1 flex items-center justify-center p-12 text-gray-400 text-sm">
           Start building by typing in the chat above
         </div>
       )}
