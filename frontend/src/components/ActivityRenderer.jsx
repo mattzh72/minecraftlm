@@ -1,3 +1,4 @@
+import { Box } from "lucide-react";
 import { cn } from "../lib/cn";
 
 function ShimmerText({ children }) {
@@ -18,8 +19,9 @@ function ShimmerText({ children }) {
 
 export function ThinkingIndicator() {
   return (
-    <div className="text-sm flex items-center gap-1.5">
-      <ShimmerText>Thinking...</ShimmerText>
+    <div className="text-sm flex items-center gap-1.5 text-slate-500">
+      <Box size={14} className="animate-spin" />
+      <ShimmerText>Thinking</ShimmerText>
     </div>
   );
 }
