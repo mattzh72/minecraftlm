@@ -10,7 +10,7 @@ export const Config = {
     panSensitivity: 200,
   },
   controls: {
-    zoomSensitivity: 0.02,
+    zoomSensitivity: 1,
   },
   renderer: {
     chunkSize: 8,

@@ -4,7 +4,7 @@ import useSessionStore from "../store/sessionStore";
 import ChatPanel from "./ChatPanel";
 import { MinecraftViewer } from "./MinecraftViewer";
 
-import { cx } from "class-variance-authority";
+import { cn } from "../lib/cn";
 
 /**
  * Session page - displays chat panel and 3D viewer for a specific session
@@ -37,7 +37,7 @@ export function SessionPage() {
         <div className="absolute top-4 left-4 z-10">
           <button
             onClick={handleBackToProjects}
-            className={cx(
+            className={cn(
               "px-3 py-1.5",
               "bg-white text-slate-600 border border-slate-200 rounded-lg",
               "cursor-pointer text-xs font-medium",
@@ -86,7 +86,7 @@ export function SessionPage() {
           </div>
         </div>
         <div
-          className={cx(
+          className={cn(
             "flex flex-col basis-md",
             "overflow-hidden m-3 rounded-2xl",
             "bg-slate-50",

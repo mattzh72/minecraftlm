@@ -1,9 +1,19 @@
 import { useState, useRef, useCallback } from "react";
-import { cva, cx } from "class-variance-authority";
+import { cva } from "class-variance-authority";
+import {
+  Check,
+  X,
+  Pencil,
+  CircleCheck,
+  Wrench,
+  ChevronRight,
+} from "lucide-react";
+import { cn } from "../lib/cn";
+import { Collapsible } from "@base-ui-components/react/collapsible";
 import useSessionStore from "../store/sessionStore";
 import useAutoScroll from "../hooks/useAutoScroll";
 import useInitialMessage from "../hooks/useInitialMessage";
-import { PromptBoxWrapper } from "./PromptBox";
+import { PromptBox } from "./PromptBox";
 import { ThinkingIndicator } from "./ActivityRenderer";
 
 // Message bubble variants
@@ -57,12 +67,11 @@ function AssistantMessage({ content, toolCalls }) {
     <div className={messageBubble()}>
       <div className={roleLabel({ role: "agent" })}>Agent</div>
       <div className="space-y-2">
-        {hasContent && (
-          <div className="whitespace-pre-wrap">{content}</div>
-        )}
-        {hasToolCalls && toolCalls.map((tc, idx) => (
-          <ToolCallDisplay key={idx} toolCall={tc} />
-        ))}
+        {hasContent && <div className="whitespace-pre-wrap">{content}</div>}
+        {hasToolCalls &&
+          toolCalls.map((tc, idx) => (
+            <ToolCallDisplay key={idx} toolCall={tc} />
+          ))}
       </div>
     </div>
   );
@@ -70,14 +79,46 @@ function AssistantMessage({ content, toolCalls }) {
 
 function ToolCallDisplay({ toolCall }) {
   const name = toolCall.function?.name || "unknown";
-  const icon = name === "edit_code" ? "✏️" : name === "complete_task" ? "✓" : "🔧";
-  const label = name === "edit_code" ? "Editing code" : name === "complete_task" ? "Validating" : name;
+  const label =
+    name === "edit_code"
+      ? "Editing code"
+      : name === "complete_task"
+      ? "Validating"
+      : name;
 
-  return (
-    <div className="text-sm flex items-center gap-1.5 text-slate-500">
-      <span>{icon}</span>
+  let args = null;
+  try {
+    args = JSON.parse(toolCall.function?.arguments || "{}");
+  } catch {
+    args = { raw: toolCall.function?.arguments };
+  }
+
+  const shouldRenderCollapsible = args !== null;
+
+  const IconComponent =
+    name === "edit_code"
+      ? Pencil
+      : name === "complete_task"
+      ? CircleCheck
+      : Wrench;
+
+  const baseNode = (
+    <div className="flex items-center gap-1.5 text-slate-500 hover:text-slate-700 transition-colors group">
+      <ChevronRight
+        size={12}
+        className="text-slate-400 transition-transform group-data-panel-open:rotate-90"
+      />
+      <IconComponent size={14} />
       <span className="font-medium">{label}</span>
     </div>
+  );
+
+  return shouldRenderCollapsible ? (
+    <Collapsible.Root className="text-sm">
+      <Collapsible.Trigger asChild>{baseNode}</Collapsible.Trigger>
+    </Collapsible.Root>
+  ) : (
+    baseNode
   );
 }
 
@@ -90,21 +131,50 @@ function ToolResultMessage({ name, content }) {
   }
 
   const hasError = result?.error;
-  const icon = hasError ? "✗" : "✓";
-  const label = name === "edit_code" 
-    ? (hasError ? "Edit failed" : "Edited code")
-    : name === "complete_task"
-    ? (hasError ? "Validation failed" : "Validated")
-    : (hasError ? "Failed" : "Done");
+  const label =
+    name === "edit_code"
+      ? hasError
+        ? "Edit failed"
+        : "Edited code"
+      : name === "complete_task"
+      ? hasError
+        ? "Validation failed"
+        : "Validated"
+      : hasError
+      ? "Failed"
+      : "Done";
+
+  const displayContent = hasError ? result.error : result.output;
 
   return (
-    <div className={cx(
-      "text-sm flex items-center gap-1.5",
-      hasError ? "text-red-500" : "text-emerald-600"
-    )}>
-      <span>{icon}</span>
-      <span className="font-medium">{label}</span>
-    </div>
+    <Collapsible.Root className="text-sm" defaultOpen={hasError}>
+      <Collapsible.Trigger className="flex items-center gap-1.5 text-slate-600 hover:text-slate-700 transition-colors group">
+        <ChevronRight
+          size={12}
+          className="text-slate-400 transition-transform group-data-panel-open:rotate-90"
+        />
+        {hasError ? (
+          <X size={14} className="text-red-500" />
+        ) : (
+          <Check size={14} className="text-emerald-600" />
+        )}
+        <span className="font-medium">{label}</span>
+      </Collapsible.Trigger>
+      {displayContent && (
+        <Collapsible.Panel className="mt-1.5 ml-5">
+          <pre
+            className={cn(
+              "p-2 rounded-lg text-xs overflow-auto max-h-48",
+              hasError
+                ? "bg-red-50 text-red-700"
+                : "bg-slate-100 text-slate-600"
+            )}
+          >
+            {displayContent}
+          </pre>
+        </Collapsible.Panel>
+      )}
+    </Collapsible.Root>
   );
 }
 
@@ -123,11 +193,7 @@ function StreamingMessage({ content, isThinking }) {
 }
 
 function ErrorMessage({ content }) {
-  return (
-    <div className={messageBubble({ error: true })}>
-      {content}
-    </div>
-  );
+  return <div className={messageBubble({ error: true })}>{content}</div>;
 }
 
 // ============================================================================
@@ -142,7 +208,10 @@ export default function ChatPanel() {
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
+
+  // Pending user message - shown immediately while waiting for backend
+  const [pendingUserMessage, setPendingUserMessage] = useState(null);
+
   // Streaming state - temporary message being built
   const [streamingContent, setStreamingContent] = useState("");
   const [isThinking, setIsThinking] = useState(false);
@@ -153,7 +222,12 @@ export default function ChatPanel() {
   // Derive display messages from conversation (no useEffect needed)
   const displayMessages = conversation || [];
 
-  const messagesEndRef = useAutoScroll([displayMessages, streamingContent, isThinking]);
+  const messagesEndRef = useAutoScroll([
+    displayMessages,
+    pendingUserMessage,
+    streamingContent,
+    isThinking,
+  ]);
 
   const handleSend = useCallback(
     async (messageText = null) => {
@@ -163,6 +237,7 @@ export default function ChatPanel() {
 
       setInput("");
       setLocalError(null);
+      setPendingUserMessage(userMessage);
       setStreamingContent("");
       setIsThinking(true);
       setIsLoading(true);
@@ -219,7 +294,7 @@ export default function ChatPanel() {
                 } else if (data.type === "complete") {
                   // Done - fetch updated conversation and structure
                   setIsThinking(false);
-                  
+
                   if (data.data.success) {
                     try {
                       const structureRes = await fetch(
@@ -250,11 +325,11 @@ export default function ChatPanel() {
           if (sessionRes.ok) {
             const sessionData = await sessionRes.json();
             setConversation(sessionData.conversation || []);
+            setPendingUserMessage(null); // Clear pending now that we have real data
           }
         } catch (err) {
           console.error("Error fetching updated conversation:", err);
         }
-
       } catch (error) {
         console.error("Chat error:", error);
         if (error.name !== "AbortError") {
@@ -265,6 +340,7 @@ export default function ChatPanel() {
         setIsLoading(false);
         setStreamingContent("");
         setIsThinking(false);
+        setPendingUserMessage(null);
       }
     },
     [sessionId, isLoading, input, setStructureData, setConversation]
@@ -305,6 +381,11 @@ export default function ChatPanel() {
           return null;
         })}
 
+        {/* Pending user message (shown immediately while loading) */}
+        {pendingUserMessage && (
+          <UserMessage content={pendingUserMessage} />
+        )}
+
         {/* Streaming message (while loading) */}
         {isLoading && (
           <StreamingMessage
@@ -321,13 +402,13 @@ export default function ChatPanel() {
 
       {/* Input - fixed at bottom */}
       <div className="p-3 pt-0">
-        <PromptBoxWrapper
+        <PromptBox
           value={input}
           onChange={setInput}
           onSubmit={handleSend}
-          disabled={!sessionId}
-          isLoading={isLoading}
+          disabled={!sessionId || isLoading}
           placeholder="Describe your Minecraft structure..."
+          className="border-slate-300"
         />
       </div>
     </div>

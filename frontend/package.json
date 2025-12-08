@@ -10,14 +10,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@base-ui-components/react": "^1.0.0-rc.0",
     "@tailwindcss/vite": "^4.1.17",
     "class-variance-authority": "^0.7.1",
     "deepslate": "^0.24.0",
     "gl-matrix": "^3.4.3",
+    "lucide-react": "^0.556.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.10.1",
     "react-textarea-autosize": "^8.5.9",
+    "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.17",
     "ts-pattern": "^5.9.0",
     "zod": "^4.1.13",
