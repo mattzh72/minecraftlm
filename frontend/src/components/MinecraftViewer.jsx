@@ -1,12 +1,12 @@
-import { useRef, useMemo } from 'react';
-import useSessionStore from '../store/sessionStore';
-import useDeepslateResources from '../hooks/useDeepslateResources';
-import useCamera from '../hooks/useCamera';
-import useRenderLoop from '../hooks/useRenderLoop';
-import useMouseControls from '../hooks/useMouseControls';
+import { useRef, useMemo } from "react";
+import useSessionStore from "../store/sessionStore";
+import useDeepslateResources from "../hooks/useDeepslateResources";
+import useCamera from "../hooks/useCamera";
+import useRenderLoop from "../hooks/useRenderLoop";
+import useMouseControls from "../hooks/useMouseControls";
 // import useKeyboardControls from '../hooks/useKeyboardControls';
 
-export default function MinecraftViewer() {
+export function MinecraftViewer() {
   const structureData = useSessionStore((state) => state.structureData);
   const canvasRef = useRef(null);
 
