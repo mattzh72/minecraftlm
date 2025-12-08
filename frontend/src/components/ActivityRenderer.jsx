@@ -1,5 +1,5 @@
-import { Box } from "lucide-react";
 import { cn } from "../lib/cn";
+import { DirtBlockAnimation } from "./DirtBlockAnimation";
 
 function ShimmerText({ children }) {
   return (
@@ -19,8 +19,8 @@ function ShimmerText({ children }) {
 
 export function ThinkingIndicator() {
   return (
-    <div className="text-sm flex items-center gap-1.5 text-slate-500">
-      <Box size={14} className="animate-spin" />
+    <div className="text-sm flex items-center gap-2 text-slate-500">
+      <DirtBlockAnimation size={16} />
       <ShimmerText>Thinking</ShimmerText>
     </div>
   );
