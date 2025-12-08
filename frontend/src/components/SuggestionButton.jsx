@@ -8,14 +8,12 @@ const SUGGESTIONS = [
 ];
 
 const suggestionButton = cva([
-  'inline-flex items-center gap-2 px-4 py-2.5',
-  'text-sm font-medium bg-white border rounded-full',
-  'transition-all duration-150 shadow-sm',
+  'inline-flex items-center gap-2 px-2 py-1',
+  'text-sm font-medium bg-white border rounded-lg',
+  'transition-colors duration-150',
   'hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300',
-  'hover:-translate-y-0.5 hover:shadow-md',
   'disabled:cursor-not-allowed disabled:opacity-50',
-  'disabled:hover:translate-y-0 disabled:hover:bg-white',
-  'disabled:hover:border-slate-200 disabled:hover:shadow-sm',
+  'disabled:hover:bg-white disabled:hover:border-slate-200',
 ], {
   variants: {
     intent: {

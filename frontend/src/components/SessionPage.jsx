@@ -39,7 +39,7 @@ export function SessionPage() {
             onClick={handleBackToProjects}
             className={cx(
               "px-3 py-1.5",
-              "bg-white text-slate-600 border border-slate-200 rounded-full",
+              "bg-white text-slate-600 border border-slate-200 rounded-lg",
               "cursor-pointer text-xs font-medium",
               "hover:bg-slate-50 hover:border-slate-300 transition-colors"
             )}
@@ -88,10 +88,10 @@ export function SessionPage() {
         <div
           className={cx(
             "flex flex-col basis-md",
-            "overflow-hidden m-3 rounded-xl",
+            "overflow-hidden m-3 rounded-2xl",
             "bg-slate-50",
-            "border border-slate-700/30",
-            "shadow-stacked-light"
+            "border border-slate-400",
+            "shadow-sm shadow-slate-900/5"
           )}
         >
           <ChatPanel />

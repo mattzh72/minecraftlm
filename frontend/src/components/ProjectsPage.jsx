@@ -8,9 +8,10 @@ import { PromptBox } from './PromptBox';
 
 // Session card style
 const sessionCard = cva([
-  'bg-white rounded-2xl overflow-hidden cursor-pointer',
-  'transition-all duration-200',
-  'border border-slate-200/50 shadow-stacked',
+  'bg-white rounded-xl overflow-hidden cursor-pointer',
+  'transition-colors duration-150',
+  'border border-slate-200',
+  'shadow-sm shadow-slate-900/5',
   'hover:border-slate-300',
 ]);
 
@@ -107,7 +108,7 @@ export default function ProjectsPage() {
             disabled={isCreating}
             isLoading={isCreating}
             placeholder="Describe what you want to build..."
-            className="max-w-2xl shadow-stacked"
+            className="max-w-2xl"
           >
             <PromptBox.Input maxRows={5} />
             <PromptBox.Submit />

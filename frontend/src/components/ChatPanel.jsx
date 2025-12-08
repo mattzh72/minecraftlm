@@ -360,7 +360,7 @@ export default function ChatPanel() {
       </div>
 
       {/* Input - fixed at bottom */}
-      <div className="p-3 border-t border-slate-200/50">
+      <div className="p-3 pt-0">
         <PromptBoxWrapper
           value={input}
           onChange={setInput}

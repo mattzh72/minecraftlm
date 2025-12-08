@@ -80,9 +80,10 @@ function PromptBoxRoot({
         onSubmit={handleSubmit}
         className={cx(
           "w-full flex flex-col",
-          "border border-slate-200 rounded-2xl",
+          "border border-slate-400 rounded-2xl",
+          "shadow-sm shadow-slate-900/5",
           "p-3",
-          "transition-all duration-150",
+          "transition-colors duration-150",
           "focus-within:border-slate-300",
           className
         )}
@@ -133,7 +134,7 @@ function PromptBoxSubmit({ className = "", children, ...props }) {
       disabled={!isActive}
       className={cx(
         "self-end",
-        "p-2 rounded-full",
+        "p-2 rounded-lg",
         "flex items-center justify-center",
         "transition-all duration-150 origin-center",
         className,
