@@ -1,5 +1,8 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { mat4, vec3 } from '../utils/deepslate';
+import { Config } from '../config';
+
+const { camera: cam } = Config;
 
 /**
  * Hook to manage camera state and movement
@@ -8,9 +11,9 @@ import { mat4, vec3 } from '../utils/deepslate';
 export default function useCamera(structureSize) {
   // Use refs for mutable camera state (avoids re-renders on every frame)
   const cameraState = useRef({
-    viewDist: 12,
-    xRotation: 0.7,
-    yRotation: 0.8,
+    viewDist: cam.defaultDistance,
+    xRotation: cam.defaultRotationX,
+    yRotation: cam.defaultRotationY,
     cameraPos: null,
   });
 
@@ -22,9 +25,9 @@ export default function useCamera(structureSize) {
       vec3.set(pos, -structureSize[0] / 2, -structureSize[1] / 2, -structureSize[2] / 2);
       cameraState.current.cameraPos = pos;
       // Reset rotation and distance when structure changes
-      cameraState.current.xRotation = 0.7;
-      cameraState.current.yRotation = 0.8;
-      cameraState.current.viewDist = Math.max(8, maxDim * 1.8);
+      cameraState.current.xRotation = cam.defaultRotationX;
+      cameraState.current.yRotation = cam.defaultRotationY;
+      cameraState.current.viewDist = Math.max(cam.minDistanceFloor, maxDim * cam.distanceMultiplier);
     }
   }, [structureSize]);
 
@@ -35,7 +38,7 @@ export default function useCamera(structureSize) {
     // Clamp rotation values
     cameraState.current.yRotation = yRotation % (Math.PI * 2);
     cameraState.current.xRotation = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, xRotation));
-    cameraState.current.viewDist = Math.max(4, Math.min(200, viewDist));
+    cameraState.current.viewDist = Math.max(cam.minDistance, Math.min(cam.maxDistance, viewDist));
 
     const view = mat4.create();
     // Pull camera back, then apply isometric-ish rotation and center the structure
@@ -71,8 +74,8 @@ export default function useCamera(structureSize) {
 
   // Pan camera (rotate view)
   const pan = useCallback((direction, sensitivity = 1) => {
-    cameraState.current.yRotation += (direction[0] / 200) * sensitivity;
-    cameraState.current.xRotation += (direction[1] / 200) * sensitivity;
+    cameraState.current.yRotation += (direction[0] / cam.panSensitivity) * sensitivity;
+    cameraState.current.xRotation += (direction[1] / cam.panSensitivity) * sensitivity;
   }, []);
 
   // Zoom camera

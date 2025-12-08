@@ -2,12 +2,15 @@ import { useRef, useEffect } from 'react';
 import { StructureRenderer } from 'deepslate';
 import useDeepslateResources from '../hooks/useDeepslateResources';
 import { structureFromJsonData, mat4, vec3 } from '../utils/deepslate';
+import { Config } from '../config';
+
+const { thumbnail: thumb, renderer: rend } = Config;
 
 /**
  * Static thumbnail viewer for Minecraft structures
  * Renders a fixed-angle view without controls
  */
-export default function ThumbnailViewer({ structureData, size = 200 }) {
+export default function ThumbnailViewer({ structureData, size = thumb.defaultSize }) {
   const canvasRef = useRef(null);
   const { resources, isLoading, error } = useDeepslateResources();
 
@@ -30,20 +33,20 @@ export default function ThumbnailViewer({ structureData, size = 200 }) {
         gl,
         structure,
         resources,
-        { chunkSize: 8 }
+        { chunkSize: rend.chunkSize }
       );
 
       // Set up camera with isometric view
       const view = mat4.create();
 
       // Calculate structure size
-      const width = structureData.width || 16;
-      const height = structureData.height || 16;
-      const depth = structureData.depth || 16;
+      const width = structureData.width || thumb.fallbackDimension;
+      const height = structureData.height || thumb.fallbackDimension;
+      const depth = structureData.depth || thumb.fallbackDimension;
 
       // Calculate viewing distance - scale with structure size
       const maxDim = Math.max(width, height, depth);
-      const viewDist = maxDim * 1.5; // Closer to fill the thumbnail better
+      const viewDist = maxDim * thumb.distanceMultiplier;
 
       // Center the structure
       const cameraPos = vec3.create();
@@ -51,8 +54,8 @@ export default function ThumbnailViewer({ structureData, size = 200 }) {
 
       // Apply transformations: first translate back, then rotate, then center structure
       mat4.translate(view, view, [0, 0, -viewDist]);
-      mat4.rotateX(view, view, 0.6);  // Tilt for isometric
-      mat4.rotateY(view, view, 0.8);  // Rotate for isometric
+      mat4.rotateX(view, view, thumb.tiltAngle);
+      mat4.rotateY(view, view, thumb.rotateAngle);
       mat4.translate(view, view, cameraPos);
 
       // Render once (static)

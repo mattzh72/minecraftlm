@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Config } from '../config';
 
 /**
  * Hook to handle mouse controls for camera
@@ -34,7 +35,7 @@ export default function useMouseControls(canvasRef, camera, requestRender) {
       evt.preventDefault();
       // Use zoom instead of moving the camera position so we always
       // orbit around the structure center.
-      const zoomDelta = evt.deltaY * 0.02;
+      const zoomDelta = evt.deltaY * Config.controls.zoomSensitivity;
       camera.zoom(zoomDelta);
       requestRender();
     };
