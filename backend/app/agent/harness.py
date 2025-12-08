@@ -76,7 +76,7 @@ class MinecraftSchematicAgent:
         prompt_path = Path(__file__).parent / "prompts" / "system_prompt.txt"
         self.prompt_template = prompt_path.read_text()
 
-        docs_dir = Path(__file__).parent / "minecraft_sdk" / "docs"
+        docs_dir = Path(__file__).parent / "minecraft" / "docs"
         self.sdk_replacements = {
             "[[SDK_OVERVIEW]]": f"01-overview.md\n\n{(docs_dir / '01-overview.md').read_text()}",
             "[[SDK_API_SCENE]]": f"02-api-scene.md\n\n{(docs_dir / '02-api-scene.md').read_text()}",
@@ -89,8 +89,8 @@ class MinecraftSchematicAgent:
         """Format code with line numbers (cat -n style)."""
         if not code or not code.strip():
             return "(empty file)"
-        lines = code.split('\n')
-        return '\n'.join(f"{i+1:6d}\t{line}" for i, line in enumerate(lines))
+        lines = code.split("\n")
+        return "\n".join(f"{i + 1:6d}\t{line}" for i, line in enumerate(lines))
 
     def _build_system_prompt(self) -> str:
         """Build system prompt with current code embedded."""
@@ -162,14 +162,18 @@ class MinecraftSchematicAgent:
                 # Handle text delta
                 if chunk.text_delta:
                     accumulated_text += chunk.text_delta
-                    logger.info(f"yielding event type=text_delta, delta={chunk.text_delta}")
+                    logger.info(
+                        f"yielding event type=text_delta, delta={chunk.text_delta}"
+                    )
                     yield ActivityEvent(
                         type="text_delta", data={"delta": chunk.text_delta}
                     )
 
                 # Handle tool calls delta
                 if chunk.tool_calls_delta:
-                    logger.info(f"yielding event type=tool_calls_delta, delta={chunk.tool_calls_delta}")
+                    logger.info(
+                        f"yielding event type=tool_calls_delta, delta={chunk.tool_calls_delta}"
+                    )
                     for tc_delta in chunk.tool_calls_delta:
                         idx = tc_delta.get("index", 0)
                         if idx not in accumulated_tool_calls:
@@ -181,15 +185,15 @@ class MinecraftSchematicAgent:
 
                         # Accumulate function name
                         if tc_delta.get("function", {}).get("name"):
-                            accumulated_tool_calls[idx]["function"][
-                                "name"
-                            ] = tc_delta["function"]["name"]
+                            accumulated_tool_calls[idx]["function"]["name"] = tc_delta[
+                                "function"
+                            ]["name"]
 
                         # Accumulate function arguments
                         if tc_delta.get("function", {}).get("arguments"):
-                            accumulated_tool_calls[idx]["function"][
-                                "arguments"
-                            ] += tc_delta["function"]["arguments"]
+                            accumulated_tool_calls[idx]["function"]["arguments"] += (
+                                tc_delta["function"]["arguments"]
+                            )
 
                         # Update ID if provided
                         if tc_delta.get("id"):

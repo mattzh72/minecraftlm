@@ -31,9 +31,9 @@ The exported structure dictionary has the form::
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from app.agent.minecraft_sdk.assets import LegacyAssets, _normalize_block_id
+from app.agent.minecraft.assets import LegacyAssets, _normalize_block_id
 
 
 class BlockCatalog:
@@ -113,7 +113,11 @@ class BlockCatalog:
         unknown = [name for name in properties.keys() if name not in schema]
         if unknown:
             allowed = ", ".join(sorted(schema.keys()))
-            detail = f"Allowed properties: {allowed}." if allowed else "This block takes no properties."
+            detail = (
+                f"Allowed properties: {allowed}."
+                if allowed
+                else "This block takes no properties."
+            )
             raise ValueError(
                 f'Invalid properties for "{normalized}": {", ".join(sorted(unknown))}. {detail}'
             )
@@ -139,6 +143,7 @@ class BlockCatalog:
             )
 
         return dict(properties)
+
 
 @dataclass
 class Vector3:

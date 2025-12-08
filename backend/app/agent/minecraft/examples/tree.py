@@ -8,12 +8,7 @@ exports a structure dictionary via the top-level `structure` variable.
 import json
 from pathlib import Path
 
-from app.agent.minecraft_sdk import (
-    Scene,
-    Block,
-    BlockCatalog,
-    axis_properties,
-)
+from app.agent.minecraft import Scene, Block, BlockCatalog, axis_properties
 
 
 def build_structure() -> dict:
@@ -71,4 +66,3 @@ if __name__ == "__main__":
     out_path = Path(__file__).with_suffix(".json")
     out_path.write_text(json.dumps(structure, indent=2))
     print(f"Wrote tree structure JSON to {out_path}")
-

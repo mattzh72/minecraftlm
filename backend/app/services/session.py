@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.agent.minecraft_sdk.scaffold import DEFAULT_SCAFFOLD
+from app.agent.minecraft.scaffold import DEFAULT_SCAFFOLD
 
 # Store sessions outside backend/ to avoid triggering uvicorn reload
 STORAGE_DIR = Path(__file__).parent.parent.parent.parent / ".storage" / "sessions"

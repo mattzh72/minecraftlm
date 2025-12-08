@@ -12,7 +12,7 @@ Edit the build_structure() function below to create the desired Minecraft
 structure using the Minecraft SDK.
 """
 
-from app.agent.minecraft_sdk import (
+from app.agent.minecraft import (
     Scene,
     Block,
     Vector3,
