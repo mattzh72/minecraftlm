@@ -30,11 +30,6 @@ const useSessionStore = create((set, get) => ({
 
       set({ sessionId: data.session_id, conversation: [] });
 
-      // Update URL with new session ID
-      const url = new URL(window.location.href);
-      url.searchParams.set('session', data.session_id);
-      window.history.pushState({}, '', url);
-
       console.log('Session created:', data.session_id);
       return data.session_id;
     } catch (error) {

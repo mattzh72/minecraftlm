@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cva } from 'class-variance-authority';
+import useSessionStore from '../store/sessionStore';
 import ThumbnailViewer from './ThumbnailViewer';
 import { SuggestionButtons } from './SuggestionButton';
 
@@ -26,7 +28,10 @@ const sessionCard = cva([
   'hover:-translate-y-1 hover:shadow-lg hover:border-gray-300',
 ]);
 
-export default function ProjectsPage({ onSelectSession, onCreateNew }) {
+export default function ProjectsPage() {
+  const navigate = useNavigate();
+  const createSession = useSessionStore((state) => state.createSession);
+
   const [sessions, setSessions] = useState([]);
   const [sessionStructures, setSessionStructures] = useState({});
   const [isLoading, setIsLoading] = useState(true);
@@ -65,14 +70,25 @@ export default function ProjectsPage({ onSelectSession, onCreateNew }) {
       });
   }, []);
 
+  // Handle creating a new session and navigating to it
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!inputValue.trim() || isCreating) return;
 
     setIsCreating(true);
-    await onCreateNew(inputValue.trim());
+    const newSessionId = await createSession(inputValue.trim());
     setInputValue('');
     setIsCreating(false);
+
+    // Navigate to the new session
+    if (newSessionId) {
+      navigate(`/session/${newSessionId}`);
+    }
+  };
+
+  // Navigate to an existing session
+  const handleSelectSession = (sessionId) => {
+    navigate(`/session/${sessionId}`);
   };
 
   const formatDate = (isoString) => {
@@ -157,7 +173,7 @@ export default function ProjectsPage({ onSelectSession, onCreateNew }) {
               {sessions.map(session => (
                 <div
                   key={session.session_id}
-                  onClick={() => onSelectSession(session.session_id)}
+                  onClick={() => handleSelectSession(session.session_id)}
                   className={sessionCard()}
                 >
                   {/* Thumbnail */}

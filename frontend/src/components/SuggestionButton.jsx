@@ -57,5 +57,3 @@ export function SuggestionButtons({ onSelect, disabled }) {
         </div>
     );
 }
-
-export default SuggestionButtons;
