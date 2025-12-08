@@ -5,7 +5,7 @@ import {
   Pencil,
   CircleCheck,
   Wrench,
-  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import { Collapsible } from "@base-ui-components/react/collapsible";
@@ -99,46 +99,59 @@ function ToolCallWithResultDisplay({ toolCall }) {
   const isExpandable = hasExpandableContent(toolCall);
   const shouldDefaultOpen = hasError;
 
-  const innerContent = (
-    <>
-      <div className="flex items-center gap-1.5">
-        <IconComponent size={14} className={iconColor} />
-        <span className="font-medium">{label}</span>
-      </div>
-      {isExpandable && (
-        <ChevronRight
-          size={14}
-          className="text-slate-400 transition-transform group-data-panel-open:rotate-90"
-        />
-      )}
-    </>
-  );
-
   if (!isExpandable) {
     return (
-      <div className="text-sm py-1 flex items-center justify-between w-full text-slate-500">
-        {innerContent}
+      <div className="text-sm py-1 flex items-center gap-1.5 text-slate-500">
+        <IconComponent size={14} className={iconColor} />
+        <span className="font-medium">{label}</span>
       </div>
     );
   }
 
   return (
     <Collapsible.Root className="text-sm" defaultOpen={shouldDefaultOpen}>
-      <Collapsible.Trigger className="group w-full text-left py-1 flex items-center justify-between text-slate-500 hover:text-slate-700 transition-colors cursor-pointer">
-        {innerContent}
-      </Collapsible.Trigger>
-      {displayContent && (
-        <Collapsible.Panel className="mt-1.5">
-          <pre
+      <Collapsible.Trigger
+        disabled={!displayContent}
+        className="group w-full text-left py-1 flex items-center gap-1.5 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+      >
+        <span className="relative size-3.5">
+          <IconComponent
+            size={14}
             className={cn(
-              "p-2 rounded-lg text-xs overflow-auto max-h-48",
-              hasError ? "bg-red-50 text-red-700" : "bg-slate-50 text-slate-600"
+              iconColor,
+              "absolute inset-0 transition-opacity group-hover:opacity-0"
             )}
-          >
-            {displayContent}
-          </pre>
-        </Collapsible.Panel>
-      )}
+          />
+          <ChevronDown
+            size={14}
+            className="absolute inset-0 text-slate-400 opacity-0 transition-all group-hover:opacity-100 group-data-panel-open:rotate-180"
+          />
+        </span>
+        <span className="font-medium">{label}</span>
+      </Collapsible.Trigger>
+      <Collapsible.Panel
+        keepMounted
+        className={cn(
+          "grid grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out",
+          "data-closed:grid-rows-[0fr]",
+          "data-starting-style:grid-rows-[0fr]"
+        )}
+      >
+        <div className="overflow-hidden min-h-0">
+          {displayContent && (
+            <pre
+              className={cn(
+                "mt-1.5 p-2 rounded-lg text-xs overflow-auto max-h-48",
+                hasError
+                  ? "bg-red-50 text-red-700"
+                  : "bg-slate-50 text-slate-600"
+              )}
+            >
+              {displayContent}
+            </pre>
+          )}
+        </div>
+      </Collapsible.Panel>
     </Collapsible.Root>
   );
 }
@@ -325,7 +338,7 @@ export default function ChatPanel() {
       <ChatPanelHeader />
 
       {/* Messages - scrollable */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-3">
+      <div className="flex-1 overflow-y-auto min-h-0 px-3 space-y-2 pt-2">
         {/* Render formatted UI messages (tool results are grouped with their calls) */}
         {displayMessages.map((msg, idx) => {
           if (msg.type === "user") {
