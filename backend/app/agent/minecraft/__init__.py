@@ -13,7 +13,7 @@ The agent should usually import from this package rather than individual
 modules.
 """
 
-from app.agent.minecraft_sdk.sdk import (
+from app.agent.minecraft.sdk import (
     Block,
     BlockCatalog,
     Object3D,
