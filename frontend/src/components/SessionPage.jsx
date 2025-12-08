@@ -15,9 +15,13 @@ export function SessionPage() {
 
   const sessionId = useSessionStore((state) => state.sessionId);
   const structureData = useSessionStore((state) => state.structureData);
+  const previewBlocks = useSessionStore((state) => state.previewBlocks);
   const isLoading = useSessionStore((state) => state.isLoading);
   const restoreSession = useSessionStore((state) => state.restoreSession);
   const resetSession = useSessionStore((state) => state.resetSession);
+
+  // Show viewer if we have structure data OR preview blocks
+  const showViewer = structureData || previewBlocks.length > 0;
 
   // Restore session from URL param on mount
   useEffect(() => {
@@ -46,17 +50,12 @@ export function SessionPage() {
           >
             ← Projects
           </button>
-          {/* {sessionId && (
-            <span className="text-xs text-slate-400 font-mono">
-              {sessionId.slice(0, 8)}...
-            </span>
-          )} */}
         </div>
 
         {/* 3D Viewer Panel */}
         <div className="flex-1 flex flex-col min-h-0 min-w-0">
           <div className="flex-1 w-full relative min-h-0">
-            {structureData ? (
+            {showViewer ? (
               <div className="absolute inset-0">
                 <MinecraftViewer />
               </div>

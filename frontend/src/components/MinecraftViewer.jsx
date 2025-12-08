@@ -1,4 +1,4 @@
-import { useRef, useMemo, useCallback, useState, useLayoutEffect } from "react";
+import { useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import useSessionStore from "../store/sessionStore";
 import useDeepslateResources from "../hooks/useDeepslateResources";
 import useCamera from "../hooks/useCamera";
@@ -7,18 +7,55 @@ import useMouseControls from "../hooks/useMouseControls";
 
 export function MinecraftViewer() {
   const structureData = useSessionStore((state) => state.structureData);
+  const previewBlocks = useSessionStore((state) => state.previewBlocks);
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
-  
 
   // Load rendering resources
   const { resources, isLoading, error } = useDeepslateResources();
 
+  // Combine structureData with preview blocks for rendering
+  const combinedStructureData = useMemo(() => {
+    // If we have preview blocks but no structure data, create a minimal structure
+    if (previewBlocks.length > 0 && !structureData) {
+      // Calculate bounding box from preview blocks
+      let minX = Infinity, minY = Infinity, minZ = Infinity;
+      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+      previewBlocks.forEach(block => {
+        minX = Math.min(minX, block.start[0]);
+        minY = Math.min(minY, block.start[1]);
+        minZ = Math.min(minZ, block.start[2]);
+        maxX = Math.max(maxX, block.end[0]);
+        maxY = Math.max(maxY, block.end[1]);
+        maxZ = Math.max(maxZ, block.end[2]);
+      });
+
+      return {
+        width: Math.max(1, maxX - minX),
+        height: Math.max(1, maxY - minY),
+        depth: Math.max(1, maxZ - minZ),
+        blocks: previewBlocks,
+      };
+    }
+
+    // If we have structure data, merge preview blocks with it
+    if (structureData && previewBlocks.length > 0) {
+      return {
+        ...structureData,
+        blocks: [...(structureData.blocks || []), ...previewBlocks],
+      };
+    }
+
+    // Otherwise just return the structure data as-is
+    return structureData;
+  }, [structureData, previewBlocks]);
+
   // Calculate structure size for camera initialization
   const structureSize = useMemo(() => {
-    if (!structureData) return null;
-    return [structureData.width, structureData.height, structureData.depth];
-  }, [structureData]);
+    if (!combinedStructureData) return null;
+    return [combinedStructureData.width, combinedStructureData.height, combinedStructureData.depth];
+  }, [combinedStructureData]);
 
   // Camera controls
   const camera = useCamera(structureSize);
@@ -26,7 +63,7 @@ export function MinecraftViewer() {
   // Render loop - recreate renderer when canvasSize changes
   const { requestRender, resize } = useRenderLoop(
     canvasRef,
-    structureData,
+    combinedStructureData,
     resources,
     camera,
   );

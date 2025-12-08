@@ -4,15 +4,14 @@ FastAPI application entry point
 
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
 from app.api import chat, session
+from app.config import settings
 
 # Configure logging before importing modules that use it
 logging.basicConfig(
@@ -59,7 +58,7 @@ async def health():
 
 
 # Serve static files from frontend build (if exists)
-frontend_build = Path(__file__).parent.parent.parent / "frontend" / "dist"
+frontend_build = settings.frontend_build_dir
 if frontend_build.exists():
     # Mount static assets
     app.mount(

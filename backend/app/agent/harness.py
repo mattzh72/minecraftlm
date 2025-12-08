@@ -3,6 +3,7 @@ Agent executor - main agentic loop
 """
 
 import json
+import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import AsyncIterator, Literal
 import logging
 
 from app.services.llm import LLMService
+from app.agent.block_parser import BlockStreamParser
 from app.services.session import SessionService
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
@@ -25,6 +27,7 @@ ActivityEventType = Literal[
     "complete",
     "turn_start",
     "error",
+    "block_preview",  # Streamed block preview from code parsing
 ]
 
 
@@ -85,6 +88,9 @@ class MinecraftSchematicAgent:
             "[[SDK_PITFALLS]]": f"05-pitfalls.md\n\n{(docs_dir / '05-pitfalls.md').read_text()}",
         }
 
+        # Block stream parser for real-time preview
+        self.block_parser = BlockStreamParser()
+
     def _format_code_with_line_numbers(self, code: str) -> str:
         """Format code with line numbers (cat -n style)."""
         if not code or not code.strip():
@@ -119,6 +125,9 @@ class MinecraftSchematicAgent:
         """
         turn_count = 0
 
+        # Reset block parser for fresh preview state
+        self.block_parser.reset()
+
         # Load conversation history
         conversation = self.session_service.load_conversation(self.session_id)
 
@@ -144,8 +153,6 @@ class MinecraftSchematicAgent:
 
             turn_count += 1
 
-            # Call model with tools (streaming)
-            logger.info(f"yielding event type=turn_start, turn={turn_count}")
             yield ActivityEvent(type="turn_start", data={"turn": turn_count})
 
             # Accumulators for streaming response
@@ -158,22 +165,15 @@ class MinecraftSchematicAgent:
                 messages,
                 self.tool_registry.get_tool_schemas(),
             ):
-                logger.info(f"handling chunk, chunk={chunk}")
                 # Handle text delta
                 if chunk.text_delta:
                     accumulated_text += chunk.text_delta
-                    logger.info(
-                        f"yielding event type=text_delta, delta={chunk.text_delta}"
-                    )
                     yield ActivityEvent(
                         type="text_delta", data={"delta": chunk.text_delta}
                     )
 
                 # Handle tool calls delta
                 if chunk.tool_calls_delta:
-                    logger.info(
-                        f"yielding event type=tool_calls_delta, delta={chunk.tool_calls_delta}"
-                    )
                     for tc_delta in chunk.tool_calls_delta:
                         idx = tc_delta.get("index", 0)
                         if idx not in accumulated_tool_calls:
@@ -198,6 +198,59 @@ class MinecraftSchematicAgent:
                         # Update ID if provided
                         if tc_delta.get("id"):
                             accumulated_tool_calls[idx]["id"] = tc_delta["id"]
+
+                        # Parse blocks from edit_code's new_string for preview
+                        func_name = accumulated_tool_calls[idx]["function"].get("name", "")
+                        args_so_far = accumulated_tool_calls[idx]["function"].get("arguments", "")
+
+                        # Stream block previews from edit_code's new_string
+                        if func_name == "edit_code":
+                            try:
+                                # Find where new_string value starts (works with incomplete JSON)
+                                start_match = re.search(
+                                    r'"new_string"\s*:\s*"',
+                                    args_so_far,
+                                )
+
+                                if start_match:
+                                    # Extract everything after the opening quote
+                                    content_start = start_match.end()
+                                    remaining = args_so_far[content_start:]
+
+                                    # Find the closing quote (handling escapes)
+                                    code_content = ""
+                                    i = 0
+                                    while i < len(remaining):
+                                        if remaining[i] == '\\' and i + 1 < len(remaining):
+                                            code_content += remaining[i:i+2]
+                                            i += 2
+                                        elif remaining[i] == '"':
+                                            break
+                                        else:
+                                            code_content += remaining[i]
+                                            i += 1
+
+                                    # Unescape the JSON string
+                                    try:
+                                        code_content = code_content.encode().decode(
+                                            "unicode_escape"
+                                        )
+                                    except Exception:
+                                        # Intentional: unicode decode failure is non-fatal, keep original content
+                                        pass
+
+                                    new_blocks = self.block_parser.feed(code_content)
+                                    for block in new_blocks:
+                                        # Get position from parser's updated state (may have position.set() now)
+                                        updated_block = self.block_parser.blocks.get(block.variable_name, block)
+                                        block_json = self.block_parser.to_block_json(updated_block)
+                                        yield ActivityEvent(
+                                            type="block_preview",
+                                            data={"block": block_json},
+                                        )
+                            except Exception:
+                                # Best effort - block parsing is non-fatal, don't break streaming
+                                pass
 
             # Build assistant message from accumulated data
             assistant_message = {"role": "assistant", "content": accumulated_text}

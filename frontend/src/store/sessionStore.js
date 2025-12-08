@@ -6,6 +6,7 @@ const useSessionStore = create((set, get) => ({
   structureData: null,
   conversation: [],
   isLoading: false,
+  previewBlocks: [], // Blocks being streamed for real-time preview
 
   // Actions
   createSession: async (initialMessage) => {
@@ -29,8 +30,6 @@ const useSessionStore = create((set, get) => ({
       }
 
       set({ sessionId: data.session_id, conversation: [] });
-
-      console.log('Session created:', data.session_id);
       return data.session_id;
     } catch (error) {
       console.error('Error creating session:', error);
@@ -45,7 +44,6 @@ const useSessionStore = create((set, get) => ({
     try {
       const response = await fetch(`/api/sessions/${sessionId}`);
       if (!response.ok) {
-        console.log('Session not found, creating new one');
         return get().createSession();
       }
 
@@ -55,7 +53,6 @@ const useSessionStore = create((set, get) => ({
         conversation: data.conversation || [],
         structureData: data.structure,
       });
-      console.log('Session restored:', data.session_id);
       return data.session_id;
     } catch (error) {
       console.error('Error restoring session:', error);
@@ -79,11 +76,20 @@ const useSessionStore = create((set, get) => ({
   setSessionId: (id) => set({ sessionId: id }),
   setConversation: (conv) => set({ conversation: conv }),
 
+  // Preview blocks actions
+  addPreviewBlock: (block) => {
+    set((state) => ({
+      previewBlocks: [...state.previewBlocks, block],
+    }));
+  },
+  clearPreviewBlocks: () => set({ previewBlocks: [] }),
+
   resetSession: () => set({
     sessionId: null,
     structureData: null,
     conversation: [],
     isLoading: false,
+    previewBlocks: [],
   }),
 }));
 

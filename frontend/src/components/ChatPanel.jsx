@@ -205,6 +205,8 @@ export default function ChatPanel() {
   const conversation = useSessionStore((state) => state.conversation);
   const setConversation = useSessionStore((state) => state.setConversation);
   const setStructureData = useSessionStore((state) => state.setStructureData);
+  const addPreviewBlock = useSessionStore((state) => state.addPreviewBlock);
+  const clearPreviewBlocks = useSessionStore((state) => state.clearPreviewBlocks);
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -241,6 +243,7 @@ export default function ChatPanel() {
       setStreamingContent("");
       setIsThinking(true);
       setIsLoading(true);
+      clearPreviewBlocks(); // Clear any previous preview blocks
 
       // Abort any previous request (only when starting new request, not on unmount)
       if (abortControllerRef.current) {
@@ -264,37 +267,41 @@ export default function ChatPanel() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let accumulatedText = "";
+        let sseBuffer = ""; // Buffer for incomplete SSE lines across chunks
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           const chunk = decoder.decode(value);
-          const lines = chunk.split("\n");
 
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
+          // Append to buffer and split by double newline (SSE event separator)
+          sseBuffer += chunk;
+          const events = sseBuffer.split("\n\n");
+
+          // Keep the last incomplete event in buffer (if any)
+          sseBuffer = events.pop() || "";
+
+          for (const event of events) {
+            const lines = event.split("\n");
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
 
                 if (data.type === "turn_start") {
-                  // New turn starting, show thinking
                   setIsThinking(true);
                 } else if (data.type === "text_delta") {
-                  // Accumulate text content
                   accumulatedText += data.data.delta;
                   setStreamingContent(accumulatedText);
                   setIsThinking(false);
                 } else if (data.type === "tool_call") {
-                  // Tool call started - show thinking while it executes
                   setIsThinking(true);
                 } else if (data.type === "tool_result") {
                   // Tool finished - thinking for next step
                   setIsThinking(true);
                 } else if (data.type === "complete") {
-                  // Done - fetch updated conversation and structure
                   setIsThinking(false);
-
                   if (data.data.success) {
                     try {
                       const structureRes = await fetch(
@@ -303,10 +310,15 @@ export default function ChatPanel() {
                       if (structureRes.ok) {
                         const structureData = await structureRes.json();
                         setStructureData(structureData);
+                        clearPreviewBlocks();
                       }
                     } catch (err) {
                       console.error("Error fetching structure:", err);
                     }
+                  }
+                } else if (data.type === "block_preview") {
+                  if (data.data.block) {
+                    addPreviewBlock(data.data.block);
                   }
                 } else if (data.type === "error") {
                   setLocalError(data.data.message);
@@ -317,6 +329,7 @@ export default function ChatPanel() {
               }
             }
           }
+          }
         }
 
         // Stream finished - fetch the updated conversation from backend
@@ -325,7 +338,7 @@ export default function ChatPanel() {
           if (sessionRes.ok) {
             const sessionData = await sessionRes.json();
             setConversation(sessionData.conversation || []);
-            setPendingUserMessage(null); // Clear pending now that we have real data
+            setPendingUserMessage(null);
           }
         } catch (err) {
           console.error("Error fetching updated conversation:", err);
@@ -343,7 +356,7 @@ export default function ChatPanel() {
         setPendingUserMessage(null);
       }
     },
-    [sessionId, isLoading, input, setStructureData, setConversation]
+    [sessionId, isLoading, input, setStructureData, setConversation, addPreviewBlock, clearPreviewBlocks]
   );
 
   useInitialMessage(sessionId, displayMessages.length, isLoading, handleSend);

@@ -2,6 +2,7 @@
 Chat API endpoints
 """
 
+import logging
 from typing import AsyncIterator
 
 from app.api.models.chat import SSEPayload, sse_repr
@@ -10,6 +11,8 @@ from fastapi.responses import StreamingResponse
 
 from app.agent.harness import MinecraftSchematicAgent
 from app.api.models import ChatRequest
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -24,6 +27,7 @@ async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
     - tool_call: Agent calling a tool
     - tool_result: Tool execution result
     - complete: Task finished (success or error)
+    - block_preview: Streamed block preview
     """
     try:
         # Create agent executor
@@ -75,3 +79,5 @@ async def chat(request: ChatRequest):
             "X-Accel-Buffering": "no",  # Disable nginx buffering
         },
     )
+
+

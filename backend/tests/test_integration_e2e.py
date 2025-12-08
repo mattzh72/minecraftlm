@@ -42,8 +42,7 @@ async def test_agent_e2e_simple_structure():
     print(f"\nCreated session: {session_id}")
 
     # Verify session files were created
-    from app.services.session import STORAGE_DIR
-    session_dir = STORAGE_DIR / session_id
+    session_dir = settings.storage_dir / session_id
     assert session_dir.exists(), f"Session directory not created: {session_dir}"
     assert (session_dir / "code.py").exists(), "code.py not created"
     assert (session_dir / "conversation.json").exists(), "conversation.json not created"

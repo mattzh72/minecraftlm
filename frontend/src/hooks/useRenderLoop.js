@@ -34,7 +34,7 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     if (!structureData || !resources || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    
+
     const hasValidDimensions = canvas.width > 0 && canvas.height > 0;
     if (!hasValidDimensions) return;
 
