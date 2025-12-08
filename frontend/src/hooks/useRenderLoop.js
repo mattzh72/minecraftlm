@@ -1,4 +1,5 @@
 import { useRef, useCallback, useEffect } from 'react';
+import { StructureRenderer } from 'deepslate';
 import { structureFromJsonData } from '../utils/deepslate';
 
 /**
@@ -46,7 +47,7 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     }
 
     // Create new renderer
-    const renderer = new window.deepslate.StructureRenderer(
+    const renderer = new StructureRenderer(
       gl,
       structure,
       resources,

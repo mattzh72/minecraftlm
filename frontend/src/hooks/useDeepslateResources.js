@@ -38,7 +38,7 @@ const fetchAssets = async () => {
     throw new Error(`Failed to fetch assets.js: ${res.status}`);
   }
   const code = await res.text();
-  const wrappedCode = `${code}\nwindow.assets = assets; return assets;`;
+  const wrappedCode = `${code}\nreturn assets;`;
   const fn = new Function(wrappedCode);
   const assets = fn();
 

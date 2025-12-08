@@ -1,8 +1,10 @@
 // Deepslate utilities for Minecraft rendering
 // Adapted from legacy implementation
 
+import { BlockDefinition, BlockModel, TextureAtlas, Structure } from 'deepslate';
+import { mat4, vec3 } from 'gl-matrix';
+
 let deepslateResources = null;
-const { mat4, vec3 } = window.glMatrix;
 
 function upperPowerOfTwo(x) {
   x -= 1;
@@ -25,14 +27,14 @@ const normalizeId = (id) => {
 export function loadDeepslateResources(textureImage, assets, blockFlags = {}) {
   const blockDefinitions = {};
   Object.keys(assets.blockstates).forEach((id) => {
-    blockDefinitions["minecraft:" + id] = window.deepslate.BlockDefinition.fromJson(
+    blockDefinitions["minecraft:" + id] = BlockDefinition.fromJson(
       assets.blockstates[id]
     );
   });
 
   const blockModels = {};
   Object.keys(assets.models).forEach((id) => {
-    blockModels["minecraft:" + id] = window.deepslate.BlockModel.fromJson(
+    blockModels["minecraft:" + id] = BlockModel.fromJson(
       assets.models[id]
     );
   });
@@ -67,7 +69,7 @@ export function loadDeepslateResources(textureImage, assets, blockFlags = {}) {
     ];
   });
 
-  const textureAtlas = new window.deepslate.TextureAtlas(atlasData, idMap);
+  const textureAtlas = new TextureAtlas(atlasData, idMap);
 
   const opaqueBlocks = blockFlags.opaque ?? new Set();
   const transparentBlocks = blockFlags.transparent ?? new Set();
@@ -115,7 +117,7 @@ export function getDeepslateResources() {
 
 export function structureFromJsonData(data) {
   const blocks = data.blocks;
-  const structure = new window.deepslate.Structure([
+  const structure = new Structure([
     data.width,
     data.height,
     data.depth,

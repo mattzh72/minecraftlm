@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { StructureRenderer } from 'deepslate';
 import useDeepslateResources from '../hooks/useDeepslateResources';
 import { structureFromJsonData, mat4, vec3 } from '../utils/deepslate';
 
@@ -25,7 +26,7 @@ export default function ThumbnailViewer({ structureData, size = 200 }) {
       const structure = structureFromJsonData(structureData);
 
       // Create renderer
-      const renderer = new window.deepslate.StructureRenderer(
+      const renderer = new StructureRenderer(
         gl,
         structure,
         resources,
