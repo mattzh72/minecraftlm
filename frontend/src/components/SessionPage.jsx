@@ -30,10 +30,10 @@ export function SessionPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900">
-      <div className="flex flex-1 min-h-0">
+    <div className="h-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Chat Panel Sidebar */}
-        <div className="w-sm border-r border-gray-200 flex flex-col min-h-0 shrink-0 bg-gray-50">
+        <div className="w-sm border-r border-gray-200 flex flex-col min-h-0 shrink-0 bg-gray-50 overflow-hidden">
           {/* Header with back button */}
           <div className="px-5 py-2.5 border-b border-gray-200 flex items-center gap-2.5">
             <button
