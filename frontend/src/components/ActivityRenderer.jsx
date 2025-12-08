@@ -1,5 +1,5 @@
 import { cn } from "../lib/cn";
-import { DirtBlockAnimation } from "./DirtBlockAnimation";
+import { BlockAnimation } from "./BlockAnimation.tsx";
 
 function ShimmerText({ children }) {
   return (
@@ -20,7 +20,7 @@ function ShimmerText({ children }) {
 export function ThinkingIndicator() {
   return (
     <div className="text-sm flex items-center gap-2 text-slate-500">
-      <DirtBlockAnimation size={16} />
+      <BlockAnimation size={12} />
       <ShimmerText>Thinking</ShimmerText>
     </div>
   );

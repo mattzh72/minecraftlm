@@ -382,9 +382,7 @@ export default function ChatPanel() {
         })}
 
         {/* Pending user message (shown immediately while loading) */}
-        {pendingUserMessage && (
-          <UserMessage content={pendingUserMessage} />
-        )}
+        {pendingUserMessage && <UserMessage content={pendingUserMessage} />}
 
         {/* Streaming message (while loading) */}
         {isLoading && (
