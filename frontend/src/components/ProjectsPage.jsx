@@ -125,7 +125,7 @@ export default function ProjectsPage() {
       {!isLoading && hasSessions && (
         <div className="px-6 pb-16 flex justify-center items-start">
           <div className="w-full max-w-5xl">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-6 text-center">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-6">
               Recent Projects
             </h2>
 

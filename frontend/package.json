@@ -19,6 +19,8 @@
     "react-router-dom": "^7.10.1",
     "react-textarea-autosize": "^8.5.9",
     "tailwindcss": "^4.1.17",
+    "ts-pattern": "^5.9.0",
+    "zod": "^4.1.13",
     "zustand": "^5.0.9"
   },
   "devDependencies": {

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import AsyncIterator, Literal
+import logging
 
 from app.services.llm import LLMService
 from app.services.session import SessionService
@@ -14,6 +15,7 @@ from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.registry import ToolRegistry
 
+logger = logging.getLogger(__name__)
 
 ActivityEventType = Literal[
     "thought",
@@ -143,6 +145,7 @@ class MinecraftSchematicAgent:
             turn_count += 1
 
             # Call model with tools (streaming)
+            logger.info(f"yielding event type=turn_start, turn={turn_count}")
             yield ActivityEvent(type="turn_start", data={"turn": turn_count})
 
             # Accumulators for streaming response
@@ -155,15 +158,18 @@ class MinecraftSchematicAgent:
                 messages,
                 self.tool_registry.get_tool_schemas(),
             ):
+                logger.info(f"handling chunk, chunk={chunk}")
                 # Handle text delta
                 if chunk.text_delta:
                     accumulated_text += chunk.text_delta
+                    logger.info(f"yielding event type=text_delta, delta={chunk.text_delta}")
                     yield ActivityEvent(
                         type="text_delta", data={"delta": chunk.text_delta}
                     )
 
                 # Handle tool calls delta
                 if chunk.tool_calls_delta:
+                    logger.info(f"yielding event type=tool_calls_delta, delta={chunk.tool_calls_delta}")
                     for tc_delta in chunk.tool_calls_delta:
                         idx = tc_delta.get("index", 0)
                         if idx not in accumulated_tool_calls:

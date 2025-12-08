@@ -1,27 +1,16 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { cva } from "class-variance-authority";
+import { useState, useRef, useCallback } from "react";
+import { cva, cx } from "class-variance-authority";
 import useSessionStore from "../store/sessionStore";
 import useAutoScroll from "../hooks/useAutoScroll";
 import useInitialMessage from "../hooks/useInitialMessage";
 import { PromptBoxWrapper } from "./PromptBox";
+import { ThinkingIndicator } from "./ActivityRenderer";
 
 // Message bubble variants
 const messageBubble = cva("p-3 text-sm text-slate-700", {
   variants: {
     error: {
       true: "text-red-700",
-    },
-  },
-});
-
-// Activity type variants
-const activityText = cva("text-sm", {
-  variants: {
-    type: {
-      thought: "text-slate-600",
-      tool_call: "text-amber-600",
-      tool_result: "text-emerald-600",
-      error: "text-red-600",
     },
   },
 });
@@ -45,86 +34,126 @@ function ChatPanelHeader() {
   );
 }
 
+// ============================================================================
+// Message Renderers - Render OpenAI conversation format directly
+// ============================================================================
+
+function UserMessage({ content }) {
+  return (
+    <div className={messageBubble()}>
+      <div className={roleLabel({ role: "user" })}>You</div>
+      <div className="whitespace-pre-wrap">{content}</div>
+    </div>
+  );
+}
+
+function AssistantMessage({ content, toolCalls }) {
+  const hasContent = content && content.trim();
+  const hasToolCalls = toolCalls && toolCalls.length > 0;
+
+  if (!hasContent && !hasToolCalls) return null;
+
+  return (
+    <div className={messageBubble()}>
+      <div className={roleLabel({ role: "agent" })}>Agent</div>
+      <div className="space-y-2">
+        {hasContent && (
+          <div className="whitespace-pre-wrap">{content}</div>
+        )}
+        {hasToolCalls && toolCalls.map((tc, idx) => (
+          <ToolCallDisplay key={idx} toolCall={tc} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ToolCallDisplay({ toolCall }) {
+  const name = toolCall.function?.name || "unknown";
+  const icon = name === "edit_code" ? "✏️" : name === "complete_task" ? "✓" : "🔧";
+  const label = name === "edit_code" ? "Editing code" : name === "complete_task" ? "Validating" : name;
+
+  return (
+    <div className="text-sm flex items-center gap-1.5 text-slate-500">
+      <span>{icon}</span>
+      <span className="font-medium">{label}</span>
+    </div>
+  );
+}
+
+function ToolResultMessage({ name, content }) {
+  let result;
+  try {
+    result = JSON.parse(content);
+  } catch {
+    result = { output: content };
+  }
+
+  const hasError = result?.error;
+  const icon = hasError ? "✗" : "✓";
+  const label = name === "edit_code" 
+    ? (hasError ? "Edit failed" : "Edited code")
+    : name === "complete_task"
+    ? (hasError ? "Validation failed" : "Validated")
+    : (hasError ? "Failed" : "Done");
+
+  return (
+    <div className={cx(
+      "text-sm flex items-center gap-1.5",
+      hasError ? "text-red-500" : "text-emerald-600"
+    )}>
+      <span>{icon}</span>
+      <span className="font-medium">{label}</span>
+    </div>
+  );
+}
+
+function StreamingMessage({ content, isThinking }) {
+  return (
+    <div className={messageBubble()}>
+      <div className={roleLabel({ role: "agent" })}>Agent</div>
+      <div className="space-y-2">
+        {content && content.trim() && (
+          <div className="whitespace-pre-wrap">{content}</div>
+        )}
+        {isThinking && <ThinkingIndicator />}
+      </div>
+    </div>
+  );
+}
+
+function ErrorMessage({ content }) {
+  return (
+    <div className={messageBubble({ error: true })}>
+      {content}
+    </div>
+  );
+}
+
+// ============================================================================
+// Main ChatPanel Component
+// ============================================================================
+
 export default function ChatPanel() {
   const sessionId = useSessionStore((state) => state.sessionId);
   const conversation = useSessionStore((state) => state.conversation);
+  const setConversation = useSessionStore((state) => state.setConversation);
   const setStructureData = useSessionStore((state) => state.setStructureData);
 
-  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Streaming state - temporary message being built
+  const [streamingContent, setStreamingContent] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
+  const [localError, setLocalError] = useState(null);
 
-  const activitiesRef = useRef([]);
   const abortControllerRef = useRef(null);
-  const requestIdRef = useRef(0);
-  const isMountedRef = useRef(true);
 
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
+  // Derive display messages from conversation (no useEffect needed)
+  const displayMessages = conversation || [];
 
-  // Restore messages from conversation when session is loaded
-  useEffect(() => {
-    if (conversation && conversation.length > 0) {
-      const restoredMessages = [];
-      let currentAgentMessage = null;
-
-      for (const msg of conversation) {
-        if (msg.role === "user") {
-          if (
-            currentAgentMessage &&
-            currentAgentMessage.activities.length > 0
-          ) {
-            restoredMessages.push(currentAgentMessage);
-            currentAgentMessage = null;
-          }
-          restoredMessages.push({ role: "user", content: msg.content });
-        } else if (msg.role === "assistant") {
-          if (!currentAgentMessage) {
-            currentAgentMessage = { role: "agent", activities: [] };
-          }
-          if (msg.content && msg.content.trim()) {
-            currentAgentMessage.activities.push({
-              type: "thought",
-              content: msg.content,
-            });
-          }
-          if (msg.tool_calls) {
-            for (const toolCall of msg.tool_calls) {
-              const args = JSON.parse(toolCall.function.arguments);
-              currentAgentMessage.activities.push({
-                type: "tool_call",
-                name: toolCall.function.name,
-                args: args,
-              });
-            }
-          }
-        } else if (msg.role === "tool") {
-          if (!currentAgentMessage) {
-            currentAgentMessage = { role: "agent", activities: [] };
-          }
-          const result = JSON.parse(msg.content);
-          currentAgentMessage.activities.push({
-            type: "tool_result",
-            result: result,
-          });
-        }
-      }
-
-      if (currentAgentMessage && currentAgentMessage.activities.length > 0) {
-        restoredMessages.push(currentAgentMessage);
-      }
-
-      setMessages(restoredMessages);
-    }
-  }, [conversation]);
-
-  const messagesEndRef = useAutoScroll([messages]);
+  const messagesEndRef = useAutoScroll([displayMessages, streamingContent, isThinking]);
 
   const handleSend = useCallback(
     async (messageText = null) => {
@@ -133,38 +162,17 @@ export default function ChatPanel() {
       if (!userMessage.trim() || !sessionId || isLoading) return;
 
       setInput("");
-
-      const newMessages = [
-        ...messages,
-        { role: "user", content: userMessage },
-        { role: "agent", activities: [] },
-      ];
-      setMessages(newMessages);
-      const requestId = requestIdRef.current + 1;
-      requestIdRef.current = requestId;
+      setLocalError(null);
+      setStreamingContent("");
+      setIsThinking(true);
       setIsLoading(true);
 
+      // Abort any previous request (only when starting new request, not on unmount)
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
-
-      activitiesRef.current = [];
-      const agentMessageIndex = newMessages.length - 1;
-
-      const syncActivities = () => {
-        setMessages((prev) => {
-          const updated = [...prev];
-          if (updated[agentMessageIndex]?.role === "agent") {
-            updated[agentMessageIndex] = {
-              ...updated[agentMessageIndex],
-              activities: [...activitiesRef.current],
-            };
-          }
-          return updated;
-        });
-      };
 
       try {
         const response = await fetch("/api/chat", {
@@ -180,6 +188,7 @@ export default function ChatPanel() {
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
+        let accumulatedText = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -187,43 +196,30 @@ export default function ChatPanel() {
 
           const chunk = decoder.decode(value);
           const lines = chunk.split("\n");
-          let hasNewActivity = false;
 
           for (const line of lines) {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
-                let activity = null;
 
-                if (data.type === "text_delta") {
-                  const lastActivity =
-                    activitiesRef.current[activitiesRef.current.length - 1];
-                  if (lastActivity && lastActivity.type === "thought") {
-                    lastActivity.content += data.data.delta;
-                  } else {
-                    activitiesRef.current.push({
-                      type: "thought",
-                      content: data.data.delta,
-                    });
-                  }
-                  hasNewActivity = true;
-                } else if (data.type === "thought") {
-                  activity = { type: "thought", content: data.data.text };
+                if (data.type === "turn_start") {
+                  // New turn starting, show thinking
+                  setIsThinking(true);
+                } else if (data.type === "text_delta") {
+                  // Accumulate text content
+                  accumulatedText += data.data.delta;
+                  setStreamingContent(accumulatedText);
+                  setIsThinking(false);
                 } else if (data.type === "tool_call") {
-                  activity = {
-                    type: "tool_call",
-                    name: data.data.name,
-                    args: data.data.args,
-                  };
+                  // Tool call started - show thinking while it executes
+                  setIsThinking(true);
                 } else if (data.type === "tool_result") {
-                  activity = { type: "tool_result", result: data.data };
+                  // Tool finished - thinking for next step
+                  setIsThinking(true);
                 } else if (data.type === "complete") {
-                  activity = {
-                    type: "complete",
-                    success: data.data.success,
-                    message: data.data.message,
-                  };
-
+                  // Done - fetch updated conversation and structure
+                  setIsThinking(false);
+                  
                   if (data.data.success) {
                     try {
                       const structureRes = await fetch(
@@ -237,50 +233,44 @@ export default function ChatPanel() {
                       console.error("Error fetching structure:", err);
                     }
                   }
-                } else if (data.type === "turn_start") {
-                  activity = { type: "turn_start", turn: data.data.turn };
                 } else if (data.type === "error") {
-                  activity = { type: "error", message: data.data.message };
-                }
-
-                if (activity) {
-                  activitiesRef.current.push(activity);
-                  hasNewActivity = true;
+                  setLocalError(data.data.message);
+                  setIsThinking(false);
                 }
               } catch (parseErr) {
                 console.error("Error parsing SSE data:", parseErr, line);
               }
             }
           }
-
-          if (hasNewActivity) {
-            syncActivities();
-          }
         }
+
+        // Stream finished - fetch the updated conversation from backend
+        try {
+          const sessionRes = await fetch(`/api/sessions/${sessionId}`);
+          if (sessionRes.ok) {
+            const sessionData = await sessionRes.json();
+            setConversation(sessionData.conversation || []);
+          }
+        } catch (err) {
+          console.error("Error fetching updated conversation:", err);
+        }
+
       } catch (error) {
         console.error("Chat error:", error);
-        if (isMountedRef.current && requestIdRef.current === requestId) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "error",
-              content:
-                error.name === "AbortError"
-                  ? "Request was cancelled."
-                  : `Error: ${error.message}`,
-            },
-          ]);
+        if (error.name !== "AbortError") {
+          setLocalError(`Error: ${error.message}`);
         }
       } finally {
-        if (isMountedRef.current && requestIdRef.current === requestId) {
-          setIsLoading(false);
-        }
+        // Always reset loading state - React safely ignores updates on unmounted components
+        setIsLoading(false);
+        setStreamingContent("");
+        setIsThinking(false);
       }
     },
-    [sessionId, isLoading, input, messages, setStructureData]
+    [sessionId, isLoading, input, setStructureData, setConversation]
   );
 
-  useInitialMessage(sessionId, messages.length, isLoading, handleSend);
+  useInitialMessage(sessionId, displayMessages.length, isLoading, handleSend);
 
   return (
     <div className="flex flex-col h-full">
@@ -289,73 +279,43 @@ export default function ChatPanel() {
 
       {/* Messages - scrollable */}
       <div className="flex-1 overflow-y-auto min-h-0 px-3">
-        {messages.map((msg, idx) => (
-          <div key={idx}>
-            {msg.role === "user" && (
-              <div className={messageBubble()}>
-                <div className={roleLabel({ role: "user" })}>You</div>
-                <div className="whitespace-pre-wrap">{msg.content}</div>
-              </div>
-            )}
+        {/* Render conversation from backend */}
+        {displayMessages.map((msg, idx) => {
+          if (msg.role === "user") {
+            return <UserMessage key={idx} content={msg.content} />;
+          }
+          if (msg.role === "assistant") {
+            return (
+              <AssistantMessage
+                key={idx}
+                content={msg.content}
+                toolCalls={msg.tool_calls}
+              />
+            );
+          }
+          if (msg.role === "tool") {
+            return (
+              <ToolResultMessage
+                key={idx}
+                name={msg.name}
+                content={msg.content}
+              />
+            );
+          }
+          return null;
+        })}
 
-            {msg.role === "agent" && (
-              <div className={messageBubble()}>
-                <div className={roleLabel({ role: "agent" })}>Agent</div>
-                <div className="space-y-2">
-                  {msg.activities.map((activity, actIdx) => (
-                    <div key={actIdx}>
-                      {activity.type === "thought" && (
-                        <div className={activityText({ type: "thought" })}>
-                          {activity.content}
-                        </div>
-                      )}
-                      {activity.type === "tool_call" && (
-                        <div className={activityText({ type: "tool_call" })}>
-                          <span className="font-medium">→ {activity.name}</span>
-                          {Object.keys(activity.args || {}).length > 0 && (
-                            <pre className="mt-1.5 p-2 bg-slate-100 rounded-lg text-xs overflow-auto">
-                              {JSON.stringify(activity.args, null, 2)}
-                            </pre>
-                          )}
-                        </div>
-                      )}
-                      {activity.type === "tool_result" && (
-                        <div className={activityText({ type: "tool_result" })}>
-                          <span className="font-medium">✓ Result</span>
-                          <pre className="mt-1.5 p-2 bg-emerald-50 rounded-lg text-xs overflow-auto">
-                            {JSON.stringify(activity.result, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                      {activity.type === "complete" && (
-                        <div
-                          className={`font-semibold text-sm ${
-                            activity.success
-                              ? "text-emerald-600"
-                              : "text-red-500"
-                          }`}
-                        >
-                          {activity.success ? "✓" : "✗"} {activity.message}
-                        </div>
-                      )}
-                      {activity.type === "error" && (
-                        <div className={activityText({ type: "error" })}>
-                          ⚠ {activity.message}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+        {/* Streaming message (while loading) */}
+        {isLoading && (
+          <StreamingMessage
+            content={streamingContent}
+            isThinking={isThinking}
+          />
+        )}
 
-            {msg.role === "error" && (
-              <div className={messageBubble({ error: true })}>
-                {msg.content}
-              </div>
-            )}
-          </div>
-        ))}
+        {/* Local error */}
+        {localError && <ErrorMessage content={localError} />}
+
         <div ref={messagesEndRef} />
       </div>
 

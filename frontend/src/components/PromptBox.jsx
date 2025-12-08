@@ -41,12 +41,11 @@ function PromptBoxRoot({
   onChange,
   onSubmit,
   disabled = false,
-  isLoading = false,
   placeholder = "Type a message...",
   className = "",
   ...props
 }) {
-  const isActive = value?.trim() && !disabled && !isLoading;
+  const isActive = value?.trim() && !disabled;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -70,7 +69,6 @@ function PromptBoxRoot({
         value,
         onChange,
         disabled,
-        isLoading,
         isActive,
         placeholder,
         handleKeyDown,
@@ -100,7 +98,7 @@ const PromptBoxInput = forwardRef(function PromptBoxInput(
   { className = "", minRows = 1, maxRows = 5, ...props },
   ref
 ) {
-  const { value, onChange, disabled, isLoading, placeholder, handleKeyDown } =
+  const { value, onChange, disabled, placeholder, handleKeyDown } =
     usePromptBoxContext();
 
   return (
@@ -110,7 +108,7 @@ const PromptBoxInput = forwardRef(function PromptBoxInput(
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
-      disabled={disabled || isLoading}
+      disabled={disabled}
       minRows={minRows}
       maxRows={maxRows}
       className={cx(
@@ -126,7 +124,7 @@ const PromptBoxInput = forwardRef(function PromptBoxInput(
 
 // Submit button component
 function PromptBoxSubmit({ className = "", children, ...props }) {
-  const { isActive, isLoading } = usePromptBoxContext();
+  const { isActive } = usePromptBoxContext();
 
   return (
     <button
@@ -145,11 +143,7 @@ function PromptBoxSubmit({ className = "", children, ...props }) {
       )}
       {...props}
     >
-      {isLoading ? (
-        <span className="text-xs">...</span>
-      ) : (
-        children || <ArrowIcon />
-      )}
+      {children || <ArrowIcon />}
     </button>
   );
 }
@@ -175,8 +169,7 @@ export function PromptBoxWrapper({
       value={value}
       onChange={onChange}
       onSubmit={onSubmit}
-      disabled={disabled}
-      isLoading={isLoading}
+      disabled={disabled || isLoading}
       placeholder={placeholder}
       className={className}
     >
