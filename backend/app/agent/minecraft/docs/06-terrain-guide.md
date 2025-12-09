@@ -203,9 +203,114 @@ scene.add(grass)
 - `oxeye_daisy`
 - `azure_bluet`
 
+## Mountain Generation
+
+The terrain system creates **organic, realistic mountains** using domain warping and multi-layer noise. Mountains have:
+- Irregular, natural base shapes (not cones!)
+- Varying slopes on different sides
+- Ridge patterns radiating from peaks
+- Stone surfaces with optional snow caps
+
+### Add a Mountain
+
+Creates an organic mountain with natural shape variation:
+
+```python
+terrain = create_terrain(128, 128, seed=42)
+
+# Add a natural-looking mountain
+terrain.add_mountain(
+    center_x=64, center_z=64,
+    radius=35,           # Base radius (use 25+ for grand mountains)
+    height=50,           # Peak height above terrain (use 30+ for impressive peaks)
+    seed=123,            # Different seeds create different shapes
+    snow=True,           # Add snow cap (default: True)
+    snow_start_percent=0.7,  # Snow starts at 70% of peak height
+)
+
+terrain.generate()
+```
+
+### Add a Ridge
+
+Creates an organic ridge with curved centerline and varying width:
+
+```python
+terrain = create_terrain(128, 128, seed=42)
+
+# Add a natural ridge with sub-peaks
+terrain.add_ridge(
+    start_x=10, start_z=64,
+    end_x=118, end_z=64,
+    width=20,            # Base half-width (varies naturally along length)
+    height=40,           # Peak height (varies with sub-peaks)
+    seed=456,            # Different seeds create different curves
+    snow=True,           # Add snow cap
+)
+
+terrain.generate()
+```
+
+### Add a Plateau
+
+Creates a flat-topped mesa with stone surface:
+
+```python
+terrain = create_terrain(128, 128, seed=42)
+
+# Add a stone plateau
+terrain.add_plateau(
+    center_x=64, center_z=64,
+    radius=25,           # Total radius including slopes
+    height=25,           # Height to raise
+    flat_radius=15,      # Radius of flat top (default: radius // 2)
+    snow=False,          # Plateaus don't have snow by default
+)
+
+terrain.generate()
+```
+
+### Mountain Parameters
+
+| Method | Parameter | Default | Description |
+|--------|-----------|---------|-------------|
+| All | `seed` | auto | Controls shape variation - try different values! |
+| All | `snow` | True (mountain/ridge), False (plateau) | Whether to add snow cap |
+| All | `snow_start_percent` | 0.7 | How far up snow starts (0.7 = top 30%) |
+| All | `falloff` | 1.8 | Slope steepness (higher = steeper near peak) |
+| `add_ridge` | `width` | - | Base half-width (varies naturally) |
+| `add_plateau` | `flat_radius` | radius // 2 | Size of flat top |
+
+### Block Types
+
+Mountains use proper Minecraft block layers:
+- **Snow cap**: `minecraft:snow_block` at elevations above snow line
+- **Stone surface**: `minecraft:stone` for mountain surfaces
+- **Plains**: Grass/dirt/stone layers for non-mountain areas
+
+### Creating a Mountain Range
+
+```python
+terrain = create_terrain(128, 128, seed=42)
+
+# Create organic peaks - each with unique shape from different seeds
+terrain.add_mountain(32, 64, radius=30, height=45, seed=100)
+terrain.add_mountain(64, 64, radius=35, height=55, seed=200)  # Central peak
+terrain.add_mountain(96, 64, radius=30, height=45, seed=300)
+
+# Connect peaks with an organic ridge
+terrain.add_ridge(32, 64, 96, 64, width=18, height=35, seed=400)
+
+# Add a plateau for a structure
+terrain.add_plateau(64, 20, radius=18, height=20, snow=False)
+terrain.flatten_for_structure(55, 11, width=18, depth=18)
+
+terrain.generate()
+```
+
 ## HeightMap Direct Access
 
-For advanced terrain manipulation:
+For advanced terrain manipulation (note: using `Terrain` methods is preferred as they handle block types automatically):
 
 ```python
 from app.agent.minecraft.terrain import HeightMap, HeightMapConfig
@@ -223,6 +328,11 @@ heightmap.flatten_area(50, 50, 10, 10, target_height=70)
 heightmap.smooth(radius=2, iterations=1)
 heightmap.raise_area(30, 30, 5, 5, amount=3)
 heightmap.carve_area(60, 60, 5, 5, amount=4)
+
+# Mountains (heightmap only - won't get stone/snow blocks, use Terrain methods instead)
+heightmap.add_mountain(64, 64, radius=35, height=50, seed=123)
+heightmap.add_ridge(10, 64, 118, 64, width=20, height=40, seed=456)
+heightmap.add_plateau(64, 64, radius=20, height=25)
 ```
 
 ## Complete Example

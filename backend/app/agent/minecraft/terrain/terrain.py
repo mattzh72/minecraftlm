@@ -2,6 +2,7 @@
 Terrain generator for procedural Minecraft landscapes.
 
 Generates plains biome terrain with grass, dirt, and stone layers.
+Supports mountains with stone surfaces and snow caps.
 Integrates with the existing SDK scene graph as an Object3D subclass.
 
 Example:
@@ -23,6 +24,16 @@ import numpy as np
 from app.agent.minecraft.sdk import Block, BlockCatalog, Object3D, Vector3
 from app.agent.minecraft.terrain.heightmap import HeightMap, HeightMapConfig
 from app.agent.minecraft.terrain.noise import NoiseConfig
+
+
+@dataclass
+class MountainInfo:
+    """Information about a mountain for block generation."""
+    center_x: int
+    center_z: int
+    radius: int
+    peak_height: int  # Absolute Y of peak
+    snow_line: Optional[int]  # Y level where snow starts (None = no snow)
 
 
 @dataclass
@@ -56,12 +67,23 @@ PLAINS_LAYERS = [
     ("minecraft:stone", 999, {}),  # Fill to bottom
 ]
 
+# Mountain layer definitions - stone surface with snow cap
+MOUNTAIN_LAYERS_SNOW = [
+    ("minecraft:snow_block", 1, {}),  # Snow cap surface
+    ("minecraft:stone", 999, {}),  # Stone all the way down
+]
+
+MOUNTAIN_LAYERS_STONE = [
+    ("minecraft:stone", 999, {}),  # Stone surface and below
+]
+
 
 class Terrain(Object3D):
     """Procedural terrain generator.
 
     Extends Object3D to integrate with the existing scene graph.
     Generates plains biome terrain with optimized block merging.
+    Supports mountains with stone surfaces and snow caps.
 
     Example:
         config = TerrainConfig(width=128, depth=128)
@@ -101,6 +123,11 @@ class Terrain(Object3D):
         self.heightmap = HeightMap(heightmap_config)
         self._generated = False
 
+        # Track mountain zones for proper block generation
+        self._mountains: List[MountainInfo] = []
+        # 2D array tracking terrain type: 0=plains, 1=mountain_stone, 2=mountain_snow
+        self._terrain_type: Optional[np.ndarray] = None
+
     def generate(self) -> "Terrain":
         """Generate complete terrain.
 
@@ -114,29 +141,79 @@ class Terrain(Object3D):
         if not self.heightmap._generated:
             self.heightmap.generate()
 
+        # Compute terrain type map (plains vs mountain)
+        self._compute_terrain_types()
+
         # Generate terrain blocks with optimization
         self._generate_terrain_blocks()
 
-        # Add decorations if enabled
+        # Add decorations if enabled (only on plains)
         if self.config.generate_decorations:
             self._add_decorations()
 
         self._generated = True
         return self
 
+    def _compute_terrain_types(self) -> None:
+        """Compute terrain type for each column based on registered mountains."""
+        width = self.config.width
+        depth = self.config.depth
+
+        # Initialize all as plains (0)
+        self._terrain_type = np.zeros((depth, width), dtype=np.int8)
+
+        # Mark mountain areas
+        for mountain in self._mountains:
+            cx, cz = mountain.center_x, mountain.center_z
+            radius = mountain.radius
+
+            # Iterate over bounding box of mountain
+            for z in range(max(0, cz - radius), min(depth, cz + radius + 1)):
+                for x in range(max(0, cx - radius), min(width, cx + radius + 1)):
+                    # Calculate distance from center
+                    dx = x - cx
+                    dz = z - cz
+                    distance = np.sqrt(dx * dx + dz * dz)
+
+                    if distance <= radius:
+                        # This column is part of the mountain
+                        surface_height = self.heightmap.get(x, z)
+
+                        if mountain.snow_line is not None and surface_height >= mountain.snow_line:
+                            self._terrain_type[z, x] = 2  # Snow-capped mountain
+                        else:
+                            self._terrain_type[z, x] = 1  # Stone mountain
+
     def _generate_terrain_blocks(self) -> None:
         """Generate optimized terrain blocks.
 
         Uses run-length encoding to merge contiguous columns with same height
         into larger blocks, significantly reducing block count.
+        Handles different terrain types (plains vs mountains).
         """
         heights = self.heightmap.heights
         min_height = self.heightmap.min_height()
 
-        # Process each layer type separately for better merging
+        # Generate blocks for each terrain type separately
+        # Plains areas (type 0)
         for block_id, layer_depth, properties in PLAINS_LAYERS:
             self._generate_layer_blocks(
-                block_id, layer_depth, properties, heights, min_height
+                block_id, layer_depth, properties, heights, min_height,
+                terrain_type_filter=0
+            )
+
+        # Mountain stone areas (type 1)
+        for block_id, layer_depth, properties in MOUNTAIN_LAYERS_STONE:
+            self._generate_layer_blocks(
+                block_id, layer_depth, properties, heights, min_height,
+                terrain_type_filter=1
+            )
+
+        # Mountain snow areas (type 2)
+        for block_id, layer_depth, properties in MOUNTAIN_LAYERS_SNOW:
+            self._generate_layer_blocks(
+                block_id, layer_depth, properties, heights, min_height,
+                terrain_type_filter=2
             )
 
     def _generate_layer_blocks(
@@ -146,11 +223,15 @@ class Terrain(Object3D):
         properties: Dict[str, str],
         heights: np.ndarray,
         min_height: int,
+        terrain_type_filter: Optional[int] = None,
     ) -> None:
         """Generate blocks for a single terrain layer with run-length merging.
 
         Scans the terrain row by row, merging adjacent columns with the
         same layer bounds into single wider blocks.
+
+        Args:
+            terrain_type_filter: If set, only generate for columns matching this type.
         """
         width = self.config.width
         depth = self.config.depth
@@ -165,22 +246,35 @@ class Terrain(Object3D):
                     x += 1
                     continue
 
+                # Skip if terrain type doesn't match filter
+                if terrain_type_filter is not None and self._terrain_type is not None:
+                    if self._terrain_type[z, x] != terrain_type_filter:
+                        x += 1
+                        continue
+
                 # Calculate layer bounds for this column
                 surface_height = heights[z, x]
+                terrain_type = self._terrain_type[z, x] if self._terrain_type is not None else 0
                 layer_top, layer_bottom = self._get_layer_bounds(
-                    surface_height, block_id, layer_depth, min_height
+                    surface_height, block_id, layer_depth, min_height, terrain_type
                 )
 
                 if layer_top <= layer_bottom:
                     x += 1
                     continue
 
-                # Find run of columns with same layer bounds
+                # Find run of columns with same layer bounds AND same terrain type
                 run_length = 1
                 while x + run_length < width:
+                    # Check terrain type matches
+                    if terrain_type_filter is not None and self._terrain_type is not None:
+                        if self._terrain_type[z, x + run_length] != terrain_type_filter:
+                            break
+
                     next_surface = heights[z, x + run_length]
+                    next_type = self._terrain_type[z, x + run_length] if self._terrain_type is not None else 0
                     next_top, next_bottom = self._get_layer_bounds(
-                        next_surface, block_id, layer_depth, min_height
+                        next_surface, block_id, layer_depth, min_height, next_type
                     )
                     if next_top == layer_top and next_bottom == layer_bottom:
                         run_length += 1
@@ -196,9 +290,15 @@ class Terrain(Object3D):
                         if processed[z + run_depth, x + dx]:
                             can_extend = False
                             break
+                        # Check terrain type matches
+                        if terrain_type_filter is not None and self._terrain_type is not None:
+                            if self._terrain_type[z + run_depth, x + dx] != terrain_type_filter:
+                                can_extend = False
+                                break
                         row_surface = heights[z + run_depth, x + dx]
+                        row_type = self._terrain_type[z + run_depth, x + dx] if self._terrain_type is not None else 0
                         row_top, row_bottom = self._get_layer_bounds(
-                            row_surface, block_id, layer_depth, min_height
+                            row_surface, block_id, layer_depth, min_height, row_type
                         )
                         if row_top != layer_top or row_bottom != layer_bottom:
                             can_extend = False
@@ -231,12 +331,38 @@ class Terrain(Object3D):
         block_id: str,
         layer_depth: int,
         min_height: int,
+        terrain_type: int = 0,
     ) -> Tuple[int, int]:
         """Calculate top and bottom Y for a layer at given surface height.
+
+        Args:
+            terrain_type: 0=plains, 1=mountain_stone, 2=mountain_snow
 
         Returns:
             Tuple of (layer_top, layer_bottom) Y coordinates.
         """
+        # Mountain terrain types (1=stone, 2=snow)
+        if terrain_type in (1, 2):
+            if block_id == "minecraft:snow_block":
+                # Snow is only on top of snow-capped mountains (type 2)
+                if terrain_type == 2:
+                    return (surface_height, surface_height - 1)
+                return (0, 0)
+            elif block_id == "minecraft:stone":
+                # Stone fills entire column for mountains
+                if terrain_type == 2:
+                    # Below snow layer
+                    stone_top = surface_height - 1
+                else:
+                    # All the way to surface
+                    stone_top = surface_height
+                stone_bottom = min_height
+                if stone_top <= stone_bottom:
+                    return (0, 0)
+                return (stone_top, stone_bottom)
+            return (0, 0)
+
+        # Plains terrain (type 0)
         if block_id == "minecraft:grass_block":
             # Grass is always the top block
             return (surface_height, surface_height - 1)
@@ -258,6 +384,7 @@ class Terrain(Object3D):
         """Add trees and vegetation to terrain.
 
         Imports decoration generators and places them based on noise.
+        Only adds decorations to plains areas (not mountains).
         """
         # Import here to avoid circular dependency
         from app.agent.minecraft.terrain.decorations import (
@@ -276,6 +403,10 @@ class Terrain(Object3D):
         tree_spacing = 12  # Minimum spacing between trees
         for z in range(0, self.config.depth - 5, tree_spacing):
             for x in range(0, self.config.width - 5, tree_spacing):
+                # Skip mountain areas
+                if self._terrain_type is not None and self._terrain_type[z, x] != 0:
+                    continue
+
                 # Use noise to vary placement within grid cell
                 noise_val = decor_noise.noise2d(x / 20.0, z / 20.0)
                 if noise_val > 0.3:  # ~35% of grid cells get trees
@@ -286,6 +417,10 @@ class Terrain(Object3D):
                     tree_z = z + offset_z
 
                     if tree_x < self.config.width - 3 and tree_z < self.config.depth - 3:
+                        # Also check the offset position isn't on a mountain
+                        if self._terrain_type is not None and self._terrain_type[tree_z, tree_x] != 0:
+                            continue
+
                         height = self.heightmap.get(tree_x, tree_z)
                         tree = generate_oak_tree(
                             tree_x, height, tree_z,
@@ -297,6 +432,10 @@ class Terrain(Object3D):
         # Scattered flowers and grass
         for z in range(self.config.depth):
             for x in range(self.config.width):
+                # Skip mountain areas
+                if self._terrain_type is not None and self._terrain_type[z, x] != 0:
+                    continue
+
                 noise_val = flower_noise.noise2d(x / 5.0, z / 5.0)
 
                 if noise_val > 0.6:  # ~20% coverage for flowers
@@ -353,6 +492,195 @@ class Terrain(Object3D):
             self.heightmap.generate()
 
         self.heightmap.flatten_area(x, z, width, depth, target_height, falloff)
+        return self
+
+    def add_mountain(
+        self,
+        center_x: int,
+        center_z: int,
+        radius: int,
+        height: int,
+        falloff: float = 1.8,
+        seed: Optional[int] = None,
+        snow: bool = True,
+        snow_start_percent: float = 0.7,
+    ) -> "Terrain":
+        """Add an organic mountain to the terrain.
+
+        Creates a natural-looking mountain with irregular base shape, varying
+        slopes, and stone surface with optional snow cap. Uses domain warping
+        for organic shapes - no more cone-shaped mountains!
+
+        Args:
+            center_x, center_z: Center position of the mountain.
+            radius: Base radius of the mountain. Use 25+ for grand mountains.
+            height: Peak height to add above current terrain. Use 30-60+ for impressive peaks.
+            falloff: Controls slope steepness. 1.8 default for natural slopes.
+            seed: Random seed for shape variation.
+            snow: Whether to add snow cap at high elevations.
+            snow_start_percent: How far up the mountain snow starts (0.7 = top 30%).
+
+        Returns:
+            Self for chaining.
+
+        Example:
+            terrain.add_mountain(64, 64, radius=35, height=50, snow=True)
+            terrain.generate()
+        """
+        if not self.heightmap._generated:
+            self.heightmap.generate()
+
+        # Get base height at center before adding mountain
+        base_height = self.heightmap.get(center_x, center_z)
+
+        self.heightmap.add_mountain(
+            center_x, center_z, radius, height, falloff, seed
+        )
+
+        # Calculate peak height and snow line
+        peak_height = base_height + height
+        snow_line = None
+        if snow:
+            snow_line = int(base_height + height * snow_start_percent)
+
+        # Register mountain for proper block generation
+        # Use extended radius to account for domain warping
+        extended_radius = int(radius * 1.4)
+        self._mountains.append(MountainInfo(
+            center_x=center_x,
+            center_z=center_z,
+            radius=extended_radius,
+            peak_height=peak_height,
+            snow_line=snow_line,
+        ))
+
+        return self
+
+    def add_ridge(
+        self,
+        start_x: int,
+        start_z: int,
+        end_x: int,
+        end_z: int,
+        width: int,
+        height: int,
+        falloff: float = 1.8,
+        seed: Optional[int] = None,
+        snow: bool = True,
+        snow_start_percent: float = 0.7,
+    ) -> "Terrain":
+        """Add an organic mountain ridge between two points.
+
+        Creates a natural-looking ridge with curved centerline, varying width,
+        height variation with sub-peaks, and stone surface with optional snow cap.
+
+        Args:
+            start_x, start_z: Start point of the ridge.
+            end_x, end_z: End point of the ridge.
+            width: Base width of the ridge (half-width on each side). Use 15+ for grand ridges.
+            height: Peak height to add above current terrain. Use 25-50+ for impressive ridges.
+            falloff: Controls slope steepness. 1.8 default for natural slopes.
+            seed: Random seed for shape variation.
+            snow: Whether to add snow cap at high elevations.
+            snow_start_percent: How far up the ridge snow starts (0.7 = top 30%).
+
+        Returns:
+            Self for chaining.
+
+        Example:
+            terrain.add_ridge(10, 64, 118, 64, width=20, height=40, snow=True)
+            terrain.generate()
+        """
+        if not self.heightmap._generated:
+            self.heightmap.generate()
+
+        # Get base height at midpoint before adding ridge
+        mid_x = (start_x + end_x) // 2
+        mid_z = (start_z + end_z) // 2
+        base_height = self.heightmap.get(mid_x, mid_z)
+
+        self.heightmap.add_ridge(
+            start_x, start_z, end_x, end_z, width, height, falloff, seed
+        )
+
+        # Calculate peak height and snow line
+        peak_height = base_height + height
+        snow_line = None
+        if snow:
+            snow_line = int(base_height + height * snow_start_percent)
+
+        # Register as a series of overlapping "mountains" along the ridge for block generation
+        # Use extended width to account for curves and width variation
+        ridge_dx = end_x - start_x
+        ridge_dz = end_z - start_z
+        ridge_length = int(np.sqrt(ridge_dx * ridge_dx + ridge_dz * ridge_dz))
+        extended_width = int(width * 1.5)
+
+        # Add mountain info points along the ridge
+        num_points = max(3, ridge_length // width)
+        for i in range(num_points + 1):
+            t = i / num_points
+            px = int(start_x + t * ridge_dx)
+            pz = int(start_z + t * ridge_dz)
+
+            self._mountains.append(MountainInfo(
+                center_x=px,
+                center_z=pz,
+                radius=extended_width,
+                peak_height=peak_height,
+                snow_line=snow_line,
+            ))
+
+        return self
+
+    def add_plateau(
+        self,
+        center_x: int,
+        center_z: int,
+        radius: int,
+        height: int,
+        flat_radius: Optional[int] = None,
+        snow: bool = False,
+    ) -> "Terrain":
+        """Add a flat-topped plateau/mesa.
+
+        Creates a raised flat area with sloped edges and stone surface.
+
+        Args:
+            center_x, center_z: Center position.
+            radius: Total radius including slopes.
+            height: Height to raise the plateau.
+            flat_radius: Radius of the flat top (default: radius // 2).
+            snow: Whether to add snow on top (default False for plateaus).
+
+        Returns:
+            Self for chaining.
+
+        Example:
+            terrain.add_plateau(64, 64, radius=20, height=25)
+            terrain.generate()
+        """
+        if not self.heightmap._generated:
+            self.heightmap.generate()
+
+        # Get base height at center before adding plateau
+        base_height = self.heightmap.get(center_x, center_z)
+
+        self.heightmap.add_plateau(center_x, center_z, radius, height, flat_radius)
+
+        # Calculate peak height and snow line
+        peak_height = base_height + height
+        snow_line = peak_height if snow else None
+
+        # Register plateau for proper block generation
+        self._mountains.append(MountainInfo(
+            center_x=center_x,
+            center_z=center_z,
+            radius=radius,
+            peak_height=peak_height,
+            snow_line=snow_line,
+        ))
+
         return self
 
 

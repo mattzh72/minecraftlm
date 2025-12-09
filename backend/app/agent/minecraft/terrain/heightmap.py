@@ -340,3 +340,262 @@ class HeightMap:
     def max_height(self) -> int:
         """Get maximum height in heightmap."""
         return int(np.max(self._heights))
+
+    def add_mountain(
+        self,
+        center_x: int,
+        center_z: int,
+        radius: int,
+        height: int,
+        falloff: float = 1.8,
+        seed: Optional[int] = None,
+    ) -> "HeightMap":
+        """Add an organic, realistic mountain at the specified location.
+
+        Creates a natural-looking mountain with irregular base shape, varying
+        slopes, and subtle ridges radiating from the peak. Uses domain warping
+        for organic shapes.
+
+        Args:
+            center_x, center_z: Center position of the mountain.
+            radius: Base radius of the mountain. Use 25+ for grand mountains.
+            height: Peak height to add above current terrain. Use 30+ for impressive peaks.
+            falloff: Controls slope steepness. 1.8 default for natural slopes.
+            seed: Random seed for shape (uses position if None).
+
+        Returns:
+            Self for chaining.
+
+        Example:
+            heightmap.add_mountain(64, 64, radius=35, height=50)
+        """
+        from app.agent.minecraft.terrain.noise import PerlinNoise
+
+        noise_seed = seed if seed is not None else (center_x * 1000 + center_z)
+
+        # Multiple noise layers for organic shape
+        shape_noise = PerlinNoise(seed=noise_seed)        # Domain warping
+        ridge_noise = PerlinNoise(seed=noise_seed + 100)  # Ridge patterns
+        detail_noise = PerlinNoise(seed=noise_seed + 200) # Surface detail
+
+        # Expand processing area to account for warping
+        warp_extent = int(radius * 0.35)
+        extended_radius = radius + warp_extent
+
+        for z in range(max(0, center_z - extended_radius), min(self.config.depth, center_z + extended_radius + 1)):
+            for x in range(max(0, center_x - extended_radius), min(self.config.width, center_x + extended_radius + 1)):
+
+                # Domain warping - distort coordinates for organic base shape
+                warp_scale = radius * 0.4
+                warp_freq = 25.0
+                wx = x + shape_noise.noise2d(x / warp_freq, z / warp_freq) * warp_scale
+                wz = z + shape_noise.noise2d(x / warp_freq + 500, z / warp_freq + 500) * warp_scale
+
+                # Calculate distance using warped coordinates
+                dx = wx - center_x
+                dz = wz - center_z
+                distance = np.sqrt(dx * dx + dz * dz)
+
+                if distance <= radius:
+                    # Normalized distance: 0 at center, 1 at edge
+                    t = distance / radius
+
+                    # Base mountain shape with smooth falloff
+                    mountain_factor = (1 - t ** falloff)
+
+                    # Add ridge patterns radiating from peak
+                    # Ridges are stronger near the peak and fade toward edges
+                    ridge_val = ridge_noise.noise2d(x / 12.0, z / 12.0)
+                    ridge_strength = (1 - t) * 0.25  # Stronger near peak
+                    if ridge_val > 0.1:
+                        mountain_factor *= (1 + ridge_val * ridge_strength)
+
+                    # Add subtle surface variation
+                    detail_val = detail_noise.noise2d(x / 8.0, z / 8.0)
+                    mountain_factor *= (1 + detail_val * 0.08)
+
+                    # Ensure non-negative
+                    mountain_factor = max(0, mountain_factor)
+
+                    # Add height to terrain
+                    added_height = int(height * mountain_factor)
+                    if added_height > 0:
+                        self._heights[z, x] += added_height
+
+        return self
+
+    def add_ridge(
+        self,
+        start_x: int,
+        start_z: int,
+        end_x: int,
+        end_z: int,
+        width: int,
+        height: int,
+        falloff: float = 1.8,
+        seed: Optional[int] = None,
+    ) -> "HeightMap":
+        """Add an organic mountain ridge between two points.
+
+        Creates a natural-looking ridge with:
+        - Slightly curved/wavy centerline
+        - Varying width along length
+        - Height variation with occasional sub-peaks
+        - Organic edges using domain warping
+
+        Args:
+            start_x, start_z: Start point of the ridge.
+            end_x, end_z: End point of the ridge.
+            width: Base width of the ridge (half-width on each side). Use 15+ for grand ridges.
+            height: Peak height to add above current terrain. Use 25+ for impressive ridges.
+            falloff: Controls slope steepness. 1.8 default for natural slopes.
+            seed: Random seed for shape.
+
+        Returns:
+            Self for chaining.
+
+        Example:
+            heightmap.add_ridge(10, 64, 118, 64, width=20, height=40)
+        """
+        from app.agent.minecraft.terrain.noise import PerlinNoise
+
+        noise_seed = seed if seed is not None else (start_x * 1000 + start_z)
+
+        # Multiple noise layers for organic shape
+        curve_noise = PerlinNoise(seed=noise_seed)         # Ridge line curvature
+        width_noise = PerlinNoise(seed=noise_seed + 100)   # Width variation
+        height_noise = PerlinNoise(seed=noise_seed + 200)  # Height variation
+        detail_noise = PerlinNoise(seed=noise_seed + 300)  # Surface detail
+
+        # Calculate ridge direction
+        ridge_dx = end_x - start_x
+        ridge_dz = end_z - start_z
+        ridge_length = np.sqrt(ridge_dx * ridge_dx + ridge_dz * ridge_dz)
+
+        if ridge_length == 0:
+            return self
+
+        # Normalized direction
+        dir_x = ridge_dx / ridge_length
+        dir_z = ridge_dz / ridge_length
+
+        # Perpendicular direction for curve offset
+        perp_x = -dir_z
+        perp_z = dir_x
+
+        # Expand bounding box to account for curve and width variation
+        max_curve = width * 0.4
+        extended_width = int(width * 1.4 + max_curve)
+
+        min_x = max(0, min(start_x, end_x) - extended_width)
+        max_x = min(self.config.width, max(start_x, end_x) + extended_width + 1)
+        min_z = max(0, min(start_z, end_z) - extended_width)
+        max_z = min(self.config.depth, max(start_z, end_z) + extended_width + 1)
+
+        for z in range(min_z, max_z):
+            for x in range(min_x, max_x):
+                # Vector from start to current point
+                to_point_x = x - start_x
+                to_point_z = z - start_z
+
+                # Project onto ridge direction (how far along the ridge)
+                along = to_point_x * dir_x + to_point_z * dir_z
+
+                # Clamp to ridge length
+                along_clamped = max(0, min(ridge_length, along))
+
+                # Calculate curved ridge centerline
+                # The ridge curves based on position along its length
+                curve_t = along_clamped / ridge_length
+                curve_offset = curve_noise.noise2d(curve_t * 3, 0) * max_curve
+
+                # Apply curve to closest point on ridge
+                closest_x = start_x + along_clamped * dir_x + curve_offset * perp_x
+                closest_z = start_z + along_clamped * dir_z + curve_offset * perp_z
+
+                # Distance from curved ridge line
+                dist_x = x - closest_x
+                dist_z = z - closest_z
+                distance = np.sqrt(dist_x * dist_x + dist_z * dist_z)
+
+                # Vary width along the ridge (creates natural bulges)
+                width_variation = width_noise.noise2d(curve_t * 4, 0) * 0.3
+                local_width = width * (1 + width_variation)
+
+                if distance <= local_width:
+                    # Calculate height factor with smooth falloff
+                    t = distance / local_width
+                    ridge_factor = (1 - t ** falloff)
+
+                    # Vary height along the ridge (creates sub-peaks)
+                    height_variation = height_noise.noise2d(curve_t * 5, 0)
+                    # Boost peaks, don't reduce valleys too much
+                    height_mult = 1.0 + height_variation * 0.35 if height_variation > 0 else 1.0 + height_variation * 0.15
+                    ridge_factor *= height_mult
+
+                    # Smooth taper at ends
+                    taper_dist = width * 0.8
+                    if along_clamped < taper_dist:
+                        ridge_factor *= (along_clamped / taper_dist) ** 0.5
+                    elif along_clamped > ridge_length - taper_dist:
+                        ridge_factor *= ((ridge_length - along_clamped) / taper_dist) ** 0.5
+
+                    # Add surface detail
+                    detail_val = detail_noise.noise2d(x / 8.0, z / 8.0)
+                    ridge_factor *= (1 + detail_val * 0.1)
+
+                    # Add height to terrain
+                    added_height = int(height * max(0, ridge_factor))
+                    if added_height > 0:
+                        self._heights[z, x] += added_height
+
+        return self
+
+    def add_plateau(
+        self,
+        center_x: int,
+        center_z: int,
+        radius: int,
+        height: int,
+        flat_radius: Optional[int] = None,
+        falloff: int = 5,
+    ) -> "HeightMap":
+        """Add a flat-topped plateau/mesa.
+
+        Creates a raised flat area with sloped edges.
+
+        Args:
+            center_x, center_z: Center position.
+            radius: Total radius including slopes.
+            height: Height to raise the plateau.
+            flat_radius: Radius of the flat top (default: radius // 2).
+            falloff: Width of the sloped edge.
+
+        Returns:
+            Self for chaining.
+
+        Example:
+            heightmap.add_plateau(64, 64, radius=15, height=20)
+        """
+        if flat_radius is None:
+            flat_radius = radius // 2
+
+        for z in range(max(0, center_z - radius), min(self.config.depth, center_z + radius + 1)):
+            for x in range(max(0, center_x - radius), min(self.config.width, center_x + radius + 1)):
+                dx = x - center_x
+                dz = z - center_z
+                distance = np.sqrt(dx * dx + dz * dz)
+
+                if distance <= flat_radius:
+                    # Flat top
+                    self._heights[z, x] += height
+                elif distance <= radius:
+                    # Sloped edge
+                    slope_dist = distance - flat_radius
+                    slope_width = radius - flat_radius
+                    t = slope_dist / slope_width
+                    # Smooth falloff
+                    factor = 1 - (t ** 2)
+                    self._heights[z, x] += int(height * factor)
+
+        return self
