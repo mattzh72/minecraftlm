@@ -8,27 +8,22 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
-import { cn } from "../lib/cn";
-import { Collapsible } from "@base-ui-components/react/collapsible";
-import useSessionStore from "../store/sessionStore";
-import useChatStore, { ChatState } from "../store/chatStore";
-import useAutoScroll from "../hooks/useAutoScroll";
-import useInitialMessage from "../hooks/useInitialMessage";
+import { cn } from "@/lib/utils";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsiblePanel,
+} from "@/components/ui/collapsible";
+import useSessionStore from "@/store/sessionStore";
+import useChatStore, { ChatState } from "@/store/chatStore";
+import useAutoScroll from "@/hooks/useAutoScroll";
+import useInitialMessage from "@/hooks/useInitialMessage";
 import { PromptBox } from "./PromptBox";
 import { ThinkingIndicator, ThoughtDisplay } from "./ActivityRenderer";
 import {
   formatConversationToUIMessages,
   getToolCallLabel,
-} from "../lib/formatConversation";
-
-// Header component
-function ChatPanelHeader() {
-  return (
-    <div className="px-4 py-3 border-b border-slate-200/50">
-      <h2 className="text-sm font-medium text-slate-700">Chat</h2>
-    </div>
-  );
-}
+} from "@/lib/formatConversation";
 
 // ============================================================================
 // Message Renderers
@@ -36,7 +31,7 @@ function ChatPanelHeader() {
 
 function UserMessage({ content }) {
   return (
-    <div className="text-sm text-slate-700 bg-slate-100 border border-slate-200 rounded-lg p-2">
+    <div className="text-sm text-foreground bg-muted border border-border rounded-lg p-2">
       <div className="whitespace-pre-wrap">{content}</div>
     </div>
   );
@@ -50,11 +45,11 @@ function AssistantMessage({ content, thought_summary, tool_calls }) {
   if (!hasContent && !hasToolCalls && !hasThought) return null;
 
   return (
-    <div className="py-3 text-sm text-slate-700 border-b border-slate-100">
+    <div className="py-3 text-sm text-foreground border-b border-border/50">
       <div className="space-y-2">
         {hasThought && <ThoughtDisplay content={thought_summary} isStreaming={false} />}
         {hasContent && (
-          <div className="prose prose-sm prose-slate max-w-none">
+          <div className="prose prose-sm prose-slate max-w-none dark:prose-invert">
             <Streamdown>{content}</Streamdown>
           </div>
         )}
@@ -68,7 +63,7 @@ function AssistantMessage({ content, thought_summary, tool_calls }) {
 }
 
 /**
- * Unified tool call display
+ * Tool call display using coss Collapsible
  */
 function ToolCallWithResultDisplay({ toolCall }) {
   const { name, result } = toolCall;
@@ -104,10 +99,10 @@ function ToolCallWithResultDisplay({ toolCall }) {
     : Check;
 
   const iconColor = !hasResult
-    ? "text-slate-400"
+    ? "text-muted-foreground"
     : hasError
-    ? "text-red-500"
-    : "text-emerald-600";
+    ? "text-destructive"
+    : "text-success";
 
   // Only expandable if there's actual content to show
   const isExpandable = !!displayContent;
@@ -115,7 +110,7 @@ function ToolCallWithResultDisplay({ toolCall }) {
 
   if (!isExpandable) {
     return (
-      <div className="text-sm py-1 flex items-center gap-1.5 text-slate-500">
+      <div className="text-sm py-1 flex items-center gap-1.5 text-muted-foreground">
         <IconComponent size={14} className={iconColor} />
         <span className="font-medium">{label}</span>
       </div>
@@ -123,8 +118,8 @@ function ToolCallWithResultDisplay({ toolCall }) {
   }
 
   return (
-    <Collapsible.Root className="text-sm" defaultOpen={shouldDefaultOpen}>
-      <Collapsible.Trigger className="group w-full text-left py-1 flex items-center gap-1.5 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer">
+    <Collapsible className="text-sm" defaultOpen={shouldDefaultOpen}>
+      <CollapsibleTrigger className="group w-full text-left py-1 flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
         <span className="relative size-3.5">
           <IconComponent
             size={14}
@@ -135,24 +130,24 @@ function ToolCallWithResultDisplay({ toolCall }) {
           />
           <ChevronDown
             size={14}
-            className="absolute inset-0 text-slate-400 opacity-0 transition-all group-hover:opacity-100 group-data-[panel-open]:rotate-180"
+            className="absolute inset-0 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-data-[panel-open]:rotate-180"
           />
         </span>
         <span className="font-medium">{label}</span>
-      </Collapsible.Trigger>
-      <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-200 ease-out data-[starting-style]:h-0 data-[ending-style]:h-0">
+      </CollapsibleTrigger>
+      <CollapsiblePanel>
         <pre
           className={cn(
             "mt-1.5 p-2 rounded-lg text-xs overflow-auto max-h-48",
             hasError
-              ? "bg-red-50 text-red-700"
-              : "bg-slate-50 text-slate-600"
+              ? "bg-destructive/10 text-destructive"
+              : "bg-muted text-muted-foreground"
           )}
         >
           {displayContent}
         </pre>
-      </Collapsible.Panel>
-    </Collapsible.Root>
+      </CollapsiblePanel>
+    </Collapsible>
   );
 }
 
@@ -163,11 +158,11 @@ function StreamingMessage({ thought, text, state }) {
   const hasText = text && text.trim();
 
   return (
-    <div className="py-3 text-sm text-slate-700">
+    <div className="py-3 text-sm text-foreground">
       <div className="space-y-2">
         {hasThought && <ThoughtDisplay content={thought} isStreaming={isStreamingThought} />}
         {hasText && (
-          <div className="prose prose-sm prose-slate max-w-none">
+          <div className="prose prose-sm prose-slate max-w-none dark:prose-invert">
             <Streamdown mode="streaming">{text}</Streamdown>
           </div>
         )}
@@ -179,7 +174,7 @@ function StreamingMessage({ thought, text, state }) {
 
 function ErrorMessage({ content }) {
   return (
-    <div className="py-3 text-sm text-red-600">
+    <div className="py-3 text-sm text-destructive">
       <div className="whitespace-pre-wrap">{content}</div>
     </div>
   );
@@ -189,7 +184,7 @@ function ErrorMessage({ content }) {
 // Main ChatPanel Component
 // ============================================================================
 
-export default function ChatPanel() {
+export function useChatPanel() {
   const sessionId = useSessionStore((state) => state.sessionId);
   const conversation = useSessionStore((state) => state.conversation);
   const setConversation = useSessionStore((state) => state.setConversation);
@@ -351,12 +346,9 @@ export default function ChatPanel() {
 
   useInitialMessage(sessionId, displayMessages.length, isLoading, handleSend);
 
-  return (
-    <div className="flex flex-col h-full">
-      <ChatPanelHeader />
-
-      {/* Messages - scrollable */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-3 space-y-2 pt-2">
+  return {
+    messages: (
+      <div className="flex-1 overflow-y-auto min-h-0 px-3 space-y-2 py-2">
         {displayMessages.map((msg, idx) => {
           if (msg.type === "user") {
             return <UserMessage key={idx} content={msg.content} />;
@@ -394,18 +386,15 @@ export default function ChatPanel() {
 
         <div ref={messagesEndRef} />
       </div>
-
-      {/* Input */}
-      <div className="p-3 pt-0">
-        <PromptBox
-          value={input}
-          onChange={setInput}
-          onSubmit={handleSend}
-          disabled={!sessionId || isLoading}
-          placeholder="Describe your Minecraft structure..."
-          className="border-slate-300"
-        />
-      </div>
-    </div>
-  );
+    ),
+    input: (
+      <PromptBox
+        value={input}
+        onChange={setInput}
+        onSubmit={handleSend}
+        disabled={!sessionId || isLoading}
+        placeholder="Describe your Minecraft structure..."
+      />
+    ),
+  };
 }

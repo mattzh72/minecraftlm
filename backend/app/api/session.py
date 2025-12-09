@@ -118,6 +118,20 @@ async def get_session(session_id: str):
         raise HTTPException(status_code=500, detail=f"Error loading session: {str(e)}")
 
 
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """
+    Delete a session and all its associated data.
+    """
+    try:
+        SessionService.delete_session(session_id)
+        return JSONResponse(content={"message": f"Session {session_id} deleted"})
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting session: {str(e)}")
+
+
 @router.get("/sessions/{session_id}/structure")
 async def get_structure(session_id: str):
     """

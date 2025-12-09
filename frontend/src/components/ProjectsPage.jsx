@@ -1,19 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { cva } from 'class-variance-authority';
-import useSessionStore from '../store/sessionStore';
+import useSessionStore from '@/store/sessionStore';
 import ThumbnailViewer from './ThumbnailViewer';
 import { SuggestionButtons } from './SuggestionButton';
 import { PromptBox } from './PromptBox';
-
-// Session card style
-const sessionCard = cva([
-  'bg-white rounded-xl overflow-hidden cursor-pointer',
-  'transition-colors duration-150',
-  'border border-slate-200',
-  'shadow-sm shadow-slate-900/5',
-  'hover:border-slate-300',
-]);
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
@@ -89,14 +82,20 @@ export default function ProjectsPage() {
   const hasSessions = sessions.length > 0;
 
   return (
-    <div className={`min-h-screen bg-slate-50 grid ${hasSessions ? 'grid-rows-[auto_1fr]' : 'grid-rows-1'}`}>
+    <div className={cn(
+      "min-h-screen bg-background grid",
+      hasSessions ? 'grid-rows-[auto_1fr]' : 'grid-rows-1'
+    )}>
       {/* Hero Section with Chat Bar */}
-      <div className={`flex flex-col items-center justify-center px-6 ${hasSessions ? 'py-20 pb-10' : 'min-h-screen py-10'}`}>
+      <div className={cn(
+        "flex flex-col items-center justify-center px-6",
+        hasSessions ? 'py-20 pb-10' : 'min-h-screen py-10'
+      )}>
         <div className="w-full max-w-5xl flex flex-col items-center">
-          <h1 className="text-5xl font-semibold text-slate-900 mb-4 tracking-tight">
+          <h1 className="text-5xl font-semibold text-foreground mb-4 tracking-tight">
             MinecraftLM
           </h1>
-          <p className="text-lg text-slate-500 mb-12 font-normal text-center max-w-md">
+          <p className="text-lg text-muted-foreground mb-12 font-normal text-center max-w-md">
             Design and export Minecraft schematics with natural language
           </p>
 
@@ -125,26 +124,26 @@ export default function ProjectsPage() {
       {!isLoading && hasSessions && (
         <div className="px-6 pb-16 flex justify-center items-start">
           <div className="w-full max-w-5xl">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-6">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-6">
               Recent Projects
             </h2>
 
             <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-5">
               {sessions.map(session => (
-                <div
+                <Card
                   key={session.session_id}
                   onClick={() => handleSelectSession(session.session_id)}
-                  className={sessionCard()}
+                  className="cursor-pointer overflow-hidden p-0 hover:border-border/80 transition-colors"
                 >
                   {/* Thumbnail */}
-                  <div className="w-full h-44 bg-slate-100 flex items-center justify-center border-b border-slate-200">
+                  <div className="w-full h-44 bg-muted flex items-center justify-center border-b border-border">
                     {session.has_structure && sessionStructures[session.session_id] ? (
                       <ThumbnailViewer
                         structureData={sessionStructures[session.session_id]}
                         size={180}
                       />
                     ) : (
-                      <div className="text-slate-300 text-5xl text-center">
+                      <div className="text-muted-foreground/50 text-5xl text-center">
                         📦
                       </div>
                     )}
@@ -152,18 +151,18 @@ export default function ProjectsPage() {
 
                   {/* Metadata */}
                   <div className="p-3.5">
-                    <div className="flex justify-between items-center text-sm text-slate-500 mb-1.5">
+                    <div className="flex justify-between items-center text-sm text-muted-foreground mb-1.5">
                       <span>{session.message_count} messages</span>
                       {session.has_structure && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        <Badge variant="success" className="h-1.5 w-1.5 p-0 rounded-full" />
                       )}
                     </div>
 
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-muted-foreground/70">
                       {formatDate(session.updated_at)}
                     </div>
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
           </div>
@@ -172,7 +171,7 @@ export default function ProjectsPage() {
 
       {/* Empty State */}
       {!isLoading && !hasSessions && (
-        <div className="flex-1 flex items-center justify-center p-12 text-slate-400 text-sm">
+        <div className="flex-1 flex items-center justify-center p-12 text-muted-foreground text-sm">
           Start building by typing in the chat above
         </div>
       )}
