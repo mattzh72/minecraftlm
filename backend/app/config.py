@@ -4,15 +4,15 @@ Configuration management using pydantic-settings
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 # Model to provider mapping (prefix-based)
-# TODO: Make this reused in the harness
 MODEL_PREFIXES = {
     "gpt-": "openai",
     "claude-": "anthropic",
     "gemini/": "gemini",
 }
 
-DEFAULT_MODEL = "gemini/gemini-3-pro"
+DEFAULT_MODEL = "gemini/gemini-3-pro-preview"
 
 
 def get_provider_for_model(model: str) -> str:

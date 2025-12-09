@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 AVAILABLE_MODELS = {
     "gemini": [
-        "gemini/gemini-3-pro",
+        "gemini/gemini-3-pro-preview",
     ],
     "openai": [
         "gpt-5.1",
