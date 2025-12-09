@@ -14,7 +14,7 @@ class ToolCallFunction(BaseModel):
 class ToolCall(BaseModel):
     """Tool call made by the assistant"""
 
-    id: str
+    id: str | None = None
     type: Literal["function"]
     function: ToolCallFunction
     thought_signature: str | None = None

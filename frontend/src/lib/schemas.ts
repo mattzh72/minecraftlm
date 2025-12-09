@@ -9,7 +9,7 @@ export const toolCallFunctionSchema = z.object({
 });
 
 export const toolCallSchema = z.object({
-  id: z.string(),
+  id: z.string().nullish(),
   type: z.literal("function"),
   function: toolCallFunctionSchema,
   thought_signature: z.string().nullish(),

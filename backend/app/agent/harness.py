@@ -294,8 +294,8 @@ class MinecraftSchematicAgent:
 
             for tool_call in tool_calls_list:
                 # Parse tool call
-                func_name = tool_call["function"]["name"]
-                func_args = json.loads(tool_call["function"]["arguments"])
+                func_name = tool_call.function.name
+                func_args = json.loads(tool_call.function.arguments)
 
                 yield ActivityEvent(
                     type="tool_call",
@@ -325,7 +325,7 @@ class MinecraftSchematicAgent:
                 # Build tool response
                 tool_response = ToolMessage(
                     role="tool",
-                    tool_call_id=tool_call.get("id", ""),
+                    tool_call_id=tool_call.id or "",
                     content=json.dumps(tool_result),
                     name=func_name,
                 ).model_dump()
