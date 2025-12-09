@@ -77,8 +77,6 @@ export function SessionPage() {
                     <p className="font-medium text-slate-500 mb-2">Controls</p>
                     <p>Mouse drag: Rotate view</p>
                     <p>Scroll: Zoom in/out</p>
-                    <p>WASD: Move camera</p>
-                    <p>Shift/Space: Move up/down</p>
                   </div>
                 </div>
               </div>

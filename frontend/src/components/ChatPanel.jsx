@@ -339,8 +339,10 @@ export default function ChatPanel() {
           const sessionRes = await fetch(`/api/sessions/${sessionId}`);
           if (sessionRes.ok) {
             const sessionData = await sessionRes.json();
+            // Clear pending BEFORE setting conversation to avoid brief duplicate
+            // (React 18 doesn't batch state updates in async callbacks)
+            setPendingUserMessage(null);
             setConversation(sessionData.conversation || []);
-            setPendingUserMessage(null); // Clear pending now that we have real data
           }
         } catch (err) {
           console.error("Error fetching updated conversation:", err);

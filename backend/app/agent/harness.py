@@ -15,6 +15,7 @@ from app.services.llm import LLMService
 from app.services.session import SessionService
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
+from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
 from app.api.models.conversation import (
     UserMessage,
@@ -78,12 +79,13 @@ class MinecraftSchematicAgent:
 
         # Initialize tools
         tools = [
+            ReadCodeTool(),
             EditCodeTool(),
             CompleteTaskTool(),
         ]
         self.tool_registry = ToolRegistry(tools)
 
-        # Load system prompt template and SDK docs (code will be injected per-call)
+        # Load system prompt template and SDK docs
         prompt_path = Path(__file__).parent / "prompts" / "system_prompt.txt"
         self.prompt_template = prompt_path.read_text()
 
@@ -94,27 +96,16 @@ class MinecraftSchematicAgent:
             "[[SDK_BLOCKS_REFERENCE]]": f"03-blocks-reference.md\n\n{(docs_dir / '03-blocks-reference.md').read_text()}",
             "[[SDK_BLOCK_LIST]]": f"04-block-list.md\n\n{(docs_dir / '04-block-list.md').read_text()}",
             "[[SDK_PITFALLS]]": f"05-pitfalls.md\n\n{(docs_dir / '05-pitfalls.md').read_text()}",
+            "[[SDK_TERRAIN]]": f"06-terrain-guide.md\n\n{(docs_dir / '06-terrain-guide.md').read_text()}",
         }
 
-    def _format_code_with_line_numbers(self, code: str) -> str:
-        """Format code with line numbers (cat -n style)."""
-        if not code or not code.strip():
-            return "(empty file)"
-        lines = code.split("\n")
-        return "\n".join(f"{i + 1:6d}\t{line}" for i, line in enumerate(lines))
-
     def _build_system_prompt(self) -> str:
-        """Build system prompt with current code embedded."""
+        """Build system prompt with SDK docs embedded."""
         template = self.prompt_template
 
         # Inject SDK docs
         for marker, text in self.sdk_replacements.items():
             template = template.replace(marker, text)
-
-        # Inject current code with line numbers
-        code = self.session_service.load_code(self.session_id)
-        formatted_code = self._format_code_with_line_numbers(code)
-        template = template.replace("[[CURRENT_CODE]]", formatted_code)
 
         return template
 
