@@ -293,7 +293,6 @@ class MinecraftSchematicAgent:
             serialized_responses = []
 
             for tool_call in tool_calls_list:
-                # Parse tool call (ToolCall is a Pydantic model, not a dict)
                 func_name = tool_call.function.name
                 func_args = json.loads(tool_call.function.arguments)
 
