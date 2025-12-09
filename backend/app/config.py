@@ -12,7 +12,7 @@ MODEL_PREFIXES = {
     "gemini/": "gemini",
 }
 
-DEFAULT_MODEL = "gemini/gemini-3-pro-preview"
+DEFAULT_MODEL = "gemini/gemini-3-pro"
 
 
 def get_provider_for_model(model: str) -> str:

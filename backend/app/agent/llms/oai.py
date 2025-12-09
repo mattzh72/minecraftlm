@@ -1,5 +1,5 @@
 """
-OpenAI API service with streaming tool support.
+OpenAI API service with streaming tool support and reasoning tokens.
 """
 
 from typing import AsyncIterator
@@ -9,6 +9,9 @@ import openai
 from app.agent.llms.base import BaseDeclarativeLLMService, StreamChunk
 from app.config import settings
 
+# Models that support reasoning tokens
+REASONING_MODELS = ("gpt-5", "o1", "o3", "o4")
+
 
 class OpenAIService(BaseDeclarativeLLMService):
     """Service for interacting with OpenAI API."""
@@ -17,6 +20,10 @@ class OpenAIService(BaseDeclarativeLLMService):
         super().__init__(model_id)
         self.client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
 
+    def _is_reasoning_model(self) -> bool:
+        """Check if the model supports reasoning tokens."""
+        return any(self.model_id.startswith(prefix) for prefix in REASONING_MODELS)
+
     async def generate_with_tools_streaming(
         self,
         system_prompt: str,
@@ -24,7 +31,7 @@ class OpenAIService(BaseDeclarativeLLMService):
         tools: list[dict],
     ) -> AsyncIterator[StreamChunk]:
         """
-        Stream responses from OpenAI with tool calling support.
+        Stream responses from OpenAI with tool calling and reasoning support.
 
         Args:
             system_prompt: System instructions
@@ -45,6 +52,10 @@ class OpenAIService(BaseDeclarativeLLMService):
         if tools:
             request_params["tools"] = tools
 
+        # Enable reasoning for supported models
+        if self._is_reasoning_model():
+            request_params["reasoning_effort"] = "medium"
+
         stream = await self.client.chat.completions.create(**request_params)
 
         async for chunk in stream:
@@ -57,6 +68,13 @@ class OpenAIService(BaseDeclarativeLLMService):
 
             # Extract text delta
             text_delta = delta.content if hasattr(delta, "content") and delta.content else None
+
+            # Extract reasoning/thought delta (GPT-5 and reasoning models)
+            thought_delta = None
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
+                thought_delta = delta.reasoning_content
+            elif hasattr(delta, "reasoning") and delta.reasoning:
+                thought_delta = delta.reasoning
 
             # Extract tool calls delta
             tool_calls_delta = None
@@ -88,10 +106,10 @@ class OpenAIService(BaseDeclarativeLLMService):
                     )
 
             # Only yield if we have something
-            if text_delta or tool_calls_delta or finish_reason:
+            if text_delta or thought_delta or tool_calls_delta or finish_reason:
                 yield StreamChunk(
                     text_delta=text_delta,
-                    thought_delta=None,  # OpenAI doesn't have thinking tokens (o1/o3 handle differently)
+                    thought_delta=thought_delta,
                     tool_calls_delta=tool_calls_delta,
                     finish_reason=finish_reason,
                 )

@@ -11,9 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.chat import router as chat
-from app.api.models_api import router as models
-from app.api.session import router as session
+from app.api.routes.chat import router as chat
+from app.api.routes.models import router as models
+from app.api.routes.session import router as session
 from app.config import settings
 
 # Configure logging before importing modules that use it

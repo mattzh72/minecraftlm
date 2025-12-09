@@ -121,8 +121,8 @@ class AnthropicService(BaseDeclarativeLLMService):
         if anthropic_tools:
             request_params["tools"] = anthropic_tools
 
-        # Enable extended thinking for supported models
-        if "claude-3" in self.model_id or "claude-sonnet-4" in self.model_id:
+        # Enable extended thinking for Claude 3+ and Claude 4+ models
+        if any(x in self.model_id for x in ("claude-3", "claude-sonnet-4", "claude-opus-4")):
             request_params["thinking"] = {
                 "type": "enabled",
                 "budget_tokens": 10000,
