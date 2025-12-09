@@ -9,7 +9,7 @@ export const toolCallFunctionSchema = z.object({
 });
 
 export const toolCallSchema = z.object({
-  id: z.string(),
+  id: z.string().nullish(),
   type: z.literal("function"),
   function: toolCallFunctionSchema,
   thought_signature: z.string().nullish(),
@@ -30,7 +30,7 @@ export const rawAssistantMessageSchema = z.object({
 
 export const rawToolMessageSchema = z.object({
   role: z.literal("tool"),
-  tool_call_id: z.string(),
+  tool_call_id: z.string().nullish(),
   content: z.string(),
   name: z.string(),
 });
@@ -52,7 +52,7 @@ export const toolCallResultSchema = z.object({
 });
 
 export const toolCallWithResultSchema = z.object({
-  id: z.string(),
+  id: z.string().nullish(),
   name: z.string(),
   arguments: z.string(),
   result: toolCallResultSchema.optional(),

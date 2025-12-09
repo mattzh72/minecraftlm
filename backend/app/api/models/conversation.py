@@ -14,7 +14,7 @@ class ToolCallFunction(BaseModel):
 class ToolCall(BaseModel):
     """Tool call made by the assistant"""
 
-    id: str
+    id: str | None = None
     type: Literal["function"]
     function: ToolCallFunction
     thought_signature: str | None = None
@@ -41,7 +41,7 @@ class ToolMessage(BaseModel):
     """Tool response message in conversation"""
 
     role: Literal["tool"]
-    tool_call_id: str
+    tool_call_id: str | None = None
     content: str
     name: str
 
@@ -49,4 +49,3 @@ class ToolMessage(BaseModel):
 
 
 ConversationMessage = Union[UserMessage, AssistantMessage, ToolMessage]
-
