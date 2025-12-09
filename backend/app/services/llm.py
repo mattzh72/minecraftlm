@@ -76,8 +76,6 @@ class LLMService:
         Yields:
             StreamChunk with text deltas, tool call deltas, or finish reason
         """
-        import json
-
         # Build messages with system prompt
         full_messages = [{"role": "system", "content": system_prompt}] + messages
 
@@ -86,7 +84,6 @@ class LLMService:
             model=self.model,
             messages=full_messages,
             tools=tools,
-            temperature=1.0,
             stream=True,
         )
 

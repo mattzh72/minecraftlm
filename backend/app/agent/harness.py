@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import AsyncIterator, Literal
 import logging
 
+from app.config import settings
+from app.services.gemini import GeminiService
 from app.services.llm import LLMService
 from app.services.session import SessionService
 from app.agent.tools.complete_task import CompleteTaskTool
@@ -62,7 +64,9 @@ class MinecraftSchematicAgent:
         self.max_turns = max_turns
 
         # Initialize services
-        self.llm = LLMService()
+        # Prefer native Gemini client when a key is provided to expose thought summaries;
+        # otherwise fall back to the LiteLLM wrapper.
+        self.llm = GeminiService() if settings.gemini_api_key else LLMService()
         self.session_service = SessionService()
 
         # Initialize tools
@@ -159,6 +163,12 @@ class MinecraftSchematicAgent:
                 self.tool_registry.get_tool_schemas(),
             ):
                 logger.info(f"handling chunk, chunk={chunk}")
+
+                # Stream thought summaries separately when available (Gemini)
+                thought_delta = getattr(chunk, "thought_delta", None)
+                if thought_delta:
+                    yield ActivityEvent(type="thought", data={"delta": thought_delta})
+
                 # Handle text delta
                 if chunk.text_delta:
                     accumulated_text += chunk.text_delta
@@ -181,6 +191,7 @@ class MinecraftSchematicAgent:
                                 "id": tc_delta.get("id", ""),
                                 "type": tc_delta.get("type", "function"),
                                 "function": {"name": "", "arguments": ""},
+                                "extra_content": {},
                             }
 
                         # Accumulate function name
@@ -195,11 +206,24 @@ class MinecraftSchematicAgent:
                                 tc_delta["function"]["arguments"]
                             )
 
+                        # Capture provider-specific metadata such as thought signatures
+                        extra_content = tc_delta.get("extra_content") or {}
+                        if extra_content:
+                            # Merge dictionaries shallowly; we only expect google.thought_signature for now
+                            merged_extra = accumulated_tool_calls[idx].get(
+                                "extra_content", {}
+                            )
+                            merged_extra.update(extra_content)
+                            accumulated_tool_calls[idx]["extra_content"] = merged_extra
+                        if tc_delta.get("thought_signature"):
+                            accumulated_tool_calls[idx]["thought_signature"] = tc_delta[
+                                "thought_signature"
+                            ]
+
                         # Update ID if provided
                         if tc_delta.get("id"):
                             accumulated_tool_calls[idx]["id"] = tc_delta["id"]
 
-            # Build assistant message from accumulated data
             assistant_message = {"role": "assistant", "content": accumulated_text}
 
             # Note: We don't yield a final 'thought' event here since we've been

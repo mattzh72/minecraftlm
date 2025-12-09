@@ -264,35 +264,42 @@ export default function ChatPanel() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let accumulatedText = "";
+        let lineBuffer = "";
+        let eventLines = [];
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n");
+          lineBuffer += decoder.decode(value, { stream: true });
+          const lines = lineBuffer.split(/\r?\n/);
+          lineBuffer = lines.pop() || "";
 
           for (const line of lines) {
-            if (line.startsWith("data: ")) {
+            if (line === "") {
+              if (eventLines.length === 0) {
+                continue;
+              }
+              const dataStr = eventLines.join("\n");
+              eventLines = [];
+
               try {
-                const data = JSON.parse(line.slice(6));
+                const data = JSON.parse(dataStr);
 
                 if (data.type === "turn_start") {
-                  // New turn starting, show thinking
+                  setIsThinking(true);
+                } else if (data.type === "thought") {
+                  setStreamingContent((prev) => prev + data.data.delta);
                   setIsThinking(true);
                 } else if (data.type === "text_delta") {
-                  // Accumulate text content
                   accumulatedText += data.data.delta;
                   setStreamingContent(accumulatedText);
                   setIsThinking(false);
                 } else if (data.type === "tool_call") {
-                  // Tool call started - show thinking while it executes
                   setIsThinking(true);
                 } else if (data.type === "tool_result") {
-                  // Tool finished - thinking for next step
                   setIsThinking(true);
                 } else if (data.type === "complete") {
-                  // Done - fetch updated conversation and structure
                   setIsThinking(false);
 
                   if (data.data.success) {
@@ -313,9 +320,27 @@ export default function ChatPanel() {
                   setIsThinking(false);
                 }
               } catch (parseErr) {
-                console.error("Error parsing SSE data:", parseErr, line);
+                console.error("Error parsing SSE data:", parseErr, dataStr);
               }
+            } else if (line.startsWith("data:")) {
+              eventLines.push(line.slice(5).trimStart());
             }
+          }
+        }
+
+        // Process any trailing event lines when stream ends
+        if (eventLines.length > 0) {
+          const dataStr = eventLines.join("\n");
+          try {
+            const data = JSON.parse(dataStr);
+            if (data.type === "thought") {
+              setStreamingContent((prev) => prev + data.data.delta);
+            } else if (data.type === "text_delta") {
+              accumulatedText += data.data.delta;
+              setStreamingContent(accumulatedText);
+            }
+          } catch (parseErr) {
+            console.error("Error parsing trailing SSE data:", parseErr, dataStr);
           }
         }
 
