@@ -30,7 +30,7 @@ export const rawAssistantMessageSchema = z.object({
 
 export const rawToolMessageSchema = z.object({
   role: z.literal("tool"),
-  tool_call_id: z.string(),
+  tool_call_id: z.string().nullish(),
   content: z.string(),
   name: z.string(),
 });
