@@ -15,7 +15,7 @@ router = APIRouter()
 CODE_FNAME = "code.json"
 # Store sessions outside backend/ to avoid triggering uvicorn reload
 LOCAL_STORAGE_FOLDER = (
-    Path(__file__).parent.parent.parent.parent / ".storage" / "sessions"
+    Path(__file__).parent.parent.parent.parent.parent / ".storage" / "sessions"
 )
 
 
