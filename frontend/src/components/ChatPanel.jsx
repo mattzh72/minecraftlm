@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   Check,
   X,
@@ -7,56 +7,54 @@ import {
   Wrench,
   ChevronDown,
 } from "lucide-react";
-import { cn } from "../lib/cn";
-import { Collapsible } from "@base-ui-components/react/collapsible";
-import useSessionStore from "../store/sessionStore";
-import useAutoScroll from "../hooks/useAutoScroll";
-import useInitialMessage from "../hooks/useInitialMessage";
+import { Streamdown } from "streamdown";
+import { cn } from "@/lib/utils";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsiblePanel,
+} from "@/components/ui/collapsible";
+import useSessionStore from "@/store/sessionStore";
+import useChatStore, { ChatState } from "@/store/chatStore";
+import useInitialMessage from "@/hooks/useInitialMessage";
 import { PromptBox } from "./PromptBox";
-import { ThinkingIndicator } from "./ActivityRenderer";
+import { AgentScroller } from "./AgentScroller";
+import { ThinkingIndicator, ThoughtDisplay } from "./ActivityRenderer";
 import {
   formatConversationToUIMessages,
   getToolCallLabel,
-  hasExpandableContent,
-} from "../lib/formatConversation";
-
-// Header component
-function ChatPanelHeader() {
-  return (
-    <div className="px-4 py-3 border-b border-slate-200/50">
-      <h2 className="text-sm font-medium text-slate-700">Chat</h2>
-    </div>
-  );
-}
+} from "@/lib/formatConversation";
 
 // ============================================================================
-// Message Renderers - Cursor-style full-width messages
+// Message Components
 // ============================================================================
 
 function UserMessage({ content }) {
   return (
-    <div className="text-sm text-slate-700 bg-slate-100 border border-slate-200 rounded-lg p-2">
+    <div className="text-sm text-foreground bg-muted border border-border rounded-lg p-2">
       <div className="whitespace-pre-wrap">{content}</div>
     </div>
   );
 }
 
-function AssistantMessage({ content, tool_calls, thought_summary }) {
+function AssistantMessage({ content, thought_summary, tool_calls }) {
   const hasContent = content && content.trim();
-  const hasToolCalls = tool_calls && tool_calls.length > 0;
   const hasThought = thought_summary && thought_summary.trim();
+  const hasToolCalls = tool_calls && tool_calls.length > 0;
 
   if (!hasContent && !hasToolCalls && !hasThought) return null;
 
   return (
-    <div className="py-3 text-sm text-slate-700 border-b border-slate-100">
+    <div className="py-3 text-sm text-foreground border-b border-border/50">
       <div className="space-y-2">
         {hasThought && (
-          <div className="text-xs text-slate-500 italic whitespace-pre-wrap">
-            {thought_summary}
+          <ThoughtDisplay content={thought_summary} isStreaming={false} />
+        )}
+        {hasContent && (
+          <div className="prose prose-sm prose-slate max-w-none dark:prose-invert">
+            <Streamdown>{content}</Streamdown>
           </div>
         )}
-        {hasContent && <div className="whitespace-pre-wrap">{content}</div>}
         {hasToolCalls &&
           tool_calls.map((tc, idx) => (
             <ToolCallWithResultDisplay key={tc.id || idx} toolCall={tc} />
@@ -66,9 +64,6 @@ function AssistantMessage({ content, tool_calls, thought_summary }) {
   );
 }
 
-/**
- * Unified tool call display - toggle on the right side to avoid offset
- */
 function ToolCallWithResultDisplay({ toolCall }) {
   const { name, result } = toolCall;
   const hasResult = !!result;
@@ -80,9 +75,14 @@ function ToolCallWithResultDisplay({ toolCall }) {
   if (result?.content) {
     try {
       const parsed = JSON.parse(result.content);
-      displayContent = hasError ? parsed.error : parsed.result;
+      const rawContent = hasError ? parsed.error : parsed.result;
+      if (rawContent && typeof rawContent === "string" && rawContent.trim()) {
+        displayContent = rawContent;
+      }
     } catch {
-      displayContent = result.content;
+      if (result.content.trim()) {
+        displayContent = result.content;
+      }
     }
   }
 
@@ -90,24 +90,24 @@ function ToolCallWithResultDisplay({ toolCall }) {
     ? name === "edit_code"
       ? Pencil
       : name === "complete_task"
-      ? CircleCheck
-      : Wrench
+        ? CircleCheck
+        : Wrench
     : hasError
-    ? X
-    : Check;
+      ? X
+      : Check;
 
   const iconColor = !hasResult
-    ? "text-slate-400"
+    ? "text-muted-foreground"
     : hasError
-    ? "text-red-500"
-    : "text-emerald-600";
+      ? "text-destructive"
+      : "text-success";
 
-  const isExpandable = hasExpandableContent(toolCall);
-  const shouldDefaultOpen = hasError;
+  const isExpandable = !!displayContent;
+  const shouldDefaultOpen = hasError && isExpandable;
 
   if (!isExpandable) {
     return (
-      <div className="text-sm py-1 flex items-center gap-1.5 text-slate-500">
+      <div className="text-sm py-1 flex items-center gap-1.5 text-muted-foreground">
         <IconComponent size={14} className={iconColor} />
         <span className="font-medium">{label}</span>
       </div>
@@ -115,11 +115,8 @@ function ToolCallWithResultDisplay({ toolCall }) {
   }
 
   return (
-    <Collapsible.Root className="text-sm" defaultOpen={shouldDefaultOpen}>
-      <Collapsible.Trigger
-        disabled={!displayContent}
-        className="group w-full text-left py-1 flex items-center gap-1.5 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
-      >
+    <Collapsible className="text-sm" defaultOpen={shouldDefaultOpen}>
+      <CollapsibleTrigger className="group w-full text-left py-1 flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
         <span className="relative size-3.5">
           <IconComponent
             size={14}
@@ -130,46 +127,46 @@ function ToolCallWithResultDisplay({ toolCall }) {
           />
           <ChevronDown
             size={14}
-            className="absolute inset-0 text-slate-400 opacity-0 transition-all group-hover:opacity-100 group-data-panel-open:rotate-180"
+            className="absolute inset-0 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-data-[panel-open]:rotate-180"
           />
         </span>
         <span className="font-medium">{label}</span>
-      </Collapsible.Trigger>
-      <Collapsible.Panel
-        keepMounted
-        className={cn(
-          "grid grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out",
-          "data-closed:grid-rows-[0fr]",
-          "data-starting-style:grid-rows-[0fr]"
-        )}
-      >
-        <div className="overflow-hidden min-h-0">
-          {displayContent && (
-            <pre
-              className={cn(
-                "mt-1.5 p-2 rounded-lg text-xs overflow-auto max-h-48",
-                hasError
-                  ? "bg-red-50 text-red-700"
-                  : "bg-slate-50 text-slate-600"
-              )}
-            >
-              {displayContent}
-            </pre>
+      </CollapsibleTrigger>
+      <CollapsiblePanel>
+        <pre
+          className={cn(
+            "mt-1.5 p-2 rounded-lg text-xs overflow-auto max-h-48",
+            hasError
+              ? "bg-destructive/10 text-destructive"
+              : "bg-muted text-muted-foreground"
           )}
-        </div>
-      </Collapsible.Panel>
-    </Collapsible.Root>
+        >
+          {displayContent}
+        </pre>
+      </CollapsiblePanel>
+    </Collapsible>
   );
 }
 
-function StreamingMessage({ content, isThinking }) {
+function StreamingMessage({ thought, text, state }) {
+  const isThinking =
+    state === ChatState.THINKING || state === ChatState.TOOL_CALLING;
+  const isStreamingThought = state === ChatState.STREAMING_THOUGHT;
+  const hasThought = thought && thought.trim();
+  const hasText = text && text.trim();
+
   return (
-    <div className="py-3 text-sm text-slate-700">
+    <div className="py-3 text-sm text-foreground">
       <div className="space-y-2">
-        {content && content.trim() && (
-          <div className="whitespace-pre-wrap">{content}</div>
+        {hasThought && (
+          <ThoughtDisplay content={thought} isStreaming={isStreamingThought} />
         )}
-        {isThinking && <ThinkingIndicator />}
+        {hasText && (
+          <div className="prose prose-sm prose-slate max-w-none dark:prose-invert">
+            <Streamdown mode="streaming">{text}</Streamdown>
+          </div>
+        )}
+        {isThinking && !hasThought && !hasText && <ThinkingIndicator />}
       </div>
     </div>
   );
@@ -177,47 +174,88 @@ function StreamingMessage({ content, isThinking }) {
 
 function ErrorMessage({ content }) {
   return (
-    <div className="py-3 text-sm text-red-600">
+    <div className="py-3 text-sm text-destructive">
       <div className="whitespace-pre-wrap">{content}</div>
     </div>
   );
 }
 
 // ============================================================================
-// Main ChatPanel Component
+// Message List Component
 // ============================================================================
 
-export default function ChatPanel() {
+function MessageList({
+  messages,
+  pendingUserMessage,
+  streamingThought,
+  streamingText,
+  chatState,
+  error,
+  isLoading,
+}) {
+  return (
+    <>
+      {messages.map((msg, idx) => {
+        if (msg.type === "user") {
+          return <UserMessage key={idx} content={msg.content} />;
+        }
+        if (msg.type === "assistant") {
+          return (
+            <AssistantMessage
+              key={idx}
+              content={msg.content}
+              thought_summary={msg.thought_summary}
+              tool_calls={msg.tool_calls}
+            />
+          );
+        }
+        return null;
+      })}
+
+      {pendingUserMessage &&
+        !messages.some(
+          (msg) => msg.type === "user" && msg.content === pendingUserMessage
+        ) && <UserMessage content={pendingUserMessage} />}
+
+      {isLoading && (
+        <StreamingMessage
+          thought={streamingThought}
+          text={streamingText}
+          state={chatState}
+        />
+      )}
+
+      {error && <ErrorMessage content={error} />}
+    </>
+  );
+}
+
+// ============================================================================
+// Chat Hook (business logic only)
+// ============================================================================
+
+export function useChat() {
   const sessionId = useSessionStore((state) => state.sessionId);
   const conversation = useSessionStore((state) => state.conversation);
   const setConversation = useSessionStore((state) => state.setConversation);
   const setStructureData = useSessionStore((state) => state.setStructureData);
 
+  const chatState = useChatStore((state) => state.state);
+  const streamingThought = useChatStore((state) => state.streamingThought);
+  const streamingText = useChatStore((state) => state.streamingText);
+  const pendingUserMessage = useChatStore((state) => state.pendingUserMessage);
+  const error = useChatStore((state) => state.error);
+  const actions = useChatStore((state) => state.actions);
+
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Pending user message - shown immediately while waiting for backend
-  const [pendingUserMessage, setPendingUserMessage] = useState(null);
+  const isLoading =
+    chatState !== ChatState.IDLE && chatState !== ChatState.ERROR;
 
-  // Streaming state - temporary message being built
-  const [streamingContent, setStreamingContent] = useState("");
-  const [isThinking, setIsThinking] = useState(false);
-  const [localError, setLocalError] = useState(null);
-
-  const abortControllerRef = useRef(null);
-
-  // Format conversation into UI-friendly messages (groups tool calls with results)
   const displayMessages = useMemo(
     () => formatConversationToUIMessages(conversation || []),
     [conversation]
   );
-
-  const messagesEndRef = useAutoScroll([
-    displayMessages,
-    pendingUserMessage,
-    streamingContent,
-    isThinking,
-  ]);
 
   const handleSend = useCallback(
     async (messageText = null) => {
@@ -226,18 +264,7 @@ export default function ChatPanel() {
       if (!userMessage.trim() || !sessionId || isLoading) return;
 
       setInput("");
-      setLocalError(null);
-      setPendingUserMessage(userMessage);
-      setStreamingContent("");
-      setIsThinking(true);
-      setIsLoading(true);
-
-      // Abort any previous request (only when starting new request, not on unmount)
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
+      const abortController = actions.startRequest(userMessage);
 
       try {
         const response = await fetch("/api/chat", {
@@ -253,7 +280,6 @@ export default function ChatPanel() {
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let accumulatedText = "";
         let lineBuffer = "";
         let eventLines = [];
 
@@ -267,9 +293,7 @@ export default function ChatPanel() {
 
           for (const line of lines) {
             if (line === "") {
-              if (eventLines.length === 0) {
-                continue;
-              }
+              if (eventLines.length === 0) continue;
               const dataStr = eventLines.join("\n");
               eventLines = [];
 
@@ -277,20 +301,17 @@ export default function ChatPanel() {
                 const data = JSON.parse(dataStr);
 
                 if (data.type === "turn_start") {
-                  setIsThinking(true);
+                  actions.onTurnStart();
                 } else if (data.type === "thought") {
-                  setStreamingContent((prev) => prev + data.data.delta);
-                  setIsThinking(true);
+                  actions.onThoughtDelta(data.data.delta);
                 } else if (data.type === "text_delta") {
-                  accumulatedText += data.data.delta;
-                  setStreamingContent(accumulatedText);
-                  setIsThinking(false);
+                  actions.onTextDelta(data.data.delta);
                 } else if (data.type === "tool_call") {
-                  setIsThinking(true);
+                  actions.onToolCall(data.data.name, data.data.args);
                 } else if (data.type === "tool_result") {
-                  setIsThinking(true);
+                  actions.onToolResult(data.data);
                 } else if (data.type === "complete") {
-                  setIsThinking(false);
+                  actions.onComplete(data.data.success, data.data.reason);
 
                   if (data.data.success) {
                     try {
@@ -306,8 +327,7 @@ export default function ChatPanel() {
                     }
                   }
                 } else if (data.type === "error") {
-                  setLocalError(data.data.message);
-                  setIsThinking(false);
+                  actions.onError(data.data.message);
                 }
               } catch (parseErr) {
                 console.error("Error parsing SSE data:", parseErr, dataStr);
@@ -318,96 +338,109 @@ export default function ChatPanel() {
           }
         }
 
-        // Process any trailing event lines when stream ends
+        // Process trailing event lines
         if (eventLines.length > 0) {
           const dataStr = eventLines.join("\n");
           try {
             const data = JSON.parse(dataStr);
             if (data.type === "thought") {
-              setStreamingContent((prev) => prev + data.data.delta);
+              actions.onThoughtDelta(data.data.delta);
             } else if (data.type === "text_delta") {
-              accumulatedText += data.data.delta;
-              setStreamingContent(accumulatedText);
+              actions.onTextDelta(data.data.delta);
             }
           } catch (parseErr) {
             console.error("Error parsing trailing SSE data:", parseErr, dataStr);
           }
         }
 
-        // Stream finished - fetch the updated conversation from backend
+        // Fetch updated conversation
         try {
           const sessionRes = await fetch(`/api/sessions/${sessionId}`);
           if (sessionRes.ok) {
             const sessionData = await sessionRes.json();
-            // Clear pending BEFORE setting conversation to avoid brief duplicate
-            // (React 18 doesn't batch state updates in async callbacks)
-            setPendingUserMessage(null);
+            actions.clearPendingMessage();
             setConversation(sessionData.conversation || []);
           }
         } catch (err) {
           console.error("Error fetching updated conversation:", err);
         }
-      } catch (error) {
-        console.error("Chat error:", error);
-        if (error.name !== "AbortError") {
-          setLocalError(`Error: ${error.message}`);
+      } catch (err) {
+        console.error("Chat error:", err);
+        if (err.name !== "AbortError") {
+          actions.onError(`Error: ${err.message}`);
         }
+        actions.clearPendingMessage();
       } finally {
-        // Always reset loading state - React safely ignores updates on unmounted components
-        setIsLoading(false);
-        setStreamingContent("");
-        setIsThinking(false);
-        setPendingUserMessage(null);
+        const currentState = useChatStore.getState().state;
+        if (
+          currentState !== ChatState.IDLE &&
+          currentState !== ChatState.ERROR
+        ) {
+          actions.reset();
+        }
       }
     },
-    [sessionId, isLoading, input, setStructureData, setConversation]
+    [sessionId, isLoading, input, setStructureData, setConversation, actions]
   );
+
+  return {
+    sessionId,
+    input,
+    setInput,
+    isLoading,
+    displayMessages,
+    pendingUserMessage,
+    streamingThought,
+    streamingText,
+    chatState,
+    error,
+    handleSend,
+  };
+}
+
+// ============================================================================
+// Main ChatPanel Component
+// ============================================================================
+
+export function ChatPanel() {
+  const {
+    sessionId,
+    input,
+    setInput,
+    isLoading,
+    displayMessages,
+    pendingUserMessage,
+    streamingThought,
+    streamingText,
+    chatState,
+    error,
+    handleSend,
+  } = useChat();
 
   useInitialMessage(sessionId, displayMessages.length, isLoading, handleSend);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <ChatPanelHeader />
+      <AgentScroller
+        autoScrollDeps={[
+          displayMessages,
+          pendingUserMessage,
+          streamingThought,
+          streamingText,
+          chatState,
+        ]}
+      >
+        <MessageList
+          messages={displayMessages}
+          pendingUserMessage={pendingUserMessage}
+          streamingThought={streamingThought}
+          streamingText={streamingText}
+          chatState={chatState}
+          error={error}
+          isLoading={isLoading}
+        />
+      </AgentScroller>
 
-      {/* Messages - scrollable */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-3 space-y-2 pt-2">
-        {/* Render formatted UI messages (tool results are grouped with their calls) */}
-        {displayMessages.map((msg, idx) => {
-          if (msg.type === "user") {
-            return <UserMessage key={idx} content={msg.content} />;
-          }
-          if (msg.type === "assistant") {
-            return (
-              <AssistantMessage
-                key={idx}
-                content={msg.content}
-                thought_summary={msg.thought_summary}
-                tool_calls={msg.tool_calls}
-              />
-            );
-          }
-          return null;
-        })}
-
-        {/* Pending user message (shown immediately while loading) */}
-        {pendingUserMessage && <UserMessage content={pendingUserMessage} />}
-
-        {/* Streaming message (while loading) */}
-        {isLoading && (
-          <StreamingMessage
-            content={streamingContent}
-            isThinking={isThinking}
-          />
-        )}
-
-        {/* Local error */}
-        {localError && <ErrorMessage content={localError} />}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input - fixed at bottom */}
       <div className="p-3 pt-0">
         <PromptBox
           value={input}
@@ -415,9 +448,13 @@ export default function ChatPanel() {
           onSubmit={handleSend}
           disabled={!sessionId || isLoading}
           placeholder="Describe your Minecraft structure..."
-          className="border-slate-300"
         />
       </div>
     </div>
   );
 }
+
+// Compound component exports for flexible composition
+ChatPanel.Messages = MessageList;
+ChatPanel.Scroller = AgentScroller;
+ChatPanel.Input = PromptBox;

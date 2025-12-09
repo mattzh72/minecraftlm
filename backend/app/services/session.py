@@ -113,3 +113,13 @@ class SessionService:
         """Save the generated structure JSON"""
         structure_file = STORAGE_DIR / session_id / "code.json"
         structure_file.write_text(json.dumps(structure, indent=2))
+
+    @staticmethod
+    def delete_session(session_id: str) -> None:
+        """Delete a session and all its associated data"""
+        import shutil
+
+        session_dir = STORAGE_DIR / session_id
+        if not session_dir.exists():
+            raise FileNotFoundError(f"Session {session_id} not found")
+        shutil.rmtree(session_dir)

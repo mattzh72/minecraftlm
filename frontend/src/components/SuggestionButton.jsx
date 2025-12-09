@@ -1,4 +1,4 @@
-import { cva } from 'class-variance-authority';
+import { Button } from "@/components/ui/button";
 
 const SUGGESTIONS = [
   { emoji: '🏠', label: 'Dorm Room', prompt: 'Build a cozy college dorm room' },
@@ -7,34 +7,18 @@ const SUGGESTIONS = [
   { emoji: '🌳', label: 'Treehouse', prompt: 'Build a treehouse' },
 ];
 
-const suggestionButton = cva([
-  'inline-flex items-center gap-2 px-2 py-1',
-  'text-sm font-medium bg-white border rounded-lg',
-  'transition-colors duration-150',
-  'hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300',
-  'disabled:cursor-not-allowed disabled:opacity-50',
-  'disabled:hover:bg-white disabled:hover:border-slate-200',
-], {
-  variants: {
-    intent: {
-      default: 'text-slate-600 border-slate-200 cursor-pointer',
-    },
-  },
-  defaultVariants: {
-    intent: 'default',
-  },
-});
-
 export function SuggestionButton({ emoji, label, onClick, disabled }) {
   return (
-    <button
-      className={suggestionButton()}
+    <Button
+      variant="outline"
+      size="sm"
       onClick={onClick}
       disabled={disabled}
+      className="gap-2"
     >
       <span className="text-base">{emoji}</span>
       <span>{label}</span>
-    </button>
+    </Button>
   );
 }
 
