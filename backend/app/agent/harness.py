@@ -6,14 +6,16 @@ import json
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import AsyncIterator, Literal
+from typing import AsyncIterator, Literal, TYPE_CHECKING
 import logging
 
-from app.services.llm import LLMService
-from app.services.session import SessionService
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.registry import ToolRegistry
+
+if TYPE_CHECKING:
+    from app.services.llm import LLMService
+    from app.services.session import SessionService
 
 logger = logging.getLogger(__name__)
 
@@ -57,18 +59,24 @@ class ActivityEvent:
 class MinecraftSchematicAgent:
     """Executes the main agentic loop"""
 
-    def __init__(self, session_id: str, max_turns: int = 20):
+    def __init__(
+        self,
+        session_id: str,
+        llm_service: "LLMService",
+        session_service: "SessionService",
+        max_turns: int = 20,
+    ):
         self.session_id = session_id
         self.max_turns = max_turns
 
-        # Initialize services
-        self.llm = LLMService()
-        self.session_service = SessionService()
+        # Injected services
+        self.llm = llm_service
+        self.session_service = session_service
 
-        # Initialize tools
+        # Initialize tools with session service
         tools = [
-            EditCodeTool(),
-            CompleteTaskTool(),
+            EditCodeTool(session_service),
+            CompleteTaskTool(session_service),
         ]
         self.tool_registry = ToolRegistry(tools)
 

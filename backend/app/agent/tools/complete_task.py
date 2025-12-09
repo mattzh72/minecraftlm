@@ -18,13 +18,17 @@ class CompleteTaskParams(BaseModel):
 class CompleteTaskInvocation(BaseToolInvocation[CompleteTaskParams, str]):
     """Invocation for completing the task"""
 
+    def __init__(self, params: CompleteTaskParams, session_service: SessionService):
+        super().__init__(params)
+        self._session_service = session_service
+
     def get_description(self) -> str:
         return f"Complete task for session {self.params.session_id}"
 
     async def execute(self) -> ToolResult:
         try:
             # Load current code
-            code = SessionService.load_code(self.params.session_id)
+            code = self._session_service.load_code(self.params.session_id)
 
             # Check if code exists
             if not code or code.strip() == "# Generated SDK code will appear here":
@@ -44,7 +48,7 @@ class CompleteTaskInvocation(BaseToolInvocation[CompleteTaskParams, str]):
                 return ToolResult(error=error_msg)
 
             # Code is valid! Save the structure JSON for the frontend
-            SessionService.save_structure(
+            self._session_service.save_structure(
                 self.params.session_id, validation_result.structure
             )
 
@@ -61,7 +65,8 @@ class CompleteTaskInvocation(BaseToolInvocation[CompleteTaskParams, str]):
 class CompleteTaskTool(BaseDeclarativeTool):
     """Tool for completing the task with automatic validation"""
 
-    def __init__(self):
+    def __init__(self, session_service: SessionService):
+        self._session_service = session_service
         schema = make_tool_schema(
             name="complete_task",
             description=(
@@ -75,4 +80,4 @@ class CompleteTaskTool(BaseDeclarativeTool):
 
     async def build(self, params: dict) -> CompleteTaskInvocation:
         validated = CompleteTaskParams(**params)
-        return CompleteTaskInvocation(validated)
+        return CompleteTaskInvocation(validated, self._session_service)

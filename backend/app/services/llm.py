@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import litellm
 
-from app.config import settings
+from app.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -44,19 +44,20 @@ class StreamChunk:
 class LLMService:
     """Provider-agnostic LLM service using LiteLLM"""
 
-    def __init__(self):
+    def __init__(self, settings: Settings):
+        self._settings = settings
         self.model = settings.llm_model
         self._configure_api_keys()
         logger.info(f"Using model: {self.model}")
 
     def _configure_api_keys(self):
         """Set API keys as environment variables for LiteLLM"""
-        if settings.openai_api_key:
-            os.environ["OPENAI_API_KEY"] = settings.openai_api_key
-        if settings.anthropic_api_key:
-            os.environ["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
-        if settings.gemini_api_key:
-            os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
+        if self._settings.openai_api_key:
+            os.environ["OPENAI_API_KEY"] = self._settings.openai_api_key
+        if self._settings.anthropic_api_key:
+            os.environ["ANTHROPIC_API_KEY"] = self._settings.anthropic_api_key
+        if self._settings.gemini_api_key:
+            os.environ["GEMINI_API_KEY"] = self._settings.gemini_api_key
 
     async def generate_with_tools_streaming(
         self,

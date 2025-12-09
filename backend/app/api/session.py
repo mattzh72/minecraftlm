@@ -3,32 +3,27 @@ Session API endpoints
 """
 
 import json
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
-from app.services.session import SessionService
 from app.api.models import SessionResponse
-
+from app.dependencies import AppSettings, Session
 
 router = APIRouter()
 
 CODE_FNAME = "code.json"
-# Store sessions outside backend/ to avoid triggering uvicorn reload
-LOCAL_STORAGE_FOLDER = (
-    Path(__file__).parent.parent.parent.parent / ".storage" / "sessions"
-)
 
 
 @router.get("/sessions")
-async def list_sessions():
+async def list_sessions(settings: AppSettings):
     """
     List all available sessions with metadata.
     """
     sessions = []
-    if LOCAL_STORAGE_FOLDER.exists():
-        for session_dir in LOCAL_STORAGE_FOLDER.iterdir():
+    storage_dir = settings.storage_dir
+    if storage_dir.exists():
+        for session_dir in storage_dir.iterdir():
             if session_dir.is_dir():
                 session_id = session_dir.name
                 # Get basic info
@@ -73,22 +68,22 @@ async def list_sessions():
 
 
 @router.post("/sessions", response_model=SessionResponse)
-async def create_session():
+async def create_session(session_service: Session):
     """
     Create a new chat session.
     Returns the session_id which maps to storage/sessions/{session_id}/
     """
-    session_id = SessionService.create_session()
+    session_id = session_service.create_session()
     return SessionResponse(session_id=session_id)
 
 
 @router.get("/sessions/{session_id}")
-async def get_session(session_id: str):
+async def get_session(session_id: str, settings: AppSettings):
     """
     Get session data including conversation history and structure (if exists).
     Used to restore sessions on page reload.
     """
-    session_dir = Path(LOCAL_STORAGE_FOLDER) / session_id
+    session_dir = settings.storage_dir / session_id
     if not session_dir.exists():
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
@@ -119,12 +114,12 @@ async def get_session(session_id: str):
 
 
 @router.get("/sessions/{session_id}/structure")
-async def get_structure(session_id: str):
+async def get_structure(session_id: str, settings: AppSettings):
     """
     Get the generated Minecraft structure JSON for visualization.
     Returns the code.json file which contains the structure data.
     """
-    code_path = Path(LOCAL_STORAGE_FOLDER) / session_id / CODE_FNAME
+    code_path = settings.storage_dir / session_id / CODE_FNAME
     if not code_path.exists():
         raise HTTPException(
             status_code=404, detail=f"Structure not found for session {session_id}"

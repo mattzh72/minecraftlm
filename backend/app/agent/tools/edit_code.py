@@ -19,6 +19,10 @@ class EditCodeParams(BaseModel):
 class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
     """Invocation for editing SDK code"""
 
+    def __init__(self, params: EditCodeParams, session_service: SessionService):
+        super().__init__(params)
+        self._session_service = session_service
+
     def get_description(self) -> str:
         preview = self.params.old_string[:50]
         if len(self.params.old_string) > 50:
@@ -28,7 +32,7 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
     async def execute(self) -> ToolResult:
         try:
             # Load current code
-            code = SessionService.load_code(self.params.session_id)
+            code = self._session_service.load_code(self.params.session_id)
 
             # Check if old_string exists in code
             if self.params.old_string not in code:
@@ -50,7 +54,7 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
             new_code = code.replace(self.params.old_string, self.params.new_string)
 
             # Save updated code
-            SessionService.save_code(self.params.session_id, new_code)
+            self._session_service.save_code(self.params.session_id, new_code)
 
             return ToolResult(output="Code edited successfully")
 
@@ -63,7 +67,8 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
 class EditCodeTool(BaseDeclarativeTool):
     """Tool for making precise edits to SDK code"""
 
-    def __init__(self):
+    def __init__(self, session_service: SessionService):
+        self._session_service = session_service
         schema = make_tool_schema(
             name="edit_code",
             description=(
@@ -90,4 +95,4 @@ class EditCodeTool(BaseDeclarativeTool):
 
     async def build(self, params: dict) -> EditCodeInvocation:
         validated = EditCodeParams(**params)
-        return EditCodeInvocation(validated)
+        return EditCodeInvocation(validated, self._session_service)

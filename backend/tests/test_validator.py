@@ -13,11 +13,13 @@ def test_validate_valid_code():
 x = 10
 y = 20
 result = x + y
-print(result)
+structure = {"blocks": [], "size": {"x": result, "y": 1, "z": 1}}
 """
     result = CodeValidator.validate_code(code)
     assert result.is_valid
     assert result.error is None
+    assert result.structure is not None
+    assert result.structure["size"]["x"] == 30
 
 
 def test_validate_syntax_error():
@@ -62,9 +64,11 @@ def add(a, b):
     return a + b
 
 result = add(5, 10)
+structure = {"blocks": [], "result": result}
 """
     result = CodeValidator.validate_code(code)
     assert result.is_valid
+    assert result.structure["result"] == 15
 
 
 def test_validate_with_imports():
@@ -72,9 +76,11 @@ def test_validate_with_imports():
     code = """
 import math
 result = math.sqrt(16)
+structure = {"blocks": [], "sqrt_result": result}
 """
     result = CodeValidator.validate_code(code)
     assert result.is_valid
+    assert result.structure["sqrt_result"] == 4.0
 
 
 def test_validate_multiline_string():
@@ -84,7 +90,8 @@ message = """
 This is a multiline
 string for testing
 """
-print(message)
+structure = {"blocks": [], "message": message}
 '''
     result = CodeValidator.validate_code(code)
     assert result.is_valid
+    assert "multiline" in result.structure["message"]

@@ -6,13 +6,12 @@ import pytest
 
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
-from app.services.session import SessionService
 
 
 @pytest.mark.asyncio
-async def test_edit_code_tool(session_with_code):
+async def test_edit_code_tool(session_with_code, session_service):
     """Test editing code with old_string/new_string"""
-    tool = EditCodeTool()
+    tool = EditCodeTool(session_service)
 
     # Edit the block type in the code
     invocation = await tool.build({
@@ -26,15 +25,15 @@ async def test_edit_code_tool(session_with_code):
     assert "edited successfully" in result.output.lower()
 
     # Verify the change
-    updated_code = SessionService.load_code(session_with_code)
+    updated_code = session_service.load_code(session_with_code)
     assert '"minecraft:stone"' in updated_code
     assert '"minecraft:oak_planks"' not in updated_code
 
 
 @pytest.mark.asyncio
-async def test_edit_code_old_string_not_found(session_with_code):
+async def test_edit_code_old_string_not_found(session_with_code, session_service):
     """Test editing with non-existent old_string"""
-    tool = EditCodeTool()
+    tool = EditCodeTool(session_service)
 
     invocation = await tool.build({
         "session_id": session_with_code,
@@ -48,9 +47,9 @@ async def test_edit_code_old_string_not_found(session_with_code):
 
 
 @pytest.mark.asyncio
-async def test_edit_code_non_unique_string(session_with_code):
+async def test_edit_code_non_unique_string(session_with_code, session_service):
     """Test editing with non-unique old_string"""
-    tool = EditCodeTool()
+    tool = EditCodeTool(session_service)
 
     # "place_block" appears multiple times
     invocation = await tool.build({
@@ -65,19 +64,19 @@ async def test_edit_code_non_unique_string(session_with_code):
 
 
 @pytest.mark.asyncio
-async def test_complete_task_valid_code(temp_storage):
+async def test_complete_task_valid_code(session_service):
     """Test completing task with valid code"""
-    session_id = SessionService.create_session()
+    session_id = session_service.create_session()
 
     valid_code = """
 x = 10
 y = 20
 result = x + y
-print(result)
+structure = {"blocks": [], "size": {"x": result, "y": 1, "z": 1}}
 """
-    SessionService.save_code(session_id, valid_code)
+    session_service.save_code(session_id, valid_code)
 
-    tool = CompleteTaskTool()
+    tool = CompleteTaskTool(session_service)
     invocation = await tool.build({"session_id": session_id})
     result = await invocation.execute()
 
@@ -86,17 +85,17 @@ print(result)
 
 
 @pytest.mark.asyncio
-async def test_complete_task_invalid_syntax(temp_storage):
+async def test_complete_task_invalid_syntax(session_service):
     """Test completing task with syntax errors"""
-    session_id = SessionService.create_session()
+    session_id = session_service.create_session()
 
     invalid_code = """
 def broken(
     print("syntax error")
 """
-    SessionService.save_code(session_id, invalid_code)
+    session_service.save_code(session_id, invalid_code)
 
-    tool = CompleteTaskTool()
+    tool = CompleteTaskTool(session_service)
     invocation = await tool.build({"session_id": session_id})
     result = await invocation.execute()
 
@@ -106,16 +105,16 @@ def broken(
 
 
 @pytest.mark.asyncio
-async def test_complete_task_execution_error(temp_storage):
+async def test_complete_task_execution_error(session_service):
     """Test completing task with execution errors"""
-    session_id = SessionService.create_session()
+    session_id = session_service.create_session()
 
     error_code = """
 x = 10 / 0  # Division by zero
 """
-    SessionService.save_code(session_id, error_code)
+    session_service.save_code(session_id, error_code)
 
-    tool = CompleteTaskTool()
+    tool = CompleteTaskTool(session_service)
     invocation = await tool.build({"session_id": session_id})
     result = await invocation.execute()
 

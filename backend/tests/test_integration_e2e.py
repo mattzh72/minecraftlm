@@ -10,8 +10,8 @@ import os
 import pytest
 
 from app.agent.harness import MinecraftSchematicAgent, TerminateReason
-from app.config import settings
-from app.services.session import SessionService
+from app.config import Settings
+from app.dependencies import set_server_state, get_server_state
 
 
 @pytest.mark.integration
@@ -23,6 +23,11 @@ async def test_agent_e2e_simple_structure():
     This test runs the full agent loop with real LLM API calls.
     Uses real storage (not temp) so you can inspect the session afterward.
     """
+    # Initialize ServerState for E2E test (uses real storage)
+    settings = Settings()
+    set_server_state(settings)
+    state = get_server_state()
+
     provider = settings.get_provider()
 
     def has_key(env_name: str, cfg_value: str | None) -> bool:
@@ -38,19 +43,23 @@ async def test_agent_e2e_simple_structure():
         pytest.skip("ANTHROPIC_API_KEY not set - skipping E2E test for Anthropic provider")
 
     # Create session (uses real storage)
-    session_id = SessionService.create_session()
+    session_id = state.session_service.create_session()
     print(f"\nCreated session: {session_id}")
 
     # Verify session files were created
-    from app.services.session import STORAGE_DIR
-    session_dir = STORAGE_DIR / session_id
+    session_dir = settings.storage_dir / session_id
     assert session_dir.exists(), f"Session directory not created: {session_dir}"
     assert (session_dir / "code.py").exists(), "code.py not created"
     assert (session_dir / "conversation.json").exists(), "conversation.json not created"
     print(f"Session directory: {session_dir}")
 
-    # Create agent
-    agent = MinecraftSchematicAgent(session_id=session_id, max_turns=15)
+    # Create agent with injected services
+    agent = MinecraftSchematicAgent(
+        session_id=session_id,
+        llm_service=state.llm_service,
+        session_service=state.session_service,
+        max_turns=15,
+    )
 
     # User prompt
     user_message = "Create a medieval house"
@@ -86,11 +95,11 @@ async def test_agent_e2e_simple_structure():
     assert "complete_task" in tool_calls, "Agent should have called complete_task"
 
     # Verify code was written
-    final_code = SessionService.load_code(session_id)
+    final_code = state.session_service.load_code(session_id)
     print(f"\nFinal code:\n{final_code}")
 
     # Verify conversation was saved
-    conversation = SessionService.load_conversation(session_id)
+    conversation = state.session_service.load_conversation(session_id)
     assert len(conversation) >= 2
     assert conversation[0]["role"] == "user"
 

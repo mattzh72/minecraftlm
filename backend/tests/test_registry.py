@@ -10,11 +10,11 @@ from app.agent.tools.registry import ToolRegistry
 
 
 @pytest.fixture
-def registry():
+def registry(session_service):
     """Create a tool registry with standard tools"""
     tools = [
-        EditCodeTool(),
-        CompleteTaskTool(),
+        EditCodeTool(session_service),
+        CompleteTaskTool(session_service),
     ]
     return ToolRegistry(tools)
 
@@ -62,11 +62,9 @@ def test_get_tool_schemas(registry):
 
 
 @pytest.mark.asyncio
-async def test_build_invocation(registry, temp_storage):
+async def test_build_invocation(registry, session_service):
     """Test building a tool invocation"""
-    from app.services.session import SessionService
-
-    session_id = SessionService.create_session()
+    session_id = session_service.create_session()
 
     invocation = await registry.build_invocation(
         "edit_code", {"session_id": session_id, "old_string": "x", "new_string": "y"}

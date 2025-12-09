@@ -4,32 +4,38 @@ FastAPI application entry point
 
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
 from app.api import chat, session
+from app.config import Settings
+from app.dependencies import set_server_state, shutdown_server_state
+from app.errors import register_exception_handlers
 
-# Configure logging before importing modules that use it
+# Configure logging early
 logging.basicConfig(
-    level=settings.log_level,
+    level="INFO",
     format="%(levelname)s:     %(name)s - %(message)s",
 )
-
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # Startup: Initialize ServerState with settings
+    settings = Settings()
+    set_server_state(settings)
+
     logger.info(f"LLM Model: {settings.llm_model} ({settings.get_provider()})")
+
     yield
-    # Shutdown (nothing to clean up)
+
+    # Shutdown: Clean up ServerState
+    await shutdown_server_state()
 
 
 app = FastAPI(
@@ -39,6 +45,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Register centralized exception handlers
+register_exception_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,11 +67,14 @@ async def health():
 
 
 # Serve static files from frontend build (if exists)
-frontend_build = Path(__file__).parent.parent.parent / "frontend" / "dist"
-if frontend_build.exists():
+# Note: We use PROJECT_ROOT here since this runs at import time before ServerState
+from app.config import PROJECT_ROOT
+
+_frontend_build = PROJECT_ROOT / "frontend" / "dist"
+if _frontend_build.exists():
     # Mount static assets
     app.mount(
-        "/assets", StaticFiles(directory=frontend_build / "assets"), name="assets"
+        "/assets", StaticFiles(directory=_frontend_build / "assets"), name="assets"
     )
 
     # Catch-all route for SPA - must be last
@@ -75,9 +86,9 @@ if frontend_build.exists():
             return {"error": "Not found"}
 
         # Check if file exists in build directory
-        file_path = frontend_build / full_path
+        file_path = _frontend_build / full_path
         if file_path.is_file():
             return FileResponse(file_path)
 
         # Otherwise return index.html for SPA routing
-        return FileResponse(frontend_build / "index.html")
+        return FileResponse(_frontend_build / "index.html")

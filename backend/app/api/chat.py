@@ -4,17 +4,24 @@ Chat API endpoints
 
 from typing import AsyncIterator
 
-from app.api.models.chat import SSEPayload, sse_repr
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from app.agent.harness import MinecraftSchematicAgent
 from app.api.models import ChatRequest
+from app.api.models.chat import SSEPayload, sse_repr
+from app.dependencies import LLM, Session
+from app.services.llm import LLMService
+from app.services.session import SessionService
 
 router = APIRouter()
 
 
-async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
+async def chat_stream(
+    request: ChatRequest,
+    llm_service: LLMService,
+    session_service: SessionService,
+) -> AsyncIterator[str]:
     """
     Stream agent activity as Server-Sent Events.
 
@@ -26,8 +33,12 @@ async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
     - complete: Task finished (success or error)
     """
     try:
-        # Create agent executor
-        agent = MinecraftSchematicAgent(session_id=request.session_id)
+        # Create agent executor with injected services
+        agent = MinecraftSchematicAgent(
+            session_id=request.session_id,
+            llm_service=llm_service,
+            session_service=session_service,
+        )
 
         # Run agent loop and stream events
         async for event in agent.run(request.message):
@@ -52,7 +63,7 @@ async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
 
 
 @router.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, llm: LLM, session: Session):
     """
     Send a message and run the agentic loop.
 
@@ -67,7 +78,7 @@ async def chat(request: ChatRequest):
     Frontend can read the final code from storage/sessions/{session_id}/code.py
     """
     return StreamingResponse(
-        chat_stream(request),
+        chat_stream(request, llm, session),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

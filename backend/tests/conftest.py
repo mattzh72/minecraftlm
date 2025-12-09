@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from app.config import Settings
+from app.dependencies import set_server_state, get_server_state
 from app.services.session import SessionService
 
 # Configure pytest-asyncio
@@ -15,26 +17,30 @@ pytest_plugins = ('pytest_asyncio',)
 
 @pytest.fixture
 def temp_storage(monkeypatch):
-    """Create a temporary storage directory for tests"""
+    """Create a temporary storage directory and initialize ServerState for tests."""
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_path = Path(tmpdir) / "sessions"
         temp_path.mkdir(parents=True, exist_ok=True)
 
-        # Update the module-level STORAGE_DIR
-        import app.services.session as session_module
-        original_storage_dir = session_module.STORAGE_DIR
-        session_module.STORAGE_DIR = temp_path
+        # Create Settings with temp storage_dir
+        test_settings = Settings(storage_dir=temp_path)
+
+        # Initialize ServerState with test settings
+        set_server_state(test_settings)
 
         yield temp_path
 
-        # Restore original
-        session_module.STORAGE_DIR = original_storage_dir
+
+@pytest.fixture
+def session_service(temp_storage) -> SessionService:
+    """Get the session service from ServerState."""
+    return get_server_state().session_service
 
 
 @pytest.fixture
-def session_with_code(temp_storage):
+def session_with_code(session_service):
     """Create a session with some initial code"""
-    session_id = SessionService.create_session()
+    session_id = session_service.create_session()
 
     initial_code = '''# Simple test structure
 def build_house():
@@ -59,6 +65,6 @@ def build_house():
 build_house()
 '''
 
-    SessionService.save_code(session_id, initial_code)
+    session_service.save_code(session_id, initial_code)
 
     return session_id
