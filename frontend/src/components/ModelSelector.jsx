@@ -59,7 +59,7 @@ export function ModelSelector({ disabled = false }) {
       onValueChange={setSelectedModel}
       disabled={disabled}
     >
-      <SelectTrigger size="sm" className="w-auto min-w-0 text-xs">
+      <SelectTrigger size="sm" className="w-auto min-w-0 h-8 text-xs">
         <SelectValue placeholder="Select model">
           {selectedModel ? getModelDisplayName(selectedModel) : "Select model"}
         </SelectValue>

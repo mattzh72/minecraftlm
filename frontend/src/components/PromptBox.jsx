@@ -3,6 +3,7 @@ import TextareaAutosize from "react-textarea-autosize";
 import { ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ModelSelector } from "./ModelSelector";
 
 export const PromptBox = forwardRef(function PromptBox(
   {
@@ -37,8 +38,8 @@ export const PromptBox = forwardRef(function PromptBox(
     <form
       onSubmit={handleSubmit}
       className={cn(
-        "w-full flex flex-col gap-2",
-        "rounded-xl border bg-background p-3 shadow-xs",
+        "w-full flex flex-col gap-3",
+        "rounded-xl border bg-background p-4 shadow-xs",
         className
       )}
     >
@@ -53,14 +54,16 @@ export const PromptBox = forwardRef(function PromptBox(
         maxRows={5}
         className="w-full px-1 resize-none bg-transparent outline-none text-foreground placeholder:text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
       />
-      <Button
-        type="submit"
-        disabled={!isActive}
-        size="icon"
-        className="self-end"
-      >
-        <ArrowUp size={18} strokeWidth={2.5} />
-      </Button>
+      <div className="flex items-center justify-between">
+        <ModelSelector disabled={disabled} />
+        <Button
+          type="submit"
+          disabled={!isActive}
+          size="icon"
+        >
+          <ArrowUp size={18} strokeWidth={2.5} />
+        </Button>
+      </div>
     </form>
   );
 });

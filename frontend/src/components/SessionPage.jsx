@@ -15,7 +15,6 @@ import {
   FrameFooter,
 } from "@/components/ui/frame";
 import useInitialMessage from "@/hooks/useInitialMessage";
-import { ModelSelector } from "./ModelSelector";
 
 /**
  * Session page - displays chat panel and 3D viewer for a specific session
@@ -110,10 +109,9 @@ export function SessionPage() {
         </div>
 
         <Frame className="w-md shrink-0 my-3 mr-3 max-h-[calc(100%-1.5rem)]">
-          <FramePanel className="py-3 flex items-center justify-between">
+          <FrameHeader>
             <FrameTitle>Chat</FrameTitle>
-            <ModelSelector disabled={chatIsLoading} />
-          </FramePanel>
+          </FrameHeader>
           <FramePanel className="flex-1 min-h-0 p-0 overflow-clip">
             <AgentScroller
               autoScrollDeps={[
