@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   Check,
   X,
@@ -6,7 +6,6 @@ import {
   CircleCheck,
   Wrench,
   ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { cn } from "@/lib/utils";
@@ -15,12 +14,11 @@ import {
   CollapsibleTrigger,
   CollapsiblePanel,
 } from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
-import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/group";
 import useSessionStore from "@/store/sessionStore";
 import useChatStore, { ChatState } from "@/store/chatStore";
 import useInitialMessage from "@/hooks/useInitialMessage";
 import { PromptBox } from "./PromptBox";
+import { AgentScroller } from "./AgentScroller";
 import { ThinkingIndicator, ThoughtDisplay } from "./ActivityRenderer";
 import {
   formatConversationToUIMessages,
@@ -28,7 +26,7 @@ import {
 } from "@/lib/formatConversation";
 
 // ============================================================================
-// Message Renderers
+// Message Components
 // ============================================================================
 
 function UserMessage({ content }) {
@@ -49,7 +47,9 @@ function AssistantMessage({ content, thought_summary, tool_calls }) {
   return (
     <div className="py-3 text-sm text-foreground border-b border-border/50">
       <div className="space-y-2">
-        {hasThought && <ThoughtDisplay content={thought_summary} isStreaming={false} />}
+        {hasThought && (
+          <ThoughtDisplay content={thought_summary} isStreaming={false} />
+        )}
         {hasContent && (
           <div className="prose prose-sm prose-slate max-w-none dark:prose-invert">
             <Streamdown>{content}</Streamdown>
@@ -64,9 +64,6 @@ function AssistantMessage({ content, thought_summary, tool_calls }) {
   );
 }
 
-/**
- * Tool call display using coss Collapsible
- */
 function ToolCallWithResultDisplay({ toolCall }) {
   const { name, result } = toolCall;
   const hasResult = !!result;
@@ -79,8 +76,7 @@ function ToolCallWithResultDisplay({ toolCall }) {
     try {
       const parsed = JSON.parse(result.content);
       const rawContent = hasError ? parsed.error : parsed.result;
-      // Only set displayContent if it's a non-empty string
-      if (rawContent && typeof rawContent === 'string' && rawContent.trim()) {
+      if (rawContent && typeof rawContent === "string" && rawContent.trim()) {
         displayContent = rawContent;
       }
     } catch {
@@ -94,19 +90,18 @@ function ToolCallWithResultDisplay({ toolCall }) {
     ? name === "edit_code"
       ? Pencil
       : name === "complete_task"
-      ? CircleCheck
-      : Wrench
+        ? CircleCheck
+        : Wrench
     : hasError
-    ? X
-    : Check;
+      ? X
+      : Check;
 
   const iconColor = !hasResult
     ? "text-muted-foreground"
     : hasError
-    ? "text-destructive"
-    : "text-success";
+      ? "text-destructive"
+      : "text-success";
 
-  // Only expandable if there's actual content to show
   const isExpandable = !!displayContent;
   const shouldDefaultOpen = hasError && isExpandable;
 
@@ -154,7 +149,8 @@ function ToolCallWithResultDisplay({ toolCall }) {
 }
 
 function StreamingMessage({ thought, text, state }) {
-  const isThinking = state === ChatState.THINKING || state === ChatState.TOOL_CALLING;
+  const isThinking =
+    state === ChatState.THINKING || state === ChatState.TOOL_CALLING;
   const isStreamingThought = state === ChatState.STREAMING_THOUGHT;
   const hasThought = thought && thought.trim();
   const hasText = text && text.trim();
@@ -162,7 +158,9 @@ function StreamingMessage({ thought, text, state }) {
   return (
     <div className="py-3 text-sm text-foreground">
       <div className="space-y-2">
-        {hasThought && <ThoughtDisplay content={thought} isStreaming={isStreamingThought} />}
+        {hasThought && (
+          <ThoughtDisplay content={thought} isStreaming={isStreamingThought} />
+        )}
         {hasText && (
           <div className="prose prose-sm prose-slate max-w-none dark:prose-invert">
             <Streamdown mode="streaming">{text}</Streamdown>
@@ -183,68 +181,81 @@ function ErrorMessage({ content }) {
 }
 
 // ============================================================================
-// Main ChatPanel Component
+// Message List Component
 // ============================================================================
 
-export function useChatPanel() {
+function MessageList({
+  messages,
+  pendingUserMessage,
+  streamingThought,
+  streamingText,
+  chatState,
+  error,
+  isLoading,
+}) {
+  return (
+    <>
+      {messages.map((msg, idx) => {
+        if (msg.type === "user") {
+          return <UserMessage key={idx} content={msg.content} />;
+        }
+        if (msg.type === "assistant") {
+          return (
+            <AssistantMessage
+              key={idx}
+              content={msg.content}
+              thought_summary={msg.thought_summary}
+              tool_calls={msg.tool_calls}
+            />
+          );
+        }
+        return null;
+      })}
+
+      {pendingUserMessage &&
+        !messages.some(
+          (msg) => msg.type === "user" && msg.content === pendingUserMessage
+        ) && <UserMessage content={pendingUserMessage} />}
+
+      {isLoading && (
+        <StreamingMessage
+          thought={streamingThought}
+          text={streamingText}
+          state={chatState}
+        />
+      )}
+
+      {error && <ErrorMessage content={error} />}
+    </>
+  );
+}
+
+// ============================================================================
+// Chat Hook (business logic only)
+// ============================================================================
+
+export function useChat() {
   const sessionId = useSessionStore((state) => state.sessionId);
   const conversation = useSessionStore((state) => state.conversation);
   const setConversation = useSessionStore((state) => state.setConversation);
   const setStructureData = useSessionStore((state) => state.setStructureData);
 
-  // Chat store state
   const chatState = useChatStore((state) => state.state);
   const streamingThought = useChatStore((state) => state.streamingThought);
   const streamingText = useChatStore((state) => state.streamingText);
   const pendingUserMessage = useChatStore((state) => state.pendingUserMessage);
   const error = useChatStore((state) => state.error);
-
-  // Get actions object once
   const actions = useChatStore((state) => state.actions);
 
   const [input, setInput] = useState("");
-  const [showTopButton, setShowTopButton] = useState(false);
-  const [showBottomButton, setShowBottomButton] = useState(false);
 
-  const scrollContainerRef = useRef(null);
-  const messagesEndRef = useRef(null);
+  const isLoading =
+    chatState !== ChatState.IDLE && chatState !== ChatState.ERROR;
 
-  const isLoading = chatState !== ChatState.IDLE && chatState !== ChatState.ERROR;
-
-  // Format conversation into UI-friendly messages
   const displayMessages = useMemo(
     () => formatConversationToUIMessages(conversation || []),
     [conversation]
   );
-
-  // Handle scroll position to show/hide jump button and masks
-  const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    const threshold = 100;
-
-    const isAwayFromTop = scrollTop > threshold;
-    const isAwayFromBottom = scrollTop < scrollHeight - clientHeight - threshold;
-
-    // Only show masks when away from respective edges
-    setShowTopButton(isAwayFromTop);
-    setShowBottomButton(isAwayFromBottom);
-  }, []);
-
-  // Auto-scroll to bottom when new content arrives
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [displayMessages, pendingUserMessage, streamingThought, streamingText, chatState]);
-
-  const scrollToTop = useCallback(() => {
-    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
 
   const handleSend = useCallback(
     async (messageText = null) => {
@@ -282,9 +293,7 @@ export function useChatPanel() {
 
           for (const line of lines) {
             if (line === "") {
-              if (eventLines.length === 0) {
-                continue;
-              }
+              if (eventLines.length === 0) continue;
               const dataStr = eventLines.join("\n");
               eventLines = [];
 
@@ -329,7 +338,7 @@ export function useChatPanel() {
           }
         }
 
-        // Process any trailing event lines when stream ends
+        // Process trailing event lines
         if (eventLines.length > 0) {
           const dataStr = eventLines.join("\n");
           try {
@@ -344,7 +353,7 @@ export function useChatPanel() {
           }
         }
 
-        // Stream finished - fetch the updated conversation from backend
+        // Fetch updated conversation
         try {
           const sessionRes = await fetch(`/api/sessions/${sessionId}`);
           if (sessionRes.ok) {
@@ -362,9 +371,11 @@ export function useChatPanel() {
         }
         actions.clearPendingMessage();
       } finally {
-        // Reset if still in a loading state (handles edge cases)
         const currentState = useChatStore.getState().state;
-        if (currentState !== ChatState.IDLE && currentState !== ChatState.ERROR) {
+        if (
+          currentState !== ChatState.IDLE &&
+          currentState !== ChatState.ERROR
+        ) {
           actions.reset();
         }
       }
@@ -372,100 +383,78 @@ export function useChatPanel() {
     [sessionId, isLoading, input, setStructureData, setConversation, actions]
   );
 
-  useInitialMessage(sessionId, displayMessages.length, isLoading, handleSend);
-
-  // Only show button group when away from BOTH edges (i.e., in the middle)
-  const showJumpButton = showTopButton && showBottomButton;
-
   return {
-    messages: (
-      <div className="relative flex-1 min-h-0">
-        {/* Top scroll mask */}
-        <div
-          className={cn(
-            "absolute top-0 inset-x-0 h-12 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none transition-opacity duration-200",
-            showTopButton ? "opacity-100" : "opacity-0"
-          )}
-        />
-
-        {/* Scrollable messages container */}
-        <div
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          className="h-full overflow-y-auto px-3 space-y-2 py-2"
-        >
-          {displayMessages.map((msg, idx) => {
-            if (msg.type === "user") {
-              return <UserMessage key={idx} content={msg.content} />;
-            }
-            if (msg.type === "assistant") {
-              return (
-                <AssistantMessage
-                  key={idx}
-                  content={msg.content}
-                  thought_summary={msg.thought_summary}
-                  tool_calls={msg.tool_calls}
-                />
-              );
-            }
-            return null;
-          })}
-
-          {/* Pending user message */}
-          {pendingUserMessage &&
-            !displayMessages.some(
-              (msg) => msg.type === "user" && msg.content === pendingUserMessage
-            ) && <UserMessage content={pendingUserMessage} />}
-
-          {/* Streaming message */}
-          {isLoading && (
-            <StreamingMessage
-              thought={streamingThought}
-              text={streamingText}
-              state={chatState}
-            />
-          )}
-
-          {/* Error */}
-          {error && <ErrorMessage content={error} />}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Bottom scroll mask */}
-        <div
-          className={cn(
-            "absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-background to-transparent z-10 pointer-events-none transition-opacity duration-200",
-            showBottomButton ? "opacity-100" : "opacity-0"
-          )}
-        />
-
-        {/* Jump button group - bottom right */}
-        <ButtonGroup
-          orientation="vertical"
-          className={cn(
-            "absolute bottom-3 right-3 z-50 transition-all duration-200",
-            showJumpButton ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"
-          )}
-        >
-          <Button variant="outline" size="icon-sm" onClick={scrollToTop}>
-            <ChevronUp size={14} />
-          </Button>
-          <ButtonGroupSeparator orientation="horizontal" />
-          <Button variant="outline" size="icon-sm" onClick={scrollToBottom}>
-            <ChevronDown size={14} />
-          </Button>
-        </ButtonGroup>
-      </div>
-    ),
-    input: (
-      <PromptBox
-        value={input}
-        onChange={setInput}
-        onSubmit={handleSend}
-        disabled={!sessionId || isLoading}
-        placeholder="Describe your Minecraft structure..."
-      />
-    ),
+    sessionId,
+    input,
+    setInput,
+    isLoading,
+    displayMessages,
+    pendingUserMessage,
+    streamingThought,
+    streamingText,
+    chatState,
+    error,
+    handleSend,
   };
 }
+
+// ============================================================================
+// Main ChatPanel Component
+// ============================================================================
+
+export function ChatPanel() {
+  const {
+    sessionId,
+    input,
+    setInput,
+    isLoading,
+    displayMessages,
+    pendingUserMessage,
+    streamingThought,
+    streamingText,
+    chatState,
+    error,
+    handleSend,
+  } = useChat();
+
+  useInitialMessage(sessionId, displayMessages.length, isLoading, handleSend);
+
+  return (
+    <div className="flex flex-col h-full">
+      <AgentScroller
+        autoScrollDeps={[
+          displayMessages,
+          pendingUserMessage,
+          streamingThought,
+          streamingText,
+          chatState,
+        ]}
+      >
+        <MessageList
+          messages={displayMessages}
+          pendingUserMessage={pendingUserMessage}
+          streamingThought={streamingThought}
+          streamingText={streamingText}
+          chatState={chatState}
+          error={error}
+          isLoading={isLoading}
+        />
+      </AgentScroller>
+
+      <div className="p-3 pt-0">
+        <PromptBox
+          value={input}
+          onChange={setInput}
+          onSubmit={handleSend}
+          disabled={!sessionId || isLoading}
+          placeholder="Describe your Minecraft structure..."
+        />
+      </div>
+    </div>
+  );
+}
+
+// Compound component exports for flexible composition
+ChatPanel.Messages = MessageList;
+ChatPanel.Scroller = AgentScroller;
+ChatPanel.Input = PromptBox;

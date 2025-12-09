@@ -8,13 +8,19 @@ function ScrollArea({
   className,
   children,
   orientation,
+  onScroll,
+  viewportRef,
   ...props
 }: ScrollAreaPrimitive.Root.Props & {
   orientation?: "horizontal" | "vertical" | "both";
+  onScroll?: React.UIEventHandler<HTMLDivElement>;
+  viewportRef?: React.Ref<HTMLDivElement>;
 }) {
   return (
     <ScrollAreaPrimitive.Root className="size-full min-h-0" {...props}>
       <ScrollAreaPrimitive.Viewport
+        ref={viewportRef}
+        onScroll={onScroll}
         className={cn(
           "size-full overscroll-contain rounded-[inherit] outline-none transition-shadows focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
           className,

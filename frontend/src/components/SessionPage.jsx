@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import useSessionStore from "@/store/sessionStore";
-import { useChatPanel } from "./ChatPanel";
+import { useChat, ChatPanel } from "./ChatPanel";
+import { AgentScroller } from "./AgentScroller";
+import { PromptBox } from "./PromptBox";
 import { MinecraftViewer } from "./MinecraftViewer";
 import { Button } from "@/components/ui/button";
 import { Card, CardPanel } from "@/components/ui/card";
@@ -12,6 +14,7 @@ import {
   FrameTitle,
   FrameFooter,
 } from "@/components/ui/frame";
+import useInitialMessage from "@/hooks/useInitialMessage";
 
 /**
  * Session page - displays chat panel and 3D viewer for a specific session
@@ -38,7 +41,26 @@ export function SessionPage() {
     navigate("/");
   };
 
-  const { messages, input } = useChatPanel();
+  const {
+    sessionId: chatSessionId,
+    input,
+    setInput,
+    isLoading: chatIsLoading,
+    displayMessages,
+    pendingUserMessage,
+    streamingThought,
+    streamingText,
+    chatState,
+    error,
+    handleSend,
+  } = useChat();
+
+  useInitialMessage(
+    chatSessionId,
+    displayMessages.length,
+    chatIsLoading,
+    handleSend
+  );
 
   return (
     <div className="h-screen flex flex-col text-foreground overflow-hidden">
@@ -85,14 +107,41 @@ export function SessionPage() {
             )}
           </div>
         </div>
-        <Frame className="w-md shrink-0 m-3 ml-0">
-          <FrameHeader>
+
+        <Frame className="w-md shrink-0 my-3 mr-3 max-h-[calc(100%-1.5rem)]">
+          <FramePanel className="py-3">
             <FrameTitle>Chat</FrameTitle>
-          </FrameHeader>
-          <FramePanel className="flex-1 min-h-0 flex flex-col p-0 overflow-clip">
-            {messages}
           </FramePanel>
-          <FrameFooter className="px-0 py-2">{input}</FrameFooter>
+          <FramePanel className="flex-1 min-h-0 p-0 overflow-clip">
+            <AgentScroller
+              autoScrollDeps={[
+                displayMessages,
+                pendingUserMessage,
+                streamingThought,
+                streamingText,
+                chatState,
+              ]}
+            >
+              <ChatPanel.Messages
+                messages={displayMessages}
+                pendingUserMessage={pendingUserMessage}
+                streamingThought={streamingThought}
+                streamingText={streamingText}
+                chatState={chatState}
+                error={error}
+                isLoading={chatIsLoading}
+              />
+            </AgentScroller>
+          </FramePanel>
+          <FrameFooter className="px-0 py-2">
+            <PromptBox
+              value={input}
+              onChange={setInput}
+              onSubmit={handleSend}
+              disabled={!chatSessionId || chatIsLoading}
+              placeholder="Describe your Minecraft structure..."
+            />
+          </FrameFooter>
         </Frame>
       </div>
     </div>
