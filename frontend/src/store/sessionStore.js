@@ -40,7 +40,7 @@ const useSessionStore = create((set, get) => ({
     }
   },
 
-  restoreSession: async (sessionId) => {
+  restoreSession: async (sessionId, setSelectedModel) => {
     set({ isLoading: true });
     try {
       const response = await fetch(`/api/sessions/${sessionId}`);
@@ -55,6 +55,12 @@ const useSessionStore = create((set, get) => ({
         conversation: data.conversation || [],
         structureData: data.structure,
       });
+
+      // Restore the model if one was saved with the session
+      if (data.model && setSelectedModel) {
+        setSelectedModel(data.model);
+      }
+
       console.log('Session restored:', data.session_id);
       return data.session_id;
     } catch (error) {
@@ -65,12 +71,12 @@ const useSessionStore = create((set, get) => ({
     }
   },
 
-  initializeSession: async () => {
+  initializeSession: async (setSelectedModel) => {
     const url = new URL(window.location.href);
     const sessionFromUrl = url.searchParams.get('session');
 
     if (sessionFromUrl) {
-      return get().restoreSession(sessionFromUrl);
+      return get().restoreSession(sessionFromUrl, setSelectedModel);
     }
     return get().createSession();
   },

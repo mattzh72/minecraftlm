@@ -9,8 +9,12 @@ from enum import Enum
 from pathlib import Path
 from typing import AsyncIterator, Literal
 
-from app.agent.llms import AnthropicService, GeminiService, OpenAIService
-from app.agent.llms.base import BaseDeclarativeLLMService
+from app.agent.llms import (
+    AnthropicService,
+    BaseLLMService,
+    GeminiService,
+    OpenAIService,
+)
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.read_code import ReadCodeTool
@@ -69,10 +73,10 @@ class MinecraftSchematicAgent:
     """Executes the main agentic loop"""
 
     # Available providers based on configured API keys
-    _providers: dict[str, type[BaseDeclarativeLLMService]] = {}
+    _providers: dict[str, type[BaseLLMService]] = {}
 
     @classmethod
-    def get_available_providers(cls) -> dict[str, type[BaseDeclarativeLLMService]]:
+    def get_available_providers(cls) -> dict[str, type[BaseLLMService]]:
         """Get providers with configured API keys"""
         providers = {}
         if settings.gemini_api_key:
@@ -144,6 +148,9 @@ class MinecraftSchematicAgent:
         """
         turn_count = 0
 
+        # Lock the model to this session on first use
+        self.session_service.set_model(self.session_id, self.model)
+
         # Load conversation history
         conversation = self.session_service.load_conversation(self.session_id)
 
@@ -176,6 +183,7 @@ class MinecraftSchematicAgent:
             # Accumulators for streaming response
             accumulated_text = ""
             accumulated_thought = ""
+            accumulated_thinking_signature = None
             accumulated_tool_calls = {}  # index -> tool call dict
 
             # Stream response chunks (rebuild system prompt to include latest code)
@@ -186,11 +194,16 @@ class MinecraftSchematicAgent:
             ):
                 logger.info(f"handling chunk, chunk={chunk}")
 
-                # Stream thought summaries separately when available (Gemini)
+                # Stream thought summaries separately when available (Gemini/Anthropic)
                 thought_delta = getattr(chunk, "thought_delta", None)
                 if thought_delta:
                     accumulated_thought += thought_delta
                     yield ActivityEvent(type="thought", data={"delta": thought_delta})
+
+                # Capture thinking signature (Anthropic)
+                thought_signature = getattr(chunk, "thought_signature", None)
+                if thought_signature:
+                    accumulated_thinking_signature = thought_signature
 
                 # Handle text delta
                 if chunk.text_delta:
@@ -268,6 +281,7 @@ class MinecraftSchematicAgent:
                 role="assistant",
                 content=accumulated_text,
                 thought_summary=accumulated_thought or None,
+                thinking_signature=accumulated_thinking_signature,
                 tool_calls=tool_calls_list if tool_calls_list else None,
             ).model_dump()
 
@@ -308,7 +322,7 @@ class MinecraftSchematicAgent:
 
             for tool_call in tool_calls_list:
                 func_name = tool_call.function.name
-                func_args = json.loads(tool_call.function.arguments)
+                func_args = json.loads(tool_call.function.arguments or "{}")
 
                 yield ActivityEvent(
                     type="tool_call",

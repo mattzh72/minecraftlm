@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import useModelStore from "@/store/modelStore";
+import useSessionStore from "@/store/sessionStore";
 import {
   Select,
   SelectTrigger,
@@ -10,6 +11,16 @@ import {
   SelectGroupLabel,
   SelectSeparator,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogPopup,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // Display names for providers
 const PROVIDER_LABELS = {
@@ -33,6 +44,11 @@ export function ModelSelector({ disabled = false }) {
   const setSelectedModel = useModelStore((state) => state.setSelectedModel);
   const getModelsByProvider = useModelStore((state) => state.getModelsByProvider);
 
+  const conversation = useSessionStore((state) => state.conversation);
+  const hasConversation = conversation && conversation.length > 0;
+
+  const [showLockedDialog, setShowLockedDialog] = useState(false);
+
   // Fetch models on mount
   useEffect(() => {
     if (models.length === 0) {
@@ -51,6 +67,42 @@ export function ModelSelector({ disabled = false }) {
 
   if (models.length === 0) {
     return null;
+  }
+
+  // If conversation has started, show locked state with dialog
+  if (hasConversation) {
+    return (
+      <Dialog open={showLockedDialog} onOpenChange={setShowLockedDialog}>
+        <DialogTrigger
+          render={
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground cursor-not-allowed opacity-60"
+            >
+              {selectedModel ? getModelDisplayName(selectedModel) : "Select model"}
+            </button>
+          }
+        />
+        <DialogPopup>
+          <DialogHeader className="p-6">
+            <DialogTitle>Model Locked</DialogTitle>
+            <DialogDescription>
+              You cannot switch models during an active conversation. Each provider
+              uses different internal IDs for tool calls, making mid-conversation
+              switches incompatible.
+            </DialogDescription>
+            <DialogDescription>
+              To use a different model, start a new project from the Projects page.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter variant="bare" className="px-6 pb-6">
+            <Button variant="outline" onClick={() => setShowLockedDialog(false)}>
+              Got it
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+    );
   }
 
   return (

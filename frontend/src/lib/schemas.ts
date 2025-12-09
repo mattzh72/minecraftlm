@@ -25,6 +25,7 @@ export const rawAssistantMessageSchema = z.object({
   role: z.literal("assistant"),
   content: z.string(),
   thought_summary: z.string().nullish(),
+  thinking_signature: z.string().nullish(), // Anthropic thinking block signature
   tool_calls: z.array(toolCallSchema).optional(),
 });
 

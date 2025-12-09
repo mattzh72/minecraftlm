@@ -55,7 +55,7 @@ export const PromptBox = forwardRef(function PromptBox(
         className="w-full px-1 resize-none bg-transparent outline-none text-foreground placeholder:text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
       />
       <div className="flex items-center justify-between">
-        <ModelSelector disabled={disabled} />
+        <ModelSelector />
         <Button
           type="submit"
           disabled={!isActive}

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import useSessionStore from "@/store/sessionStore";
+import useModelStore from "@/store/modelStore";
 import { useChat, ChatPanel } from "./ChatPanel";
 import { AgentScroller } from "./AgentScroller";
 import { PromptBox } from "./PromptBox";
@@ -29,12 +30,14 @@ export function SessionPage() {
   const restoreSession = useSessionStore((state) => state.restoreSession);
   const resetSession = useSessionStore((state) => state.resetSession);
 
+  const setSelectedModel = useModelStore((state) => state.setSelectedModel);
+
   // Restore session from URL param on mount
   useEffect(() => {
     if (sessionIdParam) {
-      restoreSession(sessionIdParam);
+      restoreSession(sessionIdParam, setSelectedModel);
     }
-  }, [sessionIdParam, restoreSession]);
+  }, [sessionIdParam, restoreSession, setSelectedModel]);
 
   const handleBackToProjects = () => {
     resetSession();

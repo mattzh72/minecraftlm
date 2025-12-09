@@ -35,6 +35,7 @@ class AssistantMessage(BaseModel):
     role: Literal["assistant"]
     content: str
     thought_summary: str | None = None
+    thinking_signature: str | None = None  # Anthropic thinking block signature
     tool_calls: list[ToolCall] | None = None
 
 
