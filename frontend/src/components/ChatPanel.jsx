@@ -41,15 +41,21 @@ function UserMessage({ content }) {
   );
 }
 
-function AssistantMessage({ content, tool_calls }) {
+function AssistantMessage({ content, tool_calls, thought_summary }) {
   const hasContent = content && content.trim();
   const hasToolCalls = tool_calls && tool_calls.length > 0;
+  const hasThought = thought_summary && thought_summary.trim();
 
-  if (!hasContent && !hasToolCalls) return null;
+  if (!hasContent && !hasToolCalls && !hasThought) return null;
 
   return (
     <div className="py-3 text-sm text-slate-700 border-b border-slate-100">
       <div className="space-y-2">
+        {hasThought && (
+          <div className="text-xs text-slate-500 italic whitespace-pre-wrap">
+            {thought_summary}
+          </div>
+        )}
         {hasContent && <div className="whitespace-pre-wrap">{content}</div>}
         {hasToolCalls &&
           tool_calls.map((tc, idx) => (
@@ -374,6 +380,7 @@ export default function ChatPanel() {
               <AssistantMessage
                 key={idx}
                 content={msg.content}
+                thought_summary={msg.thought_summary}
                 tool_calls={msg.tool_calls}
               />
             );
