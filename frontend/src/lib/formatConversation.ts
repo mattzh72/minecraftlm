@@ -54,7 +54,7 @@ export function formatConversationToUIMessages(
         content: msg.content,
       });
     } else if (msg.role === "assistant") {
-      const toolCalls: ToolCallWithResult[] = [];
+      const tool_calls: ToolCallWithResult[] = [];
 
       if (msg.tool_calls && msg.tool_calls.length > 0) {
         for (const tc of msg.tool_calls) {
@@ -73,19 +73,20 @@ export function formatConversationToUIMessages(
             };
           }
 
-          toolCalls.push(toolCallWithResult);
+          tool_calls.push(toolCallWithResult);
         }
       }
 
       // Only add assistant message if it has content or tool calls
       const hasContent = msg.content && msg.content.trim();
-      const hasToolCalls = toolCalls.length > 0;
+      const hasToolCalls = tool_calls.length > 0;
 
       if (hasContent || hasToolCalls) {
         uiMessages.push({
           type: "assistant",
           content: msg.content || "",
-          toolCalls,
+          thought_summary: msg.thought_summary,
+          tool_calls,
         });
       }
     }

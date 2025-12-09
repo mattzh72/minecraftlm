@@ -16,6 +16,13 @@ from app.services.session import SessionService
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.registry import ToolRegistry
+from app.api.models.conversation import (
+    UserMessage,
+    AssistantMessage,
+    ToolMessage,
+    ToolCall,
+    ToolCallFunction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +134,7 @@ class MinecraftSchematicAgent:
         conversation = self.session_service.load_conversation(self.session_id)
 
         # Add user message
-        conversation.append({"role": "user", "content": user_message})
+        conversation.append(UserMessage(role="user", content=user_message).model_dump())
         self.session_service.save_conversation(self.session_id, conversation)
 
         # Conversation is already in OpenAI format
@@ -154,6 +161,7 @@ class MinecraftSchematicAgent:
 
             # Accumulators for streaming response
             accumulated_text = ""
+            accumulated_thought = ""
             accumulated_tool_calls = {}  # index -> tool call dict
 
             # Stream response chunks (rebuild system prompt to include latest code)
@@ -167,6 +175,7 @@ class MinecraftSchematicAgent:
                 # Stream thought summaries separately when available (Gemini)
                 thought_delta = getattr(chunk, "thought_delta", None)
                 if thought_delta:
+                    accumulated_thought += thought_delta
                     yield ActivityEvent(type="thought", data={"delta": thought_delta})
 
                 # Handle text delta
@@ -224,15 +233,29 @@ class MinecraftSchematicAgent:
                         if tc_delta.get("id"):
                             accumulated_tool_calls[idx]["id"] = tc_delta["id"]
 
-            assistant_message = {"role": "assistant", "content": accumulated_text}
+            # Build tool calls from accumulated data
+            tool_calls_list: list[ToolCall] = []
+            for tc_data in accumulated_tool_calls.values():
+                tool_calls_list.append(
+                    ToolCall(
+                        id=tc_data.get("id", ""),
+                        type="function",
+                        function=ToolCallFunction(
+                            name=tc_data.get("function", {}).get("name", ""),
+                            arguments=tc_data.get("function", {}).get("arguments", ""),
+                        ),
+                        thought_signature=tc_data.get("thought_signature"),
+                        extra_content=tc_data.get("extra_content", {}),
+                    )
+                )
 
-            # Note: We don't yield a final 'thought' event here since we've been
-            # streaming text_delta events. The frontend accumulates those into a thought.
-
-            # Add tool calls to message
-            tool_calls_list = list(accumulated_tool_calls.values())
-            if tool_calls_list:
-                assistant_message["tool_calls"] = tool_calls_list
+            # Build assistant message
+            assistant_message = AssistantMessage(
+                role="assistant",
+                content=accumulated_text,
+                thought_summary=accumulated_thought or None,
+                tool_calls=tool_calls_list if tool_calls_list else None,
+            ).model_dump()
 
             # Save assistant message
             conversation.append(assistant_message)
@@ -299,13 +322,13 @@ class MinecraftSchematicAgent:
 
                 yield ActivityEvent(type="tool_result", data=tool_result)
 
-                # Build tool response in OpenAI format
-                tool_response = {
-                    "role": "tool",
-                    "tool_call_id": tool_call.get("id", ""),
-                    "content": json.dumps(tool_result),
-                    "name": func_name,
-                }
+                # Build tool response
+                tool_response = ToolMessage(
+                    role="tool",
+                    tool_call_id=tool_call.get("id", ""),
+                    content=json.dumps(tool_result),
+                    name=func_name,
+                ).model_dump()
                 serialized_responses.append(tool_response)
 
             if serialized_responses:

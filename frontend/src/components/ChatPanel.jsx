@@ -41,9 +41,9 @@ function UserMessage({ content }) {
   );
 }
 
-function AssistantMessage({ content, toolCalls }) {
+function AssistantMessage({ content, tool_calls }) {
   const hasContent = content && content.trim();
-  const hasToolCalls = toolCalls && toolCalls.length > 0;
+  const hasToolCalls = tool_calls && tool_calls.length > 0;
 
   if (!hasContent && !hasToolCalls) return null;
 
@@ -52,7 +52,7 @@ function AssistantMessage({ content, toolCalls }) {
       <div className="space-y-2">
         {hasContent && <div className="whitespace-pre-wrap">{content}</div>}
         {hasToolCalls &&
-          toolCalls.map((tc, idx) => (
+          tool_calls.map((tc, idx) => (
             <ToolCallWithResultDisplay key={tc.id || idx} toolCall={tc} />
           ))}
       </div>
@@ -374,7 +374,7 @@ export default function ChatPanel() {
               <AssistantMessage
                 key={idx}
                 content={msg.content}
-                toolCalls={msg.toolCalls}
+                tool_calls={msg.tool_calls}
               />
             );
           }

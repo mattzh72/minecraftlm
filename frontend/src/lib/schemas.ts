@@ -3,13 +3,17 @@ import { z } from "zod";
 /**
  * Schemas for raw conversation messages (OpenAI format)
  */
+export const toolCallFunctionSchema = z.object({
+  name: z.string(),
+  arguments: z.string(),
+});
+
 export const toolCallSchema = z.object({
   id: z.string(),
   type: z.literal("function"),
-  function: z.object({
-    name: z.string(),
-    arguments: z.string(),
-  }),
+  function: toolCallFunctionSchema,
+  thought_signature: z.string().nullish(),
+  extra_content: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const rawUserMessageSchema = z.object({
@@ -20,6 +24,7 @@ export const rawUserMessageSchema = z.object({
 export const rawAssistantMessageSchema = z.object({
   role: z.literal("assistant"),
   content: z.string(),
+  thought_summary: z.string().nullish(),
   tool_calls: z.array(toolCallSchema).optional(),
 });
 
@@ -61,7 +66,8 @@ export const uiUserMessageSchema = z.object({
 export const uiAssistantMessageSchema = z.object({
   type: z.literal("assistant"),
   content: z.string(),
-  toolCalls: z.array(toolCallWithResultSchema),
+  thought_summary: z.string().nullish(),
+  tool_calls: z.array(toolCallWithResultSchema),
 });
 
 export const uiMessageSchema = z.discriminatedUnion("type", [
