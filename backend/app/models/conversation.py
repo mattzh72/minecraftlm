@@ -46,6 +46,4 @@ class ToolMessage(BaseModel):
     name: str
 
 
-
-
 ConversationMessage = Union[UserMessage, AssistantMessage, ToolMessage]

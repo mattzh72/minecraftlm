@@ -3,30 +3,29 @@ Agent executor - main agentic loop
 """
 
 import json
+import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import AsyncIterator, Literal
-import logging
 
-from app.config import settings
-from app.services.gemini import GeminiService
-from app.services.llm import LLMService
-from app.services.session import SessionService
+from app.agent.llms import AnthropicService, GeminiService, OpenAIService
+from app.agent.llms.base import BaseDeclarativeLLMService
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
-from app.api.models.conversation import (
-    UserMessage,
+from app.config import get_provider_for_model, settings
+from app.models import (
     AssistantMessage,
-    ToolMessage,
     ToolCall,
     ToolCallFunction,
+    ToolMessage,
+    UserMessage,
 )
+from app.services.session import SessionService
 
-logger = logging.getLogger(__name__)
-
+# Event types emitted by the agent
 ActivityEventType = Literal[
     "thought",
     "text_delta",
@@ -36,6 +35,8 @@ ActivityEventType = Literal[
     "turn_start",
     "error",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class TerminateReason(str, Enum):
@@ -67,22 +68,44 @@ class ActivityEvent:
 class MinecraftSchematicAgent:
     """Executes the main agentic loop"""
 
-    def __init__(self, session_id: str, max_turns: int = 20):
+    # Available providers based on configured API keys
+    _providers: dict[str, type[BaseDeclarativeLLMService]] = {}
+
+    @classmethod
+    def get_available_providers(cls) -> dict[str, type[BaseDeclarativeLLMService]]:
+        """Get providers with configured API keys"""
+        providers = {}
+        if settings.gemini_api_key:
+            providers["gemini"] = GeminiService
+        if settings.openai_api_key:
+            providers["openai"] = OpenAIService
+        if settings.anthropic_api_key:
+            providers["anthropic"] = AnthropicService
+        return providers
+
+    def __init__(self, session_id: str, model: str | None = None, max_turns: int = 20):
         self.session_id = session_id
         self.max_turns = max_turns
 
-        # Initialize services
-        # Prefer native Gemini client when a key is provided to expose thought summaries;
-        # otherwise fall back to the LiteLLM wrapper.
-        self.llm = GeminiService() if settings.gemini_api_key else LLMService()
+        # Use provided model or fall back to config
+        self.model = model or settings.llm_model
+        provider = get_provider_for_model(self.model)
+
+        # Get available providers
+        self._providers = self.get_available_providers()
+        if provider not in self._providers:
+            raise ValueError(
+                f"Provider '{provider}' for model '{self.model}' not available. "
+                f"Available: {list(self._providers.keys())}"
+            )
+
+        # Initialize LLM service
+        self.llm = self._providers[provider](self.model)
+
         self.session_service = SessionService()
 
         # Initialize tools
-        tools = [
-            ReadCodeTool(),
-            EditCodeTool(),
-            CompleteTaskTool(),
-        ]
+        tools = [ReadCodeTool(), EditCodeTool(), CompleteTaskTool()]
         self.tool_registry = ToolRegistry(tools)
 
         # Load system prompt template and SDK docs

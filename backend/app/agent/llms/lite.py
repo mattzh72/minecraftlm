@@ -105,9 +105,13 @@ class LLMService:
                 for tc_delta in delta.tool_calls:
                     tool_calls_delta.append(
                         {
-                            "index": tc_delta.index if hasattr(tc_delta, "index") else None,
+                            "index": tc_delta.index
+                            if hasattr(tc_delta, "index")
+                            else None,
                             "id": tc_delta.id if hasattr(tc_delta, "id") else None,
-                            "type": tc_delta.type if hasattr(tc_delta, "type") else None,
+                            "type": tc_delta.type
+                            if hasattr(tc_delta, "type")
+                            else None,
                             "function": {
                                 "name": tc_delta.function.name
                                 if hasattr(tc_delta, "function")

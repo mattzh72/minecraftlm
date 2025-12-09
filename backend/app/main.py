@@ -8,11 +8,13 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
+from app.api.chat import router as chat
+from app.api.models_api import router as models
+from app.api.session import router as session
 from app.config import settings
-from app.api import chat, session
 
 # Configure logging before importing modules that use it
 logging.basicConfig(
@@ -32,14 +34,18 @@ async def lifespan(app: FastAPI):
     # Shutdown (nothing to clean up)
 
 
+def add_routers(app: FastAPI):
+    app.include_router(chat, prefix="/api", tags=["chat"])
+    app.include_router(models, prefix="/api", tags=["models"])
+    app.include_router(session, prefix="/api", tags=["sessions"])
+
+
 app = FastAPI(
     title="Minecraft Schematic Generator",
     description="Agentic interface for generating Minecraft schematics",
     version="0.1.0",
     lifespan=lifespan,
 )
-
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -47,9 +53,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.include_router(chat, prefix="/api", tags=["chat"])
-app.include_router(session, prefix="/api", tags=["sessions"])
+add_routers(app)
 
 
 @app.get("/health")
