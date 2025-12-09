@@ -1,5 +1,5 @@
 """
-Base classes and shared types for LLM services.
+Base class for LLM services with streaming support.
 """
 
 from abc import ABC, abstractmethod
