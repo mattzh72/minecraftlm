@@ -5,7 +5,7 @@ Integration test for live Gemini streaming with thought summaries.
 import pytest
 
 from app.config import settings
-from app.services.gemini import GeminiService, StreamChunk
+from app.agent.llms import GeminiService, StreamChunk
 
 
 @pytest.mark.integration
