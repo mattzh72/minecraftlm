@@ -10,14 +10,13 @@ from typing import AsyncIterator, Literal
 import logging
 
 from app.config import settings
-from app.services.gemini import GeminiService
-from app.services.llm import LLMService
+from app.agent.llms import GeminiService, LLMService
 from app.services.session import SessionService
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
-from app.api.models.conversation import (
+from app.models import (
     UserMessage,
     AssistantMessage,
     ToolMessage,
