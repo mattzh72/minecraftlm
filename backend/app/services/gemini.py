@@ -156,13 +156,13 @@ class GeminiService:
             temperature=1.0,
         )
 
-        stream = self.client.models.generate_content_stream(
+        stream = await self.client.aio.models.generate_content_stream(
             model=self.model_id,
             contents=contents,
             config=config,
         )
 
-        for chunk in stream:
+        async for chunk in stream:
             if not getattr(chunk, "candidates", None):
                 continue
 
