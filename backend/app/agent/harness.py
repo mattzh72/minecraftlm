@@ -3,29 +3,33 @@ Agent executor - main agentic loop
 """
 
 import json
+import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import AsyncIterator, Literal
-import logging
 
-from app.config import settings
-from app.agent.llms import GeminiService, LLMService
-from app.services.session import SessionService
+from app.agent.llms import (
+    AnthropicService,
+    BaseLLMService,
+    GeminiService,
+    OpenAIService,
+)
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
+from app.config import get_provider_for_model, settings
 from app.models import (
-    UserMessage,
     AssistantMessage,
-    ToolMessage,
     ToolCall,
     ToolCallFunction,
+    ToolMessage,
+    UserMessage,
 )
+from app.services.session import SessionService
 
-logger = logging.getLogger(__name__)
-
+# Event types emitted by the agent
 ActivityEventType = Literal[
     "thought",
     "text_delta",
@@ -35,6 +39,8 @@ ActivityEventType = Literal[
     "turn_start",
     "error",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class TerminateReason(str, Enum):
@@ -66,22 +72,44 @@ class ActivityEvent:
 class MinecraftSchematicAgent:
     """Executes the main agentic loop"""
 
-    def __init__(self, session_id: str, max_turns: int = 20):
+    # Available providers based on configured API keys
+    _providers: dict[str, type[BaseLLMService]] = {}
+
+    @classmethod
+    def get_available_providers(cls) -> dict[str, type[BaseLLMService]]:
+        """Get providers with configured API keys"""
+        providers = {}
+        if settings.gemini_api_key:
+            providers["gemini"] = GeminiService
+        if settings.openai_api_key:
+            providers["openai"] = OpenAIService
+        if settings.anthropic_api_key:
+            providers["anthropic"] = AnthropicService
+        return providers
+
+    def __init__(self, session_id: str, model: str | None = None, max_turns: int = 20):
         self.session_id = session_id
         self.max_turns = max_turns
 
-        # Initialize services
-        # Prefer native Gemini client when a key is provided to expose thought summaries;
-        # otherwise fall back to the LiteLLM wrapper.
-        self.llm = GeminiService() if settings.gemini_api_key else LLMService()
+        # Use provided model or fall back to config
+        self.model = model or settings.llm_model
+        provider = get_provider_for_model(self.model)
+
+        # Get available providers
+        self._providers = self.get_available_providers()
+        if provider not in self._providers:
+            raise ValueError(
+                f"Provider '{provider}' for model '{self.model}' not available. "
+                f"Available: {list(self._providers.keys())}"
+            )
+
+        # Initialize LLM service
+        self.llm = self._providers[provider](self.model)
+
         self.session_service = SessionService()
 
         # Initialize tools
-        tools = [
-            ReadCodeTool(),
-            EditCodeTool(),
-            CompleteTaskTool(),
-        ]
+        tools = [ReadCodeTool(), EditCodeTool(), CompleteTaskTool()]
         self.tool_registry = ToolRegistry(tools)
 
         # Load system prompt template and SDK docs
@@ -120,6 +148,9 @@ class MinecraftSchematicAgent:
         """
         turn_count = 0
 
+        # Lock the model to this session on first use
+        self.session_service.set_model(self.session_id, self.model)
+
         # Load conversation history
         conversation = self.session_service.load_conversation(self.session_id)
 
@@ -152,6 +183,7 @@ class MinecraftSchematicAgent:
             # Accumulators for streaming response
             accumulated_text = ""
             accumulated_thought = ""
+            accumulated_thinking_signature = None
             accumulated_tool_calls = {}  # index -> tool call dict
 
             # Stream response chunks (rebuild system prompt to include latest code)
@@ -162,11 +194,16 @@ class MinecraftSchematicAgent:
             ):
                 logger.info(f"handling chunk, chunk={chunk}")
 
-                # Stream thought summaries separately when available (Gemini)
+                # Stream thought summaries separately when available (Gemini/Anthropic)
                 thought_delta = getattr(chunk, "thought_delta", None)
                 if thought_delta:
                     accumulated_thought += thought_delta
                     yield ActivityEvent(type="thought", data={"delta": thought_delta})
+
+                # Capture thinking signature (Anthropic)
+                thought_signature = getattr(chunk, "thought_signature", None)
+                if thought_signature:
+                    accumulated_thinking_signature = thought_signature
 
                 # Handle text delta
                 if chunk.text_delta:
@@ -244,6 +281,7 @@ class MinecraftSchematicAgent:
                 role="assistant",
                 content=accumulated_text,
                 thought_summary=accumulated_thought or None,
+                thinking_signature=accumulated_thinking_signature,
                 tool_calls=tool_calls_list if tool_calls_list else None,
             ).model_dump()
 
@@ -284,7 +322,7 @@ class MinecraftSchematicAgent:
 
             for tool_call in tool_calls_list:
                 func_name = tool_call.function.name
-                func_args = json.loads(tool_call.function.arguments)
+                func_args = json.loads(tool_call.function.arguments or "{}")
 
                 yield ActivityEvent(
                     type="tool_call",

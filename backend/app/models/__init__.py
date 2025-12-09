@@ -1,8 +1,6 @@
-"""
-Shared data models
-"""
+"""Shared domain models"""
 
-from app.models.conversation import (
+from .conversation import (
     AssistantMessage,
     ConversationMessage,
     ToolCall,
@@ -12,10 +10,10 @@ from app.models.conversation import (
 )
 
 __all__ = [
-    "ConversationMessage",
-    "UserMessage",
     "AssistantMessage",
-    "ToolMessage",
+    "ConversationMessage",
     "ToolCall",
     "ToolCallFunction",
+    "ToolMessage",
+    "UserMessage",
 ]

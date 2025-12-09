@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import useSessionStore from "@/store/sessionStore";
+import useModelStore from "@/store/modelStore";
 import { useChat, ChatPanel } from "./ChatPanel";
 import { AgentScroller } from "./AgentScroller";
 import { PromptBox } from "./PromptBox";
@@ -29,12 +30,14 @@ export function SessionPage() {
   const restoreSession = useSessionStore((state) => state.restoreSession);
   const resetSession = useSessionStore((state) => state.resetSession);
 
+  const setSelectedModel = useModelStore((state) => state.setSelectedModel);
+
   // Restore session from URL param on mount
   useEffect(() => {
     if (sessionIdParam) {
-      restoreSession(sessionIdParam);
+      restoreSession(sessionIdParam, setSelectedModel);
     }
-  }, [sessionIdParam, restoreSession]);
+  }, [sessionIdParam, restoreSession, setSelectedModel]);
 
   const handleBackToProjects = () => {
     resetSession();
@@ -109,9 +112,9 @@ export function SessionPage() {
         </div>
 
         <Frame className="w-md shrink-0 my-3 mr-3 max-h-[calc(100%-1.5rem)]">
-          <FramePanel className="py-3">
+          <FrameHeader>
             <FrameTitle>Chat</FrameTitle>
-          </FramePanel>
+          </FrameHeader>
           <FramePanel className="flex-1 min-h-0 p-0 overflow-clip">
             <AgentScroller
               autoScrollDeps={[

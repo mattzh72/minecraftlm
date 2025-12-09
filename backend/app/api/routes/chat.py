@@ -27,8 +27,10 @@ async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
     - complete: Task finished (success or error)
     """
     try:
-        # Create agent executor
-        agent = MinecraftSchematicAgent(session_id=request.session_id)
+        # Create agent executor with optional model override
+        agent = MinecraftSchematicAgent(
+            session_id=request.session_id, model=request.model
+        )
 
         # Run agent loop and stream events
         async for event in agent.run(request.message):

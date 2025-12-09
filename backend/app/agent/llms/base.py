@@ -13,6 +13,7 @@ class StreamChunk:
 
     text_delta: str | None = None
     thought_delta: str | None = None  # Reasoning/thinking tokens
+    thought_signature: str | None = None  # Signature for thinking block (Anthropic)
     tool_calls_delta: list[dict] | None = None
     finish_reason: str | None = None
 

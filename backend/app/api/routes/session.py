@@ -105,11 +105,15 @@ async def get_session(session_id: str):
             with open(structure_path, "r") as f:
                 structure = json.load(f)
 
+        # Load model from metadata
+        model = SessionService.get_model(session_id)
+
         return JSONResponse(
             content={
                 "session_id": session_id,
                 "conversation": conversation,
                 "structure": structure,
+                "model": model,
             }
         )
     except Exception as e:

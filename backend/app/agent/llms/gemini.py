@@ -4,6 +4,7 @@ Gemini API service with streaming tool support.
 
 import base64
 import json
+import uuid
 from typing import AsyncIterator
 
 from google import genai
@@ -18,7 +19,9 @@ class GeminiService(BaseLLMService):
     """Service for interacting with Gemini API."""
 
     def __init__(self, model_id: str = "gemini-3-pro-preview"):
-        super().__init__(model_id)
+        # Strip gemini/ prefix if present (used for provider routing)
+        clean_model_id = model_id.removeprefix("gemini/")
+        super().__init__(clean_model_id)
         self.client = genai.Client(api_key=settings.gemini_api_key)
 
     def _convert_tools(self, tools: list[dict]) -> list[FunctionDeclaration]:
@@ -45,9 +48,8 @@ class GeminiService(BaseLLMService):
             return {}
         if isinstance(args, (dict, list)):
             return args
-        if isinstance(args, str):
-            return json.loads(args)
-        raise ValueError("Unsupported argument type for tool call")
+        # args is a string that needs to be parsed as JSON
+        return json.loads(args)
 
     @staticmethod
     def _encode_signature(signature: bytes | str | None) -> str | None:
@@ -181,10 +183,12 @@ class GeminiService(BaseLLMService):
                         function_call, "thought_signature", None
                     )
                     encoded_signature = self._encode_signature(raw_signature)
+                    # Generate stable ID if Gemini doesn't provide one
+                    call_id = getattr(function_call, "id", None) or f"call_{uuid.uuid4().hex}"
                     tool_calls_delta.append(
                         {
                             "index": len(tool_calls_delta),
-                            "id": getattr(function_call, "id", None),
+                            "id": call_id,
                             "type": "function",
                             "thought_signature": encoded_signature,
                             "extra_content": {

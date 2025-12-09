@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/collapsible";
 import useSessionStore from "@/store/sessionStore";
 import useChatStore, { ChatState } from "@/store/chatStore";
+import useModelStore from "@/store/modelStore";
 import useInitialMessage from "@/hooks/useInitialMessage";
 import { PromptBox } from "./PromptBox";
 import { AgentScroller } from "./AgentScroller";
@@ -247,6 +248,8 @@ export function useChat() {
   const error = useChatStore((state) => state.error);
   const actions = useChatStore((state) => state.actions);
 
+  const selectedModel = useModelStore((state) => state.selectedModel);
+
   const [input, setInput] = useState("");
 
   const isLoading =
@@ -270,7 +273,11 @@ export function useChat() {
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionId, message: userMessage }),
+          body: JSON.stringify({
+            session_id: sessionId,
+            message: userMessage,
+            model: selectedModel,
+          }),
           signal: abortController.signal,
         });
 
@@ -380,7 +387,7 @@ export function useChat() {
         }
       }
     },
-    [sessionId, isLoading, input, setStructureData, setConversation, actions]
+    [sessionId, isLoading, input, selectedModel, setStructureData, setConversation, actions]
   );
 
   return {

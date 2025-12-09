@@ -86,9 +86,9 @@ class SessionService:
         metadata_file.write_text(json.dumps(metadata, indent=2))
 
     @staticmethod
-    def _update_metadata(session_id: str) -> None:
+    def _update_metadata(session_id: str, **kwargs) -> None:
         """
-        Update the metadata.json updated_at field.
+        Update the metadata.json updated_at field and any additional fields.
 
         If the file is missing or malformed, recreate with best-effort values to
         avoid breaking session persistence.
@@ -106,7 +106,34 @@ class SessionService:
 
         metadata.setdefault("created_at", now)
         metadata["updated_at"] = now
+        # Update any additional fields passed in
+        metadata.update(kwargs)
         SessionService._write_metadata(session_id, metadata)
+
+    @staticmethod
+    def set_model(session_id: str, model: str) -> None:
+        """Set the model for a session (only if not already set)"""
+        metadata_file = SessionService._metadata_path(session_id)
+        try:
+            if metadata_file.exists():
+                metadata = json.loads(metadata_file.read_text())
+                # Only set if not already set (lock to first model used)
+                if not metadata.get("model"):
+                    SessionService._update_metadata(session_id, model=model)
+        except Exception:
+            pass
+
+    @staticmethod
+    def get_model(session_id: str) -> str | None:
+        """Get the model for a session"""
+        metadata_file = SessionService._metadata_path(session_id)
+        try:
+            if metadata_file.exists():
+                metadata = json.loads(metadata_file.read_text())
+                return metadata.get("model")
+        except Exception:
+            pass
+        return None
 
     @staticmethod
     def save_structure(session_id: str, structure: dict) -> None:

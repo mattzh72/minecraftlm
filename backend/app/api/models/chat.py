@@ -1,7 +1,7 @@
-from typing import Any, Literal, Union
-from app.agent.harness import ActivityEventType
+from typing import Any
 from pydantic import BaseModel
 
+from app.agent.harness import ActivityEventType
 
 sse_repr = "data: {payload}\n\n"
 
@@ -11,10 +11,11 @@ class ChatRequest(BaseModel):
 
     session_id: str
     message: str
+    model: str | None = None  # Optional - defaults to server config
 
 
 class SSEPayload(BaseModel):
     """Payload for SSE"""
 
-    type: Union[ActivityEventType, Literal["error"]]
+    type: ActivityEventType
     data: Any
