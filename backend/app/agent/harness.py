@@ -197,7 +197,7 @@ class MinecraftSchematicAgent:
                         idx = tc_delta.get("index", 0)
                         if idx not in accumulated_tool_calls:
                             accumulated_tool_calls[idx] = {
-                                "id": tc_delta.get("id", ""),
+                                "id": tc_delta.get("id"),
                                 "type": tc_delta.get("type", "function"),
                                 "function": {"name": "", "arguments": ""},
                                 "extra_content": {},
@@ -230,7 +230,7 @@ class MinecraftSchematicAgent:
                             ]
 
                         # Update ID if provided
-                        if tc_delta.get("id"):
+                        if "id" in tc_delta:
                             accumulated_tool_calls[idx]["id"] = tc_delta["id"]
 
             # Build tool calls from accumulated data
@@ -238,7 +238,7 @@ class MinecraftSchematicAgent:
             for tc_data in accumulated_tool_calls.values():
                 tool_calls_list.append(
                     ToolCall(
-                        id=tc_data.get("id", ""),
+                        id=tc_data.get("id"),
                         type="function",
                         function=ToolCallFunction(
                             name=tc_data.get("function", {}).get("name", ""),
@@ -293,7 +293,6 @@ class MinecraftSchematicAgent:
             serialized_responses = []
 
             for tool_call in tool_calls_list:
-                # Parse tool call
                 func_name = tool_call.function.name
                 func_args = json.loads(tool_call.function.arguments)
 
@@ -325,7 +324,7 @@ class MinecraftSchematicAgent:
                 # Build tool response
                 tool_response = ToolMessage(
                     role="tool",
-                    tool_call_id=tool_call.id or "",
+                    tool_call_id=tool_call.id,
                     content=json.dumps(tool_result),
                     name=func_name,
                 ).model_dump()
