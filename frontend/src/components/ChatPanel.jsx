@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   Check,
   X,
@@ -6,6 +6,7 @@ import {
   CircleCheck,
   Wrench,
   ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { cn } from "@/lib/utils";
@@ -14,9 +15,10 @@ import {
   CollapsibleTrigger,
   CollapsiblePanel,
 } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/group";
 import useSessionStore from "@/store/sessionStore";
 import useChatStore, { ChatState } from "@/store/chatStore";
-import useAutoScroll from "@/hooks/useAutoScroll";
 import useInitialMessage from "@/hooks/useInitialMessage";
 import { PromptBox } from "./PromptBox";
 import { ThinkingIndicator, ThoughtDisplay } from "./ActivityRenderer";
@@ -201,6 +203,11 @@ export function useChatPanel() {
   const actions = useChatStore((state) => state.actions);
 
   const [input, setInput] = useState("");
+  const [showTopButton, setShowTopButton] = useState(false);
+  const [showBottomButton, setShowBottomButton] = useState(false);
+
+  const scrollContainerRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   const isLoading = chatState !== ChatState.IDLE && chatState !== ChatState.ERROR;
 
@@ -210,13 +217,34 @@ export function useChatPanel() {
     [conversation]
   );
 
-  const messagesEndRef = useAutoScroll([
-    displayMessages,
-    pendingUserMessage,
-    streamingThought,
-    streamingText,
-    chatState,
-  ]);
+  // Handle scroll position to show/hide jump button and masks
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const threshold = 100;
+
+    const isAwayFromTop = scrollTop > threshold;
+    const isAwayFromBottom = scrollTop < scrollHeight - clientHeight - threshold;
+
+    // Only show masks when away from respective edges
+    setShowTopButton(isAwayFromTop);
+    setShowBottomButton(isAwayFromBottom);
+  }, []);
+
+  // Auto-scroll to bottom when new content arrives
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [displayMessages, pendingUserMessage, streamingThought, streamingText, chatState]);
+
+  const scrollToTop = useCallback(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   const handleSend = useCallback(
     async (messageText = null) => {
@@ -346,45 +374,88 @@ export function useChatPanel() {
 
   useInitialMessage(sessionId, displayMessages.length, isLoading, handleSend);
 
+  // Only show button group when away from BOTH edges (i.e., in the middle)
+  const showJumpButton = showTopButton && showBottomButton;
+
   return {
     messages: (
-      <div className="flex-1 overflow-y-auto min-h-0 px-3 space-y-2 py-2">
-        {displayMessages.map((msg, idx) => {
-          if (msg.type === "user") {
-            return <UserMessage key={idx} content={msg.content} />;
-          }
-          if (msg.type === "assistant") {
-            return (
-              <AssistantMessage
-                key={idx}
-                content={msg.content}
-                thought_summary={msg.thought_summary}
-                tool_calls={msg.tool_calls}
-              />
-            );
-          }
-          return null;
-        })}
+      <div className="relative flex-1 min-h-0">
+        {/* Top scroll mask */}
+        <div
+          className={cn(
+            "absolute top-0 inset-x-0 h-12 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none transition-opacity duration-200",
+            showTopButton ? "opacity-100" : "opacity-0"
+          )}
+        />
 
-        {/* Pending user message */}
-        {pendingUserMessage &&
-          !displayMessages.some(
-            (msg) => msg.type === "user" && msg.content === pendingUserMessage
-          ) && <UserMessage content={pendingUserMessage} />}
+        {/* Scrollable messages container */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="h-full overflow-y-auto px-3 space-y-2 py-2"
+        >
+          {displayMessages.map((msg, idx) => {
+            if (msg.type === "user") {
+              return <UserMessage key={idx} content={msg.content} />;
+            }
+            if (msg.type === "assistant") {
+              return (
+                <AssistantMessage
+                  key={idx}
+                  content={msg.content}
+                  thought_summary={msg.thought_summary}
+                  tool_calls={msg.tool_calls}
+                />
+              );
+            }
+            return null;
+          })}
 
-        {/* Streaming message */}
-        {isLoading && (
-          <StreamingMessage
-            thought={streamingThought}
-            text={streamingText}
-            state={chatState}
-          />
-        )}
+          {/* Pending user message */}
+          {pendingUserMessage &&
+            !displayMessages.some(
+              (msg) => msg.type === "user" && msg.content === pendingUserMessage
+            ) && <UserMessage content={pendingUserMessage} />}
 
-        {/* Error */}
-        {error && <ErrorMessage content={error} />}
+          {/* Streaming message */}
+          {isLoading && (
+            <StreamingMessage
+              thought={streamingThought}
+              text={streamingText}
+              state={chatState}
+            />
+          )}
 
-        <div ref={messagesEndRef} />
+          {/* Error */}
+          {error && <ErrorMessage content={error} />}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Bottom scroll mask */}
+        <div
+          className={cn(
+            "absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-background to-transparent z-10 pointer-events-none transition-opacity duration-200",
+            showBottomButton ? "opacity-100" : "opacity-0"
+          )}
+        />
+
+        {/* Jump button group - bottom right */}
+        <ButtonGroup
+          orientation="vertical"
+          className={cn(
+            "absolute bottom-3 right-3 z-50 transition-all duration-200",
+            showJumpButton ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"
+          )}
+        >
+          <Button variant="outline" size="icon-sm" onClick={scrollToTop}>
+            <ChevronUp size={14} />
+          </Button>
+          <ButtonGroupSeparator orientation="horizontal" />
+          <Button variant="outline" size="icon-sm" onClick={scrollToBottom}>
+            <ChevronDown size={14} />
+          </Button>
+        </ButtonGroup>
       </div>
     ),
     input: (

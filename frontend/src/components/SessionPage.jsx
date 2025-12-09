@@ -89,7 +89,7 @@ export function SessionPage() {
           <FrameHeader>
             <FrameTitle>Chat</FrameTitle>
           </FrameHeader>
-          <FramePanel className="flex-1 min-h-0 flex flex-col p-0">
+          <FramePanel className="flex-1 min-h-0 flex flex-col p-0 overflow-clip">
             {messages}
           </FramePanel>
           <FrameFooter className="px-0 py-2">{input}</FrameFooter>
