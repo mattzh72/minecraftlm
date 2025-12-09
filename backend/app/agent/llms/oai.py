@@ -67,7 +67,9 @@ class OpenAIService(BaseDeclarativeLLMService):
             finish_reason = choice.finish_reason
 
             # Extract text delta
-            text_delta = delta.content if hasattr(delta, "content") and delta.content else None
+            text_delta = (
+                delta.content if hasattr(delta, "content") and delta.content else None
+            )
 
             # Extract reasoning/thought delta (GPT-5 and reasoning models)
             thought_delta = None
@@ -83,7 +85,9 @@ class OpenAIService(BaseDeclarativeLLMService):
                 for tc_delta in delta.tool_calls:
                     tool_calls_delta.append(
                         {
-                            "index": tc_delta.index if hasattr(tc_delta, "index") else 0,
+                            "index": tc_delta.index
+                            if hasattr(tc_delta, "index")
+                            else 0,
                             "id": tc_delta.id if hasattr(tc_delta, "id") else None,
                             "type": "function",
                             "thought_signature": None,
