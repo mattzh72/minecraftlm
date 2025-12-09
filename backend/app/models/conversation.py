@@ -1,6 +1,7 @@
 """Storage schemas for conversation messages"""
 
 from typing import Literal, Union
+
 from pydantic import BaseModel
 
 

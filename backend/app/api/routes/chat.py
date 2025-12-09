@@ -2,12 +2,12 @@
 Chat API endpoints
 """
 
-from typing import AsyncIterator
 import logging
+from typing import AsyncIterator
 
 from app.agent.harness import MinecraftSchematicAgent
-from app.api.models.chat import SSEPayload, sse_repr
 from app.api.models import ChatRequest
+from app.api.models.chat import SSEPayload, sse_repr
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
@@ -28,7 +28,9 @@ async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
     """
     try:
         # Create agent executor with optional model override
-        agent = MinecraftSchematicAgent(session_id=request.session_id, model=request.model)
+        agent = MinecraftSchematicAgent(
+            session_id=request.session_id, model=request.model
+        )
 
         # Run agent loop and stream events
         async for event in agent.run(request.message):
@@ -45,7 +47,9 @@ async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
             ).model_dump_json()
         )
     except Exception as e:
-        logger.exception("Error while streaming chat for session %s", request.session_id)
+        logger.exception(
+            "Error while streaming chat for session %s", request.session_id
+        )
         yield sse_repr.format(
             payload=SSEPayload(
                 type="error", data={"message": f"Error: {str(e)}"}

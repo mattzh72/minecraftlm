@@ -9,7 +9,7 @@ from typing import AsyncIterator
 
 @dataclass
 class StreamChunk:
-    """Shared streaming chunk type for all LLM providers."""
+    """A single streaming chunk from an LLM provider."""
 
     text_delta: str | None = None
     thought_delta: str | None = None  # Reasoning/thinking tokens
@@ -17,8 +17,8 @@ class StreamChunk:
     finish_reason: str | None = None
 
 
-class BaseDeclarativeLLMService(ABC):
-    """Base class for LLM services that can be called with tools."""
+class BaseLLMService(ABC):
+    """Abstract base class for LLM services."""
 
     def __init__(self, model_id: str):
         self.model_id = model_id
@@ -31,7 +31,7 @@ class BaseDeclarativeLLMService(ABC):
         tools: list[dict],
     ) -> AsyncIterator[StreamChunk]:
         """
-        Stream responses from the LLM with tool calling support.
+        Stream responses with tool calling support.
 
         Args:
             system_prompt: System instructions
@@ -39,6 +39,6 @@ class BaseDeclarativeLLMService(ABC):
             tools: Tool definitions in OpenAI format
 
         Yields:
-            StreamChunk with text deltas, thought deltas, tool call deltas, or finish reason
+            StreamChunk with text, thought, or tool call deltas
         """
         ...

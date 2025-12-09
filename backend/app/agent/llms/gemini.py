@@ -10,14 +10,14 @@ from google import genai
 from google.genai import types
 from google.genai.types import Content, FunctionCall, FunctionDeclaration, Part
 
-from app.agent.llms.base import BaseDeclarativeLLMService, StreamChunk
+from app.agent.llms.base import BaseLLMService, StreamChunk
 from app.config import settings
 
 
-class GeminiService(BaseDeclarativeLLMService):
+class GeminiService(BaseLLMService):
     """Service for interacting with Gemini API."""
 
-    def __init__(self, model_id: str):
+    def __init__(self, model_id: str = "gemini-3-pro-preview"):
         super().__init__(model_id)
         self.client = genai.Client(api_key=settings.gemini_api_key)
 
