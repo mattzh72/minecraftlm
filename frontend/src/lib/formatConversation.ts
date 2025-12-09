@@ -22,11 +22,14 @@ export function formatConversationToUIMessages(
     return [];
   }
 
-  // Build a map of tool_call_id -> tool result for O(1) lookups
-  const toolResultMap = new Map<
+  // Build a map of tool_call_id -> tool result for O(1) lookups (for non-null IDs)
+  const toolResultMapById = new Map<
     string,
     { content: string; name: string; hasError: boolean }
   >();
+
+  // Also collect tool results in order for index-based matching when IDs are null
+  const toolResultsByIndex: Array<{ content: string; name: string; hasError: boolean }> = [];
 
   for (const msg of conversation) {
     if (msg.role === "tool") {
@@ -37,15 +40,25 @@ export function formatConversationToUIMessages(
       } catch {
         // If we can't parse, assume no error
       }
-      toolResultMap.set(msg.tool_call_id, {
+
+      const resultData = {
         content: msg.content,
         name: msg.name,
         hasError,
-      });
+      };
+
+      // Store by ID if available
+      if (msg.tool_call_id) {
+        toolResultMapById.set(msg.tool_call_id, resultData);
+      }
+
+      // Always store in order for index-based fallback
+      toolResultsByIndex.push(resultData);
     }
   }
 
   const uiMessages: UIMessage[] = [];
+  let toolResultIndex = 0;
 
   for (const msg of conversation) {
     if (msg.role === "user") {
@@ -64,8 +77,15 @@ export function formatConversationToUIMessages(
             arguments: tc.function?.arguments || "{}",
           };
 
-          // Attach the result if we have it
-          const result = toolResultMap.get(tc.id);
+          // Try to attach the result - first by ID, then by index
+          let result = tc.id ? toolResultMapById.get(tc.id) : null;
+
+          // Fallback to index-based matching if ID is null/missing
+          if (!result && toolResultIndex < toolResultsByIndex.length) {
+            result = toolResultsByIndex[toolResultIndex];
+            toolResultIndex++;
+          }
+
           if (result) {
             toolCallWithResult.result = {
               content: result.content,
@@ -93,6 +113,7 @@ export function formatConversationToUIMessages(
     // Skip tool messages - they're absorbed into assistant messages above
   }
 
+  console.log("uiMessages", uiMessages);
   return uiMessages;
 }
 

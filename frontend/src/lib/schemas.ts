@@ -52,7 +52,7 @@ export const toolCallResultSchema = z.object({
 });
 
 export const toolCallWithResultSchema = z.object({
-  id: z.string(),
+  id: z.string().nullish(),
   name: z.string(),
   arguments: z.string(),
   result: toolCallResultSchema.optional(),
