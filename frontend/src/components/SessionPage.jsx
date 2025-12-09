@@ -88,7 +88,7 @@ export function SessionPage() {
         <div
           className={cn(
             "flex flex-col basis-md",
-            "overflow-hidden m-3 rounded-2xl",
+            "overflow-hidden m-3 ml-0 rounded-2xl",
             "bg-slate-50",
             "border border-slate-400",
             "shadow-sm shadow-slate-900/5"

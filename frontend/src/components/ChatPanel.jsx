@@ -140,7 +140,7 @@ function ToolCallWithResultDisplay({ toolCall }) {
         </span>
         <span className="font-medium">{label}</span>
       </Collapsible.Trigger>
-      <Collapsible.Panel className="h-[--collapsible-panel-height] overflow-hidden transition-[height] duration-200 ease-out data-[starting-style]:h-0 data-[ending-style]:h-0">
+      <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-200 ease-out data-[starting-style]:h-0 data-[ending-style]:h-0">
         <pre
           className={cn(
             "mt-1.5 p-2 rounded-lg text-xs overflow-auto max-h-48",
