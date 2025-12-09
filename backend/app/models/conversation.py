@@ -1,6 +1,7 @@
 """Storage schemas for conversation messages"""
 
 from typing import Literal, Union
+
 from pydantic import BaseModel
 
 
@@ -44,8 +45,6 @@ class ToolMessage(BaseModel):
     tool_call_id: str | None = None
     content: str
     name: str
-
-
 
 
 ConversationMessage = Union[UserMessage, AssistantMessage, ToolMessage]

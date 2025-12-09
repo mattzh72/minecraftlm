@@ -5,19 +5,17 @@ Session API endpoints
 import json
 from pathlib import Path
 
+from app.api.models import SessionResponse
+from app.services.session import SessionService
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-
-from app.services.session import SessionService
-from app.api.models import SessionResponse
-
 
 router = APIRouter()
 
 CODE_FNAME = "code.json"
 # Store sessions outside backend/ to avoid triggering uvicorn reload
 LOCAL_STORAGE_FOLDER = (
-    Path(__file__).parent.parent.parent.parent / ".storage" / "sessions"
+    Path(__file__).parent.parent.parent.parent.parent / ".storage" / "sessions"
 )
 
 

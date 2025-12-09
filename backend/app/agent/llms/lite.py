@@ -5,49 +5,23 @@ Supports OpenAI, Anthropic, and Google Gemini
 
 import logging
 import os
-from dataclasses import dataclass
+from typing import AsyncIterator
 
 import litellm
 
+from app.agent.llms.base import BaseLLMService, StreamChunk
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class FunctionCall:
-    """Normalized function call from any provider"""
-
-    name: str
-    args: dict
-    id: str | None = None
-
-
-@dataclass
-class ModelResponse:
-    """Normalized response from any provider"""
-
-    text: str | None
-    function_calls: list[FunctionCall] | None
-    finish_reason: str | None
-
-
-@dataclass
-class StreamChunk:
-    """A single streaming chunk"""
-
-    text_delta: str | None = None
-    tool_calls_delta: list[dict] | None = None
-    finish_reason: str | None = None
-
-
-class LLMService:
+class LLMService(BaseLLMService):
     """Provider-agnostic LLM service using LiteLLM"""
 
-    def __init__(self):
-        self.model = settings.llm_model
+    def __init__(self, model_id: str | None = None):
+        super().__init__(model_id or settings.llm_model)
         self._configure_api_keys()
-        logger.info(f"Using model: {self.model}")
+        logger.info(f"Using model: {self.model_id}")
 
     def _configure_api_keys(self):
         """Set API keys as environment variables for LiteLLM"""
@@ -63,7 +37,7 @@ class LLMService:
         system_prompt: str,
         messages: list[dict],
         tools: list[dict],
-    ):
+    ) -> AsyncIterator[StreamChunk]:
         """
         Call LLM with function/tool calling enabled, streaming response.
 
@@ -81,7 +55,7 @@ class LLMService:
 
         # Call LiteLLM with streaming enabled
         response = await litellm.acompletion(
-            model=self.model,
+            model=self.model_id,
             messages=full_messages,
             tools=tools,
             stream=True,

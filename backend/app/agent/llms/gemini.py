@@ -4,32 +4,22 @@ Gemini API service with streaming tool support.
 
 import base64
 import json
-from dataclasses import dataclass
 from typing import AsyncIterator
 
 from google import genai
 from google.genai import types
 from google.genai.types import Content, FunctionCall, FunctionDeclaration, Part
 
+from app.agent.llms.base import BaseLLMService, StreamChunk
 from app.config import settings
 
 
-@dataclass
-class StreamChunk:
-    """A single streaming chunk from Gemini."""
-
-    text_delta: str | None = None
-    thought_delta: str | None = None
-    tool_calls_delta: list[dict] | None = None
-    finish_reason: str | None = None
-
-
-class GeminiService:
+class GeminiService(BaseLLMService):
     """Service for interacting with Gemini API."""
 
-    def __init__(self):
+    def __init__(self, model_id: str = "gemini-3-pro-preview"):
+        super().__init__(model_id)
         self.client = genai.Client(api_key=settings.gemini_api_key)
-        self.model_id = "gemini-3-pro-preview"
 
     def _convert_tools(self, tools: list[dict]) -> list[FunctionDeclaration]:
         """Convert OpenAI-style tool specs into Gemini FunctionDeclarations."""
@@ -66,7 +56,7 @@ class GeminiService:
             return None
         if isinstance(signature, bytes):
             return base64.b64encode(signature).decode("utf-8")
-        return signature  
+        return signature
 
     @staticmethod
     def _decode_signature(signature: str | bytes | None) -> bytes | None:
@@ -90,15 +80,14 @@ class GeminiService:
             if message.get("content"):
                 parts.append(Part(text=message["content"]))
             for tool_call in message.get("tool_calls", []):
-                function = tool_call.get("function", {}) if isinstance(tool_call, dict) else {}
+                function = (
+                    tool_call.get("function", {}) if isinstance(tool_call, dict) else {}
+                )
                 signature = None
                 if isinstance(tool_call, dict):
-                    raw_signature = (
-                        tool_call.get("thought_signature")
-                        or tool_call.get("extra_content", {})
-                        .get("google", {})
-                        .get("thought_signature")
-                    )
+                    raw_signature = tool_call.get("thought_signature") or tool_call.get(
+                        "extra_content", {}
+                    ).get("google", {}).get("thought_signature")
                     signature = self._decode_signature(raw_signature)
                 fn_call = FunctionCall(
                     name=function.get("name", ""),
@@ -151,7 +140,9 @@ class GeminiService:
 
         config = types.GenerateContentConfig(
             system_instruction=system_prompt,
-            tools=[types.Tool(function_declarations=tool_declarations)] if tool_declarations else None,
+            tools=[types.Tool(function_declarations=tool_declarations)]
+            if tool_declarations
+            else None,
             thinking_config=types.ThinkingConfig(include_thoughts=True),
             temperature=1.0,
         )
@@ -196,7 +187,9 @@ class GeminiService:
                             "id": getattr(function_call, "id", None),
                             "type": "function",
                             "thought_signature": encoded_signature,
-                            "extra_content": {"google": {"thought_signature": encoded_signature}}
+                            "extra_content": {
+                                "google": {"thought_signature": encoded_signature}
+                            }
                             if encoded_signature
                             else {},
                             "function": {
