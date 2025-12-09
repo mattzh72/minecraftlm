@@ -2,6 +2,7 @@
 OpenAI API service with streaming tool support and reasoning tokens.
 """
 
+import uuid
 from typing import AsyncIterator
 
 import openai
@@ -24,6 +25,41 @@ class OpenAIService(BaseLLMService):
         """Check if the model supports reasoning tokens."""
         return any(self.model_id.startswith(prefix) for prefix in REASONING_MODELS)
 
+    def _sanitize_messages(self, messages: list[dict]) -> list[dict]:
+        """
+        Sanitize messages for OpenAI compatibility.
+
+        OpenAI requires tool_call IDs to be non-null strings. Conversations
+        from other providers (like Gemini) may have null IDs. This generates
+        consistent IDs and ensures tool messages reference the correct IDs.
+        """
+        sanitized = []
+        pending_tool_call_ids: list[str] = []
+
+        for msg in messages:
+            msg_copy = dict(msg)
+
+            if msg_copy.get("role") == "assistant" and msg_copy.get("tool_calls"):
+                pending_tool_call_ids = []
+                sanitized_tool_calls = []
+                for tc in msg_copy["tool_calls"]:
+                    tc_copy = dict(tc)
+                    if not tc_copy.get("id"):
+                        tc_copy["id"] = f"call_{uuid.uuid4().hex}"
+                    pending_tool_call_ids.append(tc_copy["id"])
+                    sanitized_tool_calls.append(tc_copy)
+                msg_copy["tool_calls"] = sanitized_tool_calls
+
+            if msg_copy.get("role") == "tool":
+                if not msg_copy.get("tool_call_id") and pending_tool_call_ids:
+                    msg_copy["tool_call_id"] = pending_tool_call_ids.pop(0)
+                elif not msg_copy.get("tool_call_id"):
+                    msg_copy["tool_call_id"] = f"call_{uuid.uuid4().hex}"
+
+            sanitized.append(msg_copy)
+
+        return sanitized
+
     async def generate_with_tools_streaming(
         self,
         system_prompt: str,
@@ -38,7 +74,8 @@ class OpenAIService(BaseLLMService):
             messages: Conversation history in OpenAI format
             tools: Tool definitions in OpenAI format
         """
-        full_messages = [{"role": "system", "content": system_prompt}] + messages
+        sanitized = self._sanitize_messages(messages)
+        full_messages = [{"role": "system", "content": system_prompt}] + sanitized
 
         # Build request params
         request_params = {
