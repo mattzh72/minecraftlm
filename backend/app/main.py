@@ -8,12 +8,12 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
+from app.api.routes.chat import router as chat
+from app.api.routes.session import router as session
 from app.config import settings
-from app.api.chat import router as chat
-from app.api.session import router as session
 
 # Configure logging before importing modules that use it
 logging.basicConfig(

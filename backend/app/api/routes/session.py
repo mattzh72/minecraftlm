@@ -5,12 +5,10 @@ Session API endpoints
 import json
 from pathlib import Path
 
+from app.api.models import SessionResponse
+from app.services.session import SessionService
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-
-from app.services.session import SessionService
-from app.api.models import SessionResponse
-
 
 router = APIRouter()
 

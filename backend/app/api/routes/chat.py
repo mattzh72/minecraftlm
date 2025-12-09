@@ -2,15 +2,14 @@
 Chat API endpoints
 """
 
-from typing import AsyncIterator
 import logging
-
-from app.api.models.chat import SSEPayload, sse_repr
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
+from typing import AsyncIterator
 
 from app.agent.harness import MinecraftSchematicAgent
 from app.api.models import ChatRequest
+from app.api.models.chat import SSEPayload, sse_repr
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -46,7 +45,9 @@ async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
             ).model_dump_json()
         )
     except Exception as e:
-        logger.exception("Error while streaming chat for session %s", request.session_id)
+        logger.exception(
+            "Error while streaming chat for session %s", request.session_id
+        )
         yield sse_repr.format(
             payload=SSEPayload(
                 type="error", data={"message": f"Error: {str(e)}"}

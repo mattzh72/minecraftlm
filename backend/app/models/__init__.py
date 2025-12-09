@@ -3,12 +3,12 @@ Shared data models
 """
 
 from app.models.conversation import (
-    ConversationMessage,
-    UserMessage,
     AssistantMessage,
-    ToolMessage,
+    ConversationMessage,
     ToolCall,
     ToolCallFunction,
+    ToolMessage,
+    UserMessage,
 )
 
 __all__ = [
