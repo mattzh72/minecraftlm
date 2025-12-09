@@ -48,9 +48,8 @@ class GeminiService(BaseLLMService):
             return {}
         if isinstance(args, (dict, list)):
             return args
-        if isinstance(args, str):
-            return json.loads(args)
-        raise ValueError("Unsupported argument type for tool call")
+        # args is a string that needs to be parsed as JSON
+        return json.loads(args)
 
     @staticmethod
     def _encode_signature(signature: bytes | str | None) -> str | None:
