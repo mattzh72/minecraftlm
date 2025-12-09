@@ -1,12 +1,11 @@
-import { useState, useRef, useCallback } from "react";
-import { cva } from "class-variance-authority";
+import { useState, useRef, useCallback, useMemo } from "react";
 import {
   Check,
   X,
   Pencil,
   CircleCheck,
   Wrench,
-  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import { Collapsible } from "@base-ui-components/react/collapsible";
@@ -15,25 +14,11 @@ import useAutoScroll from "../hooks/useAutoScroll";
 import useInitialMessage from "../hooks/useInitialMessage";
 import { PromptBox } from "./PromptBox";
 import { ThinkingIndicator } from "./ActivityRenderer";
-
-// Message bubble variants
-const messageBubble = cva("p-3 text-sm text-slate-700", {
-  variants: {
-    error: {
-      true: "text-red-700",
-    },
-  },
-});
-
-// Message role label
-const roleLabel = cva("text-xs font-semibold uppercase tracking-wide mb-1.5", {
-  variants: {
-    role: {
-      user: "text-slate-500",
-      agent: "text-emerald-600",
-    },
-  },
-});
+import {
+  formatConversationToUIMessages,
+  getToolCallLabel,
+  hasExpandableContent,
+} from "../lib/formatConversation";
 
 // Header component
 function ChatPanelHeader() {
@@ -45,13 +30,12 @@ function ChatPanelHeader() {
 }
 
 // ============================================================================
-// Message Renderers - Render OpenAI conversation format directly
+// Message Renderers - Cursor-style full-width messages
 // ============================================================================
 
 function UserMessage({ content }) {
   return (
-    <div className={messageBubble()}>
-      <div className={roleLabel({ role: "user" })}>You</div>
+    <div className="text-sm text-slate-700 bg-slate-100 border border-slate-200 rounded-lg p-2">
       <div className="whitespace-pre-wrap">{content}</div>
     </div>
   );
@@ -64,124 +48,117 @@ function AssistantMessage({ content, toolCalls }) {
   if (!hasContent && !hasToolCalls) return null;
 
   return (
-    <div className={messageBubble()}>
-      <div className={roleLabel({ role: "agent" })}>Agent</div>
+    <div className="py-3 text-sm text-slate-700 border-b border-slate-100">
       <div className="space-y-2">
         {hasContent && <div className="whitespace-pre-wrap">{content}</div>}
         {hasToolCalls &&
           toolCalls.map((tc, idx) => (
-            <ToolCallDisplay key={idx} toolCall={tc} />
+            <ToolCallWithResultDisplay key={tc.id || idx} toolCall={tc} />
           ))}
       </div>
     </div>
   );
 }
 
-function ToolCallDisplay({ toolCall }) {
-  const name = toolCall.function?.name || "unknown";
-  const label =
-    name === "edit_code"
-      ? "Editing code"
-      : name === "complete_task"
-      ? "Validating"
-      : name;
+/**
+ * Unified tool call display - toggle on the right side to avoid offset
+ */
+function ToolCallWithResultDisplay({ toolCall }) {
+  const { name, result } = toolCall;
+  const hasResult = !!result;
+  const hasError = result?.hasError || false;
 
-  let args = null;
-  try {
-    args = JSON.parse(toolCall.function?.arguments || "{}");
-  } catch {
-    args = { raw: toolCall.function?.arguments };
+  const label = getToolCallLabel(name, hasResult, hasError);
+
+  let displayContent = null;
+  if (result?.content) {
+    try {
+      const parsed = JSON.parse(result.content);
+      displayContent = hasError ? parsed.error : parsed.result;
+    } catch {
+      displayContent = result.content;
+    }
   }
 
-  const shouldRenderCollapsible = args !== null;
-
-  const IconComponent =
-    name === "edit_code"
+  const IconComponent = !hasResult
+    ? name === "edit_code"
       ? Pencil
       : name === "complete_task"
       ? CircleCheck
-      : Wrench;
+      : Wrench
+    : hasError
+    ? X
+    : Check;
 
-  const baseNode = (
-    <div className="flex items-center gap-1.5 text-slate-500 hover:text-slate-700 transition-colors group">
-      <ChevronRight
-        size={12}
-        className="text-slate-400 transition-transform group-data-panel-open:rotate-90"
-      />
-      <IconComponent size={14} />
-      <span className="font-medium">{label}</span>
-    </div>
-  );
+  const iconColor = !hasResult
+    ? "text-slate-400"
+    : hasError
+    ? "text-red-500"
+    : "text-emerald-600";
 
-  return shouldRenderCollapsible ? (
-    <Collapsible.Root className="text-sm">
-      <Collapsible.Trigger asChild>{baseNode}</Collapsible.Trigger>
-    </Collapsible.Root>
-  ) : (
-    baseNode
-  );
-}
+  const isExpandable = hasExpandableContent(toolCall);
+  const shouldDefaultOpen = hasError;
 
-function ToolResultMessage({ name, content }) {
-  let result;
-  try {
-    result = JSON.parse(content);
-  } catch {
-    result = { output: content };
+  if (!isExpandable) {
+    return (
+      <div className="text-sm py-1 flex items-center gap-1.5 text-slate-500">
+        <IconComponent size={14} className={iconColor} />
+        <span className="font-medium">{label}</span>
+      </div>
+    );
   }
 
-  const hasError = result?.error;
-  const label =
-    name === "edit_code"
-      ? hasError
-        ? "Edit failed"
-        : "Edited code"
-      : name === "complete_task"
-      ? hasError
-        ? "Validation failed"
-        : "Validated"
-      : hasError
-      ? "Failed"
-      : "Done";
-
-  const displayContent = hasError ? result.error : result.output;
-
   return (
-    <Collapsible.Root className="text-sm" defaultOpen={hasError}>
-      <Collapsible.Trigger className="flex items-center gap-1.5 text-slate-600 hover:text-slate-700 transition-colors group">
-        <ChevronRight
-          size={12}
-          className="text-slate-400 transition-transform group-data-panel-open:rotate-90"
-        />
-        {hasError ? (
-          <X size={14} className="text-red-500" />
-        ) : (
-          <Check size={14} className="text-emerald-600" />
-        )}
+    <Collapsible.Root className="text-sm" defaultOpen={shouldDefaultOpen}>
+      <Collapsible.Trigger
+        disabled={!displayContent}
+        className="group w-full text-left py-1 flex items-center gap-1.5 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+      >
+        <span className="relative size-3.5">
+          <IconComponent
+            size={14}
+            className={cn(
+              iconColor,
+              "absolute inset-0 transition-opacity group-hover:opacity-0"
+            )}
+          />
+          <ChevronDown
+            size={14}
+            className="absolute inset-0 text-slate-400 opacity-0 transition-all group-hover:opacity-100 group-data-panel-open:rotate-180"
+          />
+        </span>
         <span className="font-medium">{label}</span>
       </Collapsible.Trigger>
-      {displayContent && (
-        <Collapsible.Panel className="mt-1.5 ml-5">
-          <pre
-            className={cn(
-              "p-2 rounded-lg text-xs overflow-auto max-h-48",
-              hasError
-                ? "bg-red-50 text-red-700"
-                : "bg-slate-100 text-slate-600"
-            )}
-          >
-            {displayContent}
-          </pre>
-        </Collapsible.Panel>
-      )}
+      <Collapsible.Panel
+        keepMounted
+        className={cn(
+          "grid grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out",
+          "data-closed:grid-rows-[0fr]",
+          "data-starting-style:grid-rows-[0fr]"
+        )}
+      >
+        <div className="overflow-hidden min-h-0">
+          {displayContent && (
+            <pre
+              className={cn(
+                "mt-1.5 p-2 rounded-lg text-xs overflow-auto max-h-48",
+                hasError
+                  ? "bg-red-50 text-red-700"
+                  : "bg-slate-50 text-slate-600"
+              )}
+            >
+              {displayContent}
+            </pre>
+          )}
+        </div>
+      </Collapsible.Panel>
     </Collapsible.Root>
   );
 }
 
 function StreamingMessage({ content, isThinking }) {
   return (
-    <div className={messageBubble()}>
-      <div className={roleLabel({ role: "agent" })}>Agent</div>
+    <div className="py-3 text-sm text-slate-700">
       <div className="space-y-2">
         {content && content.trim() && (
           <div className="whitespace-pre-wrap">{content}</div>
@@ -193,7 +170,11 @@ function StreamingMessage({ content, isThinking }) {
 }
 
 function ErrorMessage({ content }) {
-  return <div className={messageBubble({ error: true })}>{content}</div>;
+  return (
+    <div className="py-3 text-sm text-red-600">
+      <div className="whitespace-pre-wrap">{content}</div>
+    </div>
+  );
 }
 
 // ============================================================================
@@ -219,8 +200,11 @@ export default function ChatPanel() {
 
   const abortControllerRef = useRef(null);
 
-  // Derive display messages from conversation (no useEffect needed)
-  const displayMessages = conversation || [];
+  // Format conversation into UI-friendly messages (groups tool calls with results)
+  const displayMessages = useMemo(
+    () => formatConversationToUIMessages(conversation || []),
+    [conversation]
+  );
 
   const messagesEndRef = useAutoScroll([
     displayMessages,
@@ -379,27 +363,18 @@ export default function ChatPanel() {
       <ChatPanelHeader />
 
       {/* Messages - scrollable */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-3">
-        {/* Render conversation from backend */}
+      <div className="flex-1 overflow-y-auto min-h-0 px-3 space-y-2 pt-2">
+        {/* Render formatted UI messages (tool results are grouped with their calls) */}
         {displayMessages.map((msg, idx) => {
-          if (msg.role === "user") {
+          if (msg.type === "user") {
             return <UserMessage key={idx} content={msg.content} />;
           }
-          if (msg.role === "assistant") {
+          if (msg.type === "assistant") {
             return (
               <AssistantMessage
                 key={idx}
                 content={msg.content}
-                toolCalls={msg.tool_calls}
-              />
-            );
-          }
-          if (msg.role === "tool") {
-            return (
-              <ToolResultMessage
-                key={idx}
-                name={msg.name}
-                content={msg.content}
+                toolCalls={msg.toolCalls}
               />
             );
           }
@@ -407,9 +382,7 @@ export default function ChatPanel() {
         })}
 
         {/* Pending user message (shown immediately while loading) */}
-        {pendingUserMessage && (
-          <UserMessage content={pendingUserMessage} />
-        )}
+        {pendingUserMessage && <UserMessage content={pendingUserMessage} />}
 
         {/* Streaming message (while loading) */}
         {isLoading && (
