@@ -181,3 +181,49 @@ class BlockStreamParser:
             "properties": block.properties,
             "fill": block.fill,
         }
+
+    def to_block_json_chunks(
+        self, block: ParsedBlock, max_chunk_size: int = 8
+    ) -> list[dict]:
+        """
+        Convert ParsedBlock to one or more structure JSON blocks.
+
+        Large blocks are split into smaller chunks for faster streaming preview.
+        Each chunk is at most max_chunk_size in any dimension.
+        """
+        x, y, z = block.position
+        sx, sy, sz = block.size
+
+        # Normalize block_id
+        block_id = block.block_id
+        if not block_id.startswith("minecraft:"):
+            block_id = f"minecraft:{block_id}"
+
+        # If block is small enough, return as-is
+        if sx <= max_chunk_size and sy <= max_chunk_size and sz <= max_chunk_size:
+            return [self.to_block_json(block)]
+
+        # Split into chunks
+        chunks = []
+        for cx in range(0, sx, max_chunk_size):
+            for cy in range(0, sy, max_chunk_size):
+                for cz in range(0, sz, max_chunk_size):
+                    chunk_sx = min(max_chunk_size, sx - cx)
+                    chunk_sy = min(max_chunk_size, sy - cy)
+                    chunk_sz = min(max_chunk_size, sz - cz)
+
+                    chunks.append(
+                        {
+                            "start": [int(x + cx), int(y + cy), int(z + cz)],
+                            "end": [
+                                int(x + cx + chunk_sx),
+                                int(y + cy + chunk_sy),
+                                int(z + cz + chunk_sz),
+                            ],
+                            "type": block_id,
+                            "properties": block.properties,
+                            "fill": block.fill,
+                        }
+                    )
+
+        return chunks

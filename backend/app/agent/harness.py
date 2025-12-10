@@ -243,11 +243,12 @@ class MinecraftSchematicAgent:
                                     for block in new_blocks:
                                         # Get position from parser's updated state (may have position.set() now)
                                         updated_block = self.block_parser.blocks.get(block.variable_name, block)
-                                        block_json = self.block_parser.to_block_json(updated_block)
-                                        yield ActivityEvent(
-                                            type="block_preview",
-                                            data={"block": block_json},
-                                        )
+                                        # Split large blocks into chunks for faster streaming
+                                        for block_json in self.block_parser.to_block_json_chunks(updated_block):
+                                            yield ActivityEvent(
+                                                type="block_preview",
+                                                data={"block": block_json},
+                                            )
                             except Exception:
                                 # Best effort - block parsing is non-fatal, don't break streaming
                                 pass
