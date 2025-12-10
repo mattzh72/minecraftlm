@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
-type CubeProps = {
+type BlockAnimationProps = {
   size?: number;
   className?: string;
 };
 
-export function BlockAnimation({ size = 16, className }: CubeProps) {
+export function BlockAnimation({ size = 16, className }: BlockAnimationProps) {
   const cubeRef = useRef<HTMLDivElement | null>(null);
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);

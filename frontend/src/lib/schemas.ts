@@ -1,8 +1,24 @@
 import { z } from "zod";
 
+export const createSessionResponseSchema = z.object({
+  session_id: z.string(),
+});
+
 /**
  * Schemas for raw conversation messages (OpenAI format)
  */
+export const sessionLiteSchema = z.object({
+  session_id: z.string(),
+  has_structure: z.boolean(),
+  message_count: z.number(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const listSessionsResponseSchema = z.object({
+  sessions: z.array(sessionLiteSchema),
+});
+
 export const toolCallFunctionSchema = z.object({
   name: z.string(),
   arguments: z.string(),
@@ -26,7 +42,7 @@ export const rawAssistantMessageSchema = z.object({
   content: z.string(),
   thought_summary: z.string().nullish(),
   thinking_signature: z.string().nullish(), // Anthropic thinking block signature
-  tool_calls: z.array(toolCallSchema).optional(),
+  tool_calls: z.array(toolCallSchema).nullish(),
 });
 
 export const rawToolMessageSchema = z.object({
@@ -50,7 +66,7 @@ export const rawConversationSchema = z.array(rawMessageSchema);
 export const toolCallResultSchema = z.object({
   content: z.string(),
   hasError: z.boolean(),
-});
+})
 
 export const toolCallWithResultSchema = z.object({
   id: z.string().nullish(),
@@ -78,6 +94,30 @@ export const uiMessageSchema = z.discriminatedUnion("type", [
 
 export const uiConversationSchema = z.array(uiMessageSchema);
 
+const structureDataSchema = z.record(z.string(), z.unknown()).nullish().default(null);
+export const sessionDetailsResponseSchema = z.object({
+  session_id: z.string(),
+  conversation: rawConversationSchema,
+  structure: structureDataSchema,
+});
+
+export const storeSessionSchema = sessionLiteSchema.extend({
+  conversation: rawConversationSchema.nullish().default([]),
+  structure: structureDataSchema,
+});
+
+const providerSchema = z.enum(["gemini", "openai", "anthropic"]);
+
+export const modelSchema = z.object({
+  id: z.string(),
+  provider: providerSchema,
+});
+
+export const modelsResponseSchema = z.object({
+  models: z.array(modelSchema),
+  default: z.string(),
+});
+
 /**
  * Inferred types from schemas
  */
@@ -93,3 +133,9 @@ export type UIUserMessage = z.infer<typeof uiUserMessageSchema>;
 export type UIAssistantMessage = z.infer<typeof uiAssistantMessageSchema>;
 export type UIMessage = z.infer<typeof uiMessageSchema>;
 export type UIConversation = z.infer<typeof uiConversationSchema>;
+export type SessionLite = z.infer<typeof sessionLiteSchema>;
+export type ListSessionsResponse = z.infer<typeof listSessionsResponseSchema>;
+export type StoreSession = z.infer<typeof storeSessionSchema>;
+export type Model = z.infer<typeof modelSchema>;
+export type ModelsResponse = z.infer<typeof modelsResponseSchema>;
+export type ModelProvider = z.infer<typeof providerSchema>;

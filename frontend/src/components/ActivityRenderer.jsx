@@ -41,7 +41,7 @@ export function ThoughtDisplay({ content, isStreaming }) {
   if (!content || !content.trim()) return null;
 
   return (
-    <Collapsible defaultOpen={false}>
+    <Collapsible defaultOpen={isStreaming}>
       <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-left py-1">
         <ChevronDown
           size={12}

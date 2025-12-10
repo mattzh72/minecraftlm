@@ -1,8 +1,8 @@
-import { Routes, Route } from 'react-router-dom';
-import ProjectsPage from './components/ProjectsPage';
-import { SessionPage } from './components/SessionPage';
+import { Routes, Route } from "react-router-dom";
+import { ProjectsPage } from "@/components/ProjectsPage";
+import { SessionPage } from "@/components/SessionPage";
 
-function App() {
+export function App() {
   return (
     <Routes>
       {/* Home / Projects listing */}
@@ -13,5 +13,3 @@ function App() {
     </Routes>
   );
 }
-
-export default App;

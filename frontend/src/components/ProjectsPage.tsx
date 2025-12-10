@@ -1,62 +1,66 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import useSessionStore from '@/store/sessionStore';
-import ThumbnailViewer from './ThumbnailViewer';
-import { SuggestionButtons } from './SuggestionButton';
-import { PromptBox } from './PromptBox';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSession } from "@/hooks/useSession";
+import ThumbnailViewer from "./ThumbnailViewer";
+import { SuggestionButtons } from "./SuggestionButton.tsx";
+import { PromptBox } from "./PromptBox";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { listSessionsResponseSchema, storeSessionSchema } from "@/lib/schemas";
+import { useStore } from "@/store";
 
-export default function ProjectsPage() {
+export function ProjectsPage() {
   const navigate = useNavigate();
-  const createSession = useSessionStore((state) => state.createSession);
-
-  const [sessions, setSessions] = useState([]);
-  const [sessionStructures, setSessionStructures] = useState({});
+  const { createSession } = useSession();
+  const addSessions = useStore((s) => s.addSessions);
+  const addStructureData = useStore((s) => s.addStructureData);
+  const sessions = useStore((s) => s.sessions);
   const [isLoading, setIsLoading] = useState(true);
-  const [inputValue, setInputValue] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const hasSessions = useStore((s) => Object.keys(s.sessions).length > 0);
 
   // Fetch all sessions on mount
   useEffect(() => {
-    fetch('/api/sessions')
-      .then(res => res.json())
-      .then(data => {
-        const fetchedSessions = data.sessions || [];
-        setSessions(fetchedSessions);
+    fetch("/api/sessions")
+      .then((res) => res.json())
+      .then((data) => {
+        const result = listSessionsResponseSchema.parse(data);
+        const sessions = result.sessions;
+
+        const storeSessions = sessions.map((s) => storeSessionSchema.parse(s));
+        addSessions(storeSessions);
         setIsLoading(false);
 
         // Fetch structure data for sessions that have structures
-        fetchedSessions.forEach(session => {
-          if (session.has_structure) {
-            fetch(`/api/sessions/${session.session_id}/structure`)
-              .then(res => res.json())
-              .then(structureData => {
-                setSessionStructures(prev => ({
-                  ...prev,
-                  [session.session_id]: structureData,
-                }));
+        storeSessions.forEach((sesh) => {
+          if (sesh.has_structure) {
+            fetch(`/api/sessions/${sesh.session_id}/structure`)
+              .then((res) => res.json())
+              .then((structureData) => {
+                addStructureData(sesh.session_id, structureData);
               })
-              .catch(err => {
-                console.error(`Error fetching structure for ${session.session_id}:`, err);
+              .catch((err) => {
+                console.error(
+                  `Error fetching structure for ${sesh.session_id}:`,
+                  err
+                );
               });
           }
         });
       })
-      .catch(err => {
-        console.error('Error fetching sessions:', err);
+      .catch((err) => {
+        console.error("Error fetching sessions:", err);
         setIsLoading(false);
       });
   }, []);
 
   // Handle creating a new session and navigating to it
-  const handleSubmit = async (message) => {
+  const handleSubmit = async (message: string) => {
     if (!message.trim() || isCreating) return;
-
     setIsCreating(true);
     const newSessionId = await createSession(message.trim());
-    setInputValue('');
+    console.log(`newSessionId`, newSessionId);
     setIsCreating(false);
 
     if (newSessionId) {
@@ -65,32 +69,34 @@ export default function ProjectsPage() {
   };
 
   // Navigate to an existing session
-  const handleSelectSession = (sessionId) => {
+  const handleSelectSession = (sessionId: string) => {
     navigate(`/session/${sessionId}`);
   };
 
-  const formatDate = (isoString) => {
-    if (!isoString) return 'Unknown';
+  const formatDate = (isoString: string) => {
+    if (!isoString) return "Unknown";
     const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   };
 
-  const hasSessions = sessions.length > 0;
-
   return (
-    <div className={cn(
-      "min-h-screen bg-background grid",
-      hasSessions ? 'grid-rows-[auto_1fr]' : 'grid-rows-1'
-    )}>
+    <div
+      className={cn(
+        "min-h-screen bg-background grid",
+        hasSessions ? "grid-rows-[auto_1fr]" : "grid-rows-1"
+      )}
+    >
       {/* Hero Section with Chat Bar */}
-      <div className={cn(
-        "flex flex-col items-center justify-center px-6",
-        hasSessions ? 'py-20 pb-10' : 'min-h-screen py-10'
-      )}>
+      <div
+        className={cn(
+          "flex flex-col items-center justify-center px-6",
+          hasSessions ? "py-20 pb-10" : "min-h-screen py-10"
+        )}
+      >
         <div className="w-full max-w-5xl flex flex-col items-center">
           <h1 className="text-5xl font-semibold text-foreground mb-4 tracking-tight">
             MinecraftLM
@@ -101,22 +107,13 @@ export default function ProjectsPage() {
 
           {/* Chat Input */}
           <PromptBox
-            value={inputValue}
-            onChange={setInputValue}
             onSubmit={handleSubmit}
             disabled={isCreating}
-            isLoading={isCreating}
             placeholder="Describe what you want to build..."
             className="max-w-2xl"
-          >
-            <PromptBox.Input maxRows={5} />
-            <PromptBox.Submit />
-          </PromptBox>
-
-          <SuggestionButtons
-            onSelect={(prompt) => setInputValue(prompt)}
-            disabled={isCreating}
           />
+
+          <SuggestionButtons disabled={isCreating} />
         </div>
       </div>
 
@@ -129,7 +126,7 @@ export default function ProjectsPage() {
             </h2>
 
             <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-5">
-              {sessions.map(session => (
+              {Object.values(sessions).map((session) => (
                 <Card
                   key={session.session_id}
                   onClick={() => handleSelectSession(session.session_id)}
@@ -137,11 +134,8 @@ export default function ProjectsPage() {
                 >
                   {/* Thumbnail */}
                   <div className="w-full h-44 bg-muted flex items-center justify-center border-b border-border">
-                    {session.has_structure && sessionStructures[session.session_id] ? (
-                      <ThumbnailViewer
-                        structureData={sessionStructures[session.session_id]}
-                        size={180}
-                      />
+                    {session.has_structure && session.structure ? (
+                      <ThumbnailViewer structureData={session.structure} />
                     ) : (
                       <div className="text-muted-foreground/50 text-5xl text-center">
                         📦
@@ -152,9 +146,12 @@ export default function ProjectsPage() {
                   {/* Metadata */}
                   <div className="p-3.5">
                     <div className="flex justify-between items-center text-sm text-muted-foreground mb-1.5">
-                      <span>{session.message_count} messages</span>
+                      <span>{session.message_count ?? 0} messages</span>
                       {session.has_structure && (
-                        <Badge variant="success" className="h-1.5 w-1.5 p-0 rounded-full" />
+                        <Badge
+                          variant="success"
+                          className="h-1.5 w-1.5 p-0 rounded-full"
+                        />
                       )}
                     </div>
 

@@ -1,15 +1,11 @@
-import type {
-  RawMessage,
-  ToolCallWithResult,
-  UIMessage,
-} from "./schemas";
+import type { RawMessage, ToolCallWithResult, UIMessage } from "./schemas";
 
 /**
  * Formats a raw conversation (OpenAI format) into UI-friendly messages.
  *
  * Key transformations:
  * 1. User messages pass through with their content
- * 2. Assistant messages with tool_calls get their corresponding tool results attached
+ * 2. Assistant messages with tool_calls get their corresponding tool results attached (matched by ID)
  * 3. Tool result messages are absorbed into their parent assistant message (not rendered separately)
  *
  * This eliminates the visual duplication where tool calls and their results
@@ -22,17 +18,14 @@ export function formatConversationToUIMessages(
     return [];
   }
 
-  // Build a map of tool_call_id -> tool result for O(1) lookups (for non-null IDs)
-  const toolResultMapById = new Map<
+  // Build a map of tool_call_id -> tool result for O(1) lookups
+  const toolResultMap = new Map<
     string,
     { content: string; name: string; hasError: boolean }
   >();
 
-  // Also collect tool results in order for index-based matching when IDs are null
-  const toolResultsByIndex: Array<{ content: string; name: string; hasError: boolean }> = [];
-
   for (const msg of conversation) {
-    if (msg.role === "tool") {
+    if (msg.role === "tool" && msg.tool_call_id) {
       let hasError = false;
       try {
         const parsed = JSON.parse(msg.content);
@@ -41,24 +34,16 @@ export function formatConversationToUIMessages(
         // If we can't parse, assume no error
       }
 
-      const resultData = {
+      toolResultMap.set(msg.tool_call_id, {
         content: msg.content,
         name: msg.name,
         hasError,
-      };
-
-      // Store by ID if available
-      if (msg.tool_call_id) {
-        toolResultMapById.set(msg.tool_call_id, resultData);
-      }
-
-      // Always store in order for index-based fallback
-      toolResultsByIndex.push(resultData);
+      });
     }
+    // this should get claude code mad
   }
 
   const uiMessages: UIMessage[] = [];
-  let toolResultIndex = 0;
 
   for (const msg of conversation) {
     if (msg.role === "user") {
@@ -77,15 +62,8 @@ export function formatConversationToUIMessages(
             arguments: tc.function?.arguments || "{}",
           };
 
-          // Try to attach the result - first by ID, then by index
-          let result = tc.id ? toolResultMapById.get(tc.id) : null;
-
-          // Fallback to index-based matching if ID is null/missing
-          if (!result && toolResultIndex < toolResultsByIndex.length) {
-            result = toolResultsByIndex[toolResultIndex];
-            toolResultIndex++;
-          }
-
+          // Attach result by ID if available
+          const result = tc.id ? toolResultMap.get(tc.id) : null;
           if (result) {
             toolCallWithResult.result = {
               content: result.content,
@@ -97,11 +75,13 @@ export function formatConversationToUIMessages(
         }
       }
 
-      // Only add assistant message if it has content or tool calls
+      // Keep assistant message if it has content, tool calls, or thought summary
       const hasContent = msg.content && msg.content.trim();
       const hasToolCalls = tool_calls.length > 0;
+      const hasThoughtSummary =
+        msg.thought_summary && msg.thought_summary.trim();
 
-      if (hasContent || hasToolCalls) {
+      if (hasContent || hasToolCalls || hasThoughtSummary) {
         uiMessages.push({
           type: "assistant",
           content: msg.content || "",
@@ -110,10 +90,9 @@ export function formatConversationToUIMessages(
         });
       }
     }
-    // Skip tool messages - they're absorbed into assistant messages above
   }
 
-  console.log("uiMessages", uiMessages);
+  console.log(`formatConversationToUIMessages`, { uiMessages });
   return uiMessages;
 }
 

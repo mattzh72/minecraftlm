@@ -5,19 +5,29 @@ import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+type AgentScrollerProps = {
+  children: React.ReactNode;
+  className?: string;
+  autoScrollDeps?: unknown[];
+};
+
 /**
  * A scrollable container with scroll masks and jump buttons.
  * Designed for chat/agent message lists with auto-scroll on new content.
  */
-export function AgentScroller({ children, className, autoScrollDeps = [] }) {
+export function AgentScroller({
+  children,
+  className,
+  autoScrollDeps = [],
+}: AgentScrollerProps) {
   const [showTopMask, setShowTopMask] = useState(false);
   const [showBottomMask, setShowBottomMask] = useState(false);
 
-  const scrollEndRef = useRef(null);
-  const viewportRef = useRef(null);
+  const scrollEndRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
-  const handleScroll = useCallback((e) => {
-    const container = e.target;
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.target as HTMLDivElement | null;
     if (!container) return;
 
     const { scrollTop, scrollHeight, clientHeight } = container;
