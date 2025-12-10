@@ -6,11 +6,13 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.121.3",
     "uvicorn[standard]>=0.38.0",
-    "litellm>=1.72.0",
     "pydantic>=2.12.4",
     "pydantic-settings>=2.12.0",
     "python-dotenv>=1.2.1",
-    "flask>=3.1.2",
+    "google-genai>=1.54.0",
+    "numpy>=2.0.0",
+    "anthropic>=0.75.0",
+    "openai>=1.0.0",
 ]
 
 [project.optional-dependencies]

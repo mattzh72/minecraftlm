@@ -15,6 +15,7 @@ structure using the Minecraft SDK.
 from app.agent.minecraft import (
     Scene,
     Block,
+    Object3D,
     Vector3,
     BlockCatalog,
     stair_properties,
@@ -22,6 +23,13 @@ from app.agent.minecraft import (
     slab_properties,
     make_stair,
     facing_from_vector,
+)
+from app.agent.minecraft.terrain import (
+    create_terrain,
+    drop_to_surface,
+    Terrain,
+    TerrainConfig,
+    generate_oak_tree,
 )
 
 

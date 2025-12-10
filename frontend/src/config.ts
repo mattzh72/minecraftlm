@@ -16,7 +16,7 @@ export const Config = {
     chunkSize: 8,
   },
   thumbnail: {
-    defaultSize: 200,
+    defaultSize: 180,
     distanceMultiplier: 1.5,
     tiltAngle: 0.6,
     rotateAngle: 0.8,

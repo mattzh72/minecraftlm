@@ -4,13 +4,16 @@ FastAPI application entry point
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import chat, session
+from app.api.routes.chat import router as chat
+from app.api.routes.models import router as models
+from app.api.routes.session import router as session
 from app.config import settings
 
 # Configure logging before importing modules that use it
@@ -24,11 +27,17 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     # Startup
     logger.info(f"LLM Model: {settings.llm_model} ({settings.get_provider()})")
     yield
     # Shutdown (nothing to clean up)
+
+
+def add_routers(app: FastAPI):
+    app.include_router(chat, prefix="/api", tags=["chat"])
+    app.include_router(models, prefix="/api", tags=["models"])
+    app.include_router(session, prefix="/api", tags=["sessions"])
 
 
 app = FastAPI(
@@ -37,8 +46,6 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
-
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -46,9 +53,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.include_router(chat, prefix="/api", tags=["chat"])
-app.include_router(session, prefix="/api", tags=["sessions"])
+add_routers(app)
 
 
 @app.get("/health")
@@ -59,6 +64,7 @@ async def health():
 
 # Serve static files from frontend build (if exists)
 frontend_build = settings.frontend_build_dir
+frontend_build = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
 if frontend_build.exists():
     # Mount static assets
     app.mount(

@@ -3,22 +3,35 @@ Agent executor - main agentic loop
 """
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import AsyncIterator, Literal
-import logging
 
-from app.services.llm import LLMService
 from app.agent.block_parser import BlockStreamParser
-from app.services.session import SessionService
+from app.agent.llms import (
+    AnthropicService,
+    BaseLLMService,
+    GeminiService,
+    OpenAIService,
+)
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
+from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
+from app.config import get_provider_for_model, settings
+from app.models import (
+    AssistantMessage,
+    ToolCall,
+    ToolCallFunction,
+    ToolMessage,
+    UserMessage,
+)
+from app.services.session import SessionService
 
-logger = logging.getLogger(__name__)
-
+# Event types emitted by the agent
 ActivityEventType = Literal[
     "thought",
     "text_delta",
@@ -29,6 +42,8 @@ ActivityEventType = Literal[
     "error",
     "block_preview",  # Streamed block preview from code parsing
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class TerminateReason(str, Enum):
@@ -60,22 +75,47 @@ class ActivityEvent:
 class MinecraftSchematicAgent:
     """Executes the main agentic loop"""
 
-    def __init__(self, session_id: str, max_turns: int = 20):
+    # Available providers based on configured API keys
+    _providers: dict[str, type[BaseLLMService]] = {}
+
+    @classmethod
+    def get_available_providers(cls) -> dict[str, type[BaseLLMService]]:
+        """Get providers with configured API keys"""
+        providers = {}
+        if settings.gemini_api_key:
+            providers["gemini"] = GeminiService
+        if settings.openai_api_key:
+            providers["openai"] = OpenAIService
+        if settings.anthropic_api_key:
+            providers["anthropic"] = AnthropicService
+        return providers
+
+    def __init__(self, session_id: str, model: str | None = None, max_turns: int = 20):
         self.session_id = session_id
         self.max_turns = max_turns
 
-        # Initialize services
-        self.llm = LLMService()
+        # Use provided model or fall back to config
+        self.model = model or settings.llm_model
+        provider = get_provider_for_model(self.model)
+
+        # Get available providers
+        self._providers = self.get_available_providers()
+        if provider not in self._providers:
+            raise ValueError(
+                f"Provider '{provider}' for model '{self.model}' not available. "
+                f"Available: {list(self._providers.keys())}"
+            )
+
+        # Initialize LLM service
+        self.llm = self._providers[provider](self.model)
+
         self.session_service = SessionService()
 
         # Initialize tools
-        tools = [
-            EditCodeTool(),
-            CompleteTaskTool(),
-        ]
+        tools = [ReadCodeTool(), EditCodeTool(), CompleteTaskTool()]
         self.tool_registry = ToolRegistry(tools)
 
-        # Load system prompt template and SDK docs (code will be injected per-call)
+        # Load system prompt template and SDK docs
         prompt_path = Path(__file__).parent / "prompts" / "system_prompt.txt"
         self.prompt_template = prompt_path.read_text()
 
@@ -86,6 +126,7 @@ class MinecraftSchematicAgent:
             "[[SDK_BLOCKS_REFERENCE]]": f"03-blocks-reference.md\n\n{(docs_dir / '03-blocks-reference.md').read_text()}",
             "[[SDK_BLOCK_LIST]]": f"04-block-list.md\n\n{(docs_dir / '04-block-list.md').read_text()}",
             "[[SDK_PITFALLS]]": f"05-pitfalls.md\n\n{(docs_dir / '05-pitfalls.md').read_text()}",
+            "[[SDK_TERRAIN]]": f"06-terrain-guide.md\n\n{(docs_dir / '06-terrain-guide.md').read_text()}",
         }
 
         # Block stream parser for real-time preview
@@ -99,17 +140,12 @@ class MinecraftSchematicAgent:
         return "\n".join(f"{i + 1:6d}\t{line}" for i, line in enumerate(lines))
 
     def _build_system_prompt(self) -> str:
-        """Build system prompt with current code embedded."""
+        """Build system prompt with SDK docs embedded."""
         template = self.prompt_template
 
         # Inject SDK docs
         for marker, text in self.sdk_replacements.items():
             template = template.replace(marker, text)
-
-        # Inject current code with line numbers
-        code = self.session_service.load_code(self.session_id)
-        formatted_code = self._format_code_with_line_numbers(code)
-        template = template.replace("[[CURRENT_CODE]]", formatted_code)
 
         return template
 
@@ -127,12 +163,14 @@ class MinecraftSchematicAgent:
 
         # Reset block parser for fresh preview state
         self.block_parser.reset()
+        # Lock the model to this session on first use
+        self.session_service.set_model(self.session_id, self.model)
 
         # Load conversation history
         conversation = self.session_service.load_conversation(self.session_id)
 
         # Add user message
-        conversation.append({"role": "user", "content": user_message})
+        conversation.append(UserMessage(role="user", content=user_message).model_dump())
         self.session_service.save_conversation(self.session_id, conversation)
 
         # Conversation is already in OpenAI format
@@ -157,6 +195,8 @@ class MinecraftSchematicAgent:
 
             # Accumulators for streaming response
             accumulated_text = ""
+            accumulated_thought = ""
+            accumulated_thinking_signature = None
             accumulated_tool_calls = {}  # index -> tool call dict
 
             # Stream response chunks (rebuild system prompt to include latest code)
@@ -165,6 +205,19 @@ class MinecraftSchematicAgent:
                 messages,
                 self.tool_registry.get_tool_schemas(),
             ):
+                logger.info(f"handling chunk, chunk={chunk}")
+
+                # Stream thought summaries separately when available (Gemini/Anthropic)
+                thought_delta = getattr(chunk, "thought_delta", None)
+                if thought_delta:
+                    accumulated_thought += thought_delta
+                    yield ActivityEvent(type="thought", data={"delta": thought_delta})
+
+                # Capture thinking signature (Anthropic)
+                thought_signature = getattr(chunk, "thought_signature", None)
+                if thought_signature:
+                    accumulated_thinking_signature = thought_signature
+
                 # Handle text delta
                 if chunk.text_delta:
                     accumulated_text += chunk.text_delta
@@ -178,9 +231,10 @@ class MinecraftSchematicAgent:
                         idx = tc_delta.get("index", 0)
                         if idx not in accumulated_tool_calls:
                             accumulated_tool_calls[idx] = {
-                                "id": tc_delta.get("id", ""),
+                                "id": tc_delta.get("id"),
                                 "type": tc_delta.get("type", "function"),
                                 "function": {"name": "", "arguments": ""},
+                                "extra_content": {},
                             }
 
                         # Accumulate function name
@@ -195,13 +249,31 @@ class MinecraftSchematicAgent:
                                 tc_delta["function"]["arguments"]
                             )
 
+                        # Capture provider-specific metadata such as thought signatures
+                        extra_content = tc_delta.get("extra_content") or {}
+                        if extra_content:
+                            # Merge dictionaries shallowly; we only expect google.thought_signature for now
+                            merged_extra = accumulated_tool_calls[idx].get(
+                                "extra_content", {}
+                            )
+                            merged_extra.update(extra_content)
+                            accumulated_tool_calls[idx]["extra_content"] = merged_extra
+                        if tc_delta.get("thought_signature"):
+                            accumulated_tool_calls[idx]["thought_signature"] = tc_delta[
+                                "thought_signature"
+                            ]
+
                         # Update ID if provided
-                        if tc_delta.get("id"):
+                        if "id" in tc_delta:
                             accumulated_tool_calls[idx]["id"] = tc_delta["id"]
 
                         # Parse blocks from edit_code's new_string for preview
-                        func_name = accumulated_tool_calls[idx]["function"].get("name", "")
-                        args_so_far = accumulated_tool_calls[idx]["function"].get("arguments", "")
+                        func_name = accumulated_tool_calls[idx]["function"].get(
+                            "name", ""
+                        )
+                        args_so_far = accumulated_tool_calls[idx]["function"].get(
+                            "arguments", ""
+                        )
 
                         # Stream block previews from edit_code's new_string
                         if func_name == "edit_code":
@@ -221,8 +293,10 @@ class MinecraftSchematicAgent:
                                     code_content = ""
                                     i = 0
                                     while i < len(remaining):
-                                        if remaining[i] == '\\' and i + 1 < len(remaining):
-                                            code_content += remaining[i:i+2]
+                                        if remaining[i] == "\\" and i + 1 < len(
+                                            remaining
+                                        ):
+                                            code_content += remaining[i : i + 2]
                                             i += 2
                                         elif remaining[i] == '"':
                                             break
@@ -242,9 +316,15 @@ class MinecraftSchematicAgent:
                                     new_blocks = self.block_parser.feed(code_content)
                                     for block in new_blocks:
                                         # Get position from parser's updated state (may have position.set() now)
-                                        updated_block = self.block_parser.blocks.get(block.variable_name, block)
+                                        updated_block = self.block_parser.blocks.get(
+                                            block.variable_name, block
+                                        )
                                         # Split large blocks into chunks for faster streaming
-                                        for block_json in self.block_parser.to_block_json_chunks(updated_block):
+                                        for (
+                                            block_json
+                                        ) in self.block_parser.to_block_json_chunks(
+                                            updated_block
+                                        ):
                                             yield ActivityEvent(
                                                 type="block_preview",
                                                 data={"block": block_json},
@@ -255,14 +335,30 @@ class MinecraftSchematicAgent:
 
             # Build assistant message from accumulated data
             assistant_message = {"role": "assistant", "content": accumulated_text}
+            # Build tool calls from accumulated data
+            tool_calls_list: list[ToolCall] = []
+            for tc_data in accumulated_tool_calls.values():
+                tool_calls_list.append(
+                    ToolCall(
+                        id=tc_data.get("id"),
+                        type="function",
+                        function=ToolCallFunction(
+                            name=tc_data.get("function", {}).get("name", ""),
+                            arguments=tc_data.get("function", {}).get("arguments", ""),
+                        ),
+                        thought_signature=tc_data.get("thought_signature"),
+                        extra_content=tc_data.get("extra_content", {}),
+                    )
+                )
 
-            # Note: We don't yield a final 'thought' event here since we've been
-            # streaming text_delta events. The frontend accumulates those into a thought.
-
-            # Add tool calls to message
-            tool_calls_list = list(accumulated_tool_calls.values())
-            if tool_calls_list:
-                assistant_message["tool_calls"] = tool_calls_list
+            # Build assistant message
+            assistant_message = AssistantMessage(
+                role="assistant",
+                content=accumulated_text,
+                thought_summary=accumulated_thought or None,
+                thinking_signature=accumulated_thinking_signature,
+                tool_calls=tool_calls_list if tool_calls_list else None,
+            ).model_dump()
 
             # Save assistant message
             conversation.append(assistant_message)
@@ -300,9 +396,8 @@ class MinecraftSchematicAgent:
             serialized_responses = []
 
             for tool_call in tool_calls_list:
-                # Parse tool call
-                func_name = tool_call["function"]["name"]
-                func_args = json.loads(tool_call["function"]["arguments"])
+                func_name = tool_call.function.name
+                func_args = json.loads(tool_call.function.arguments or "{}")
 
                 yield ActivityEvent(
                     type="tool_call",
@@ -329,13 +424,13 @@ class MinecraftSchematicAgent:
 
                 yield ActivityEvent(type="tool_result", data=tool_result)
 
-                # Build tool response in OpenAI format
-                tool_response = {
-                    "role": "tool",
-                    "tool_call_id": tool_call.get("id", ""),
-                    "content": json.dumps(tool_result),
-                    "name": func_name,
-                }
+                # Build tool response
+                tool_response = ToolMessage(
+                    role="tool",
+                    tool_call_id=tool_call.id,
+                    content=json.dumps(tool_result),
+                    name=func_name,
+                ).model_dump()
                 serialized_responses.append(tool_response)
 
             if serialized_responses:

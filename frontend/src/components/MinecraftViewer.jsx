@@ -1,13 +1,21 @@
 import { useRef, useMemo, useCallback, useLayoutEffect } from "react";
-import useSessionStore from "../store/sessionStore";
+import { useStore } from "../store";
 import useDeepslateResources from "../hooks/useDeepslateResources";
 import useCamera from "../hooks/useCamera";
 import useRenderLoop from "../hooks/useRenderLoop";
 import useMouseControls from "../hooks/useMouseControls";
 
 export function MinecraftViewer() {
-  const structureData = useSessionStore((state) => state.structureData);
-  const previewBlocks = useSessionStore((state) => state.previewBlocks);
+  const activeSessionId = useStore((s) => s.activeSessionId);
+  const sessions = useStore((s) => s.sessions);
+  const previewBlocks = useStore((s) => s.previewBlocks);
+
+  const activeSession = useMemo(() => {
+    return activeSessionId ? sessions[activeSessionId] : null;
+  }, [activeSessionId, sessions]);
+
+  const structureData = activeSession?.structure || null;
+
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -65,7 +73,7 @@ export function MinecraftViewer() {
     canvasRef,
     combinedStructureData,
     resources,
-    camera,
+    camera
   );
 
   // Store resize in ref to avoid dependency issues
@@ -84,7 +92,7 @@ export function MinecraftViewer() {
     // Update canvas buffer dimensions
     canvas.width = clientWidth;
     canvas.height = clientHeight;
-    
+
     // Update viewport and re-render
     resizeRef.current();
   }, []);
@@ -110,7 +118,7 @@ export function MinecraftViewer() {
         ref={canvasRef}
         className="block w-full h-full"
         style={{
-          display: isLoading || error ? 'none' : 'block',
+          display: isLoading || error ? "none" : "block",
         }}
       />
 

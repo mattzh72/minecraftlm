@@ -9,8 +9,11 @@ const { thumbnail: thumb, renderer: rend } = Config;
 /**
  * Static thumbnail viewer for Minecraft structures
  * Renders a fixed-angle view without controls
+ * @param {Object} structureData - The structure data to render
+ * @param {number} size - Canvas size in pixels (default: 180)
+ * @param {function} onRenderComplete - Callback with canvas data URL after render
  */
-export default function ThumbnailViewer({ structureData, size = thumb.defaultSize }) {
+export default function ThumbnailViewer({ structureData, size = thumb.defaultSize, onRenderComplete }) {
   const canvasRef = useRef(null);
   const { resources, isLoading, error } = useDeepslateResources();
 
@@ -61,10 +64,20 @@ export default function ThumbnailViewer({ structureData, size = thumb.defaultSiz
       // Render once (static)
       renderer.drawStructure(view);
       renderer.drawGrid(view);
+
+      // Capture canvas and call callback if provided
+      if (onRenderComplete) {
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          onRenderComplete(dataUrl);
+        } catch (captureErr) {
+          console.error('Error capturing thumbnail:', captureErr);
+        }
+      }
     } catch (err) {
       console.error('Error rendering thumbnail:', err);
     }
-  }, [structureData, resources]);
+  }, [structureData, resources, onRenderComplete]);
 
   // Loading state
   if (isLoading) {
