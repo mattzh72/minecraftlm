@@ -2,17 +2,19 @@
 Session API endpoints
 """
 
+import base64
 import json
 from pathlib import Path
 
 from app.api.models import SessionResponse
 from app.services.session import SessionService
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 
 router = APIRouter()
 
 CODE_FNAME = "code.json"
+THUMBNAIL_FNAME = "thumbnail.png"
 # Store sessions outside backend/ to avoid triggering uvicorn reload
 LOCAL_STORAGE_FOLDER = (
     Path(__file__).parent.parent.parent.parent.parent / ".storage" / "sessions"
@@ -31,6 +33,7 @@ async def list_sessions():
                 session_id = session_dir.name
                 # Get basic info
                 has_structure = (session_dir / CODE_FNAME).exists()
+                has_thumbnail = (session_dir / THUMBNAIL_FNAME).exists()
                 conversation_path = session_dir / "conversation.json"
                 message_count = 0
                 if conversation_path.exists():
@@ -58,6 +61,7 @@ async def list_sessions():
                     {
                         "session_id": session_id,
                         "has_structure": has_structure,
+                        "has_thumbnail": has_thumbnail,
                         "message_count": message_count,
                         "created_at": created_at,
                         "updated_at": updated_at,
@@ -153,4 +157,59 @@ async def get_structure(session_id: str):
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error reading structure: {str(e)}"
+        )
+
+
+@router.get("/sessions/{session_id}/thumbnail")
+async def get_thumbnail(session_id: str):
+    """
+    Get the cached thumbnail image for a session.
+    Returns the thumbnail.png file if it exists.
+    """
+    thumbnail_path = Path(LOCAL_STORAGE_FOLDER) / session_id / THUMBNAIL_FNAME
+    if not thumbnail_path.exists():
+        raise HTTPException(
+            status_code=404, detail=f"Thumbnail not found for session {session_id}"
+        )
+
+    return FileResponse(
+        thumbnail_path,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=31536000"},  # Cache for 1 year
+    )
+
+
+@router.post("/sessions/{session_id}/thumbnail")
+async def upload_thumbnail(session_id: str, request: Request):
+    """
+    Upload and save a thumbnail image for a session.
+    Accepts base64-encoded PNG image data.
+    """
+    session_dir = Path(LOCAL_STORAGE_FOLDER) / session_id
+    if not session_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+    try:
+        body = await request.json()
+        image_data = body.get("image")
+        if not image_data:
+            raise HTTPException(status_code=400, detail="Missing 'image' field")
+
+        # Handle data URL format: "data:image/png;base64,..."
+        if image_data.startswith("data:"):
+            # Extract base64 portion after the comma
+            image_data = image_data.split(",", 1)[1]
+
+        # Decode base64 and save
+        image_bytes = base64.b64decode(image_data)
+        thumbnail_path = session_dir / THUMBNAIL_FNAME
+        with open(thumbnail_path, "wb") as f:
+            f.write(image_bytes)
+
+        return JSONResponse(content={"message": "Thumbnail saved successfully"})
+    except base64.binascii.Error:
+        raise HTTPException(status_code=400, detail="Invalid base64 image data")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error saving thumbnail: {str(e)}"
         )

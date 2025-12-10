@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSession } from "@/hooks/useSession";
 import ThumbnailViewer from "./ThumbnailViewer";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { listSessionsResponseSchema, storeSessionSchema } from "@/lib/schemas";
 import { useStore } from "@/store";
+import { Config } from "@/config";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
@@ -19,6 +20,27 @@ export function ProjectsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const hasSessions = useStore((s) => Object.keys(s.sessions).length > 0);
+  // Track sessions that have had thumbnails uploaded this session to avoid duplicate uploads
+  const [uploadedThumbnails, setUploadedThumbnails] = useState<Set<string>>(new Set());
+
+  // Upload thumbnail to backend for caching
+  const uploadThumbnail = useCallback(async (sessionId: string, dataUrl: string) => {
+    // Skip if already uploaded this session
+    if (uploadedThumbnails.has(sessionId)) return;
+
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/thumbnail`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      if (response.ok) {
+        setUploadedThumbnails((prev) => new Set(prev).add(sessionId));
+      }
+    } catch (err) {
+      console.error(`Error uploading thumbnail for ${sessionId}:`, err);
+    }
+  }, [uploadedThumbnails]);
 
   // Fetch all sessions on mount
   useEffect(() => {
@@ -32,9 +54,10 @@ export function ProjectsPage() {
         addSessions(storeSessions);
         setIsLoading(false);
 
-        // Fetch structure data for sessions that have structures
+        // Only fetch structure data for sessions that need to render (no cached thumbnail)
+        // Sessions with cached thumbnails will show the cached image instead
         storeSessions.forEach((sesh) => {
-          if (sesh.has_structure) {
+          if (sesh.has_structure && !sesh.has_thumbnail) {
             fetch(`/api/sessions/${sesh.session_id}/structure`)
               .then((res) => res.json())
               .then((structureData) => {
@@ -134,8 +157,20 @@ export function ProjectsPage() {
                 >
                   {/* Thumbnail */}
                   <div className="w-full h-44 bg-muted flex items-center justify-center border-b border-border">
-                    {session.has_structure && session.structure ? (
-                      <ThumbnailViewer structureData={session.structure} />
+                    {session.has_thumbnail ? (
+                      // Use cached thumbnail image
+                      <img
+                        src={`/api/sessions/${session.session_id}/thumbnail`}
+                        alt="Structure preview"
+                        className="rounded-lg"
+                        style={{ width: Config.thumbnail.defaultSize, height: Config.thumbnail.defaultSize }}
+                      />
+                    ) : session.has_structure && session.structure ? (
+                      // Render and cache thumbnail
+                      <ThumbnailViewer
+                        structureData={session.structure}
+                        onRenderComplete={(dataUrl) => uploadThumbnail(session.session_id, dataUrl)}
+                      />
                     ) : (
                       <div className="text-muted-foreground/50 text-5xl text-center">
                         📦

@@ -10,6 +10,7 @@ export const createSessionResponseSchema = z.object({
 export const sessionLiteSchema = z.object({
   session_id: z.string(),
   has_structure: z.boolean(),
+  has_thumbnail: z.boolean().optional().default(false),
   message_count: z.number(),
   created_at: z.string(),
   updated_at: z.string(),
