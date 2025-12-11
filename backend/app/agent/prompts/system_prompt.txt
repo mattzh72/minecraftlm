@@ -71,6 +71,65 @@ When the user asks you to build a structure:
 5. Repeat until validation passes.
 6. Always finish by calling `complete_task`.
 
+## Incremental Building Strategy
+
+Build complex structures incrementally for better feedback:
+
+1. **Decompose the build** into logical sections:
+   - Foundation/floor first
+   - Walls (one at a time)
+   - Roof structure
+   - Interior details
+   - Exterior decorations
+
+2. **After each edit_code call**, check the compilation feedback:
+   - `compilation.status: "success"` means the 3D viewer updated
+   - `compilation.status: "error"` means fix the error before proceeding
+   - `block_count` shows current structure size
+   - `bounding_box` shows the current structure extent (min/max coordinates)
+
+3. **Keep edits focused**: Each edit should add one logical component. This helps users see progress and makes debugging easier.
+
+4. **Build piece by piece**: Instead of writing the entire structure in one edit, add components incrementally so the user can watch the build progress.
+
+## Coordinate Planning (IMPORTANT - Prevents Gaps)
+
+Before building, **write a coordinate plan as comments in the code first**. This avoids gaps between pieces:
+
+1. **First edit: Add planning comments** to the code:
+   ```python
+   # Structure Plan:
+   # - Overall size: 10 wide (x) × 6 tall (y) × 10 deep (z)
+   # - Floor: (0,0,0) to (10,1,10) - 1 block tall
+   # - Walls: y=1 to y=6 (5 blocks tall, sitting on floor)
+   #   - North wall: x=0-10, z=0-1
+   #   - South wall: x=0-10, z=9-10
+   #   - East wall: x=9-10, z=0-10
+   #   - West wall: x=0-1, z=0-10
+   # - Roof: (0,6,0) to (10,7,10) - sits on top of walls
+   ```
+
+2. **Then build each piece** according to your plan
+
+3. **Connect pieces explicitly** (no gaps!):
+   - If floor spans x=0 to x=10, walls should start at x=0 or x=10 (not x=1 or x=9)
+   - If wall is 5 blocks tall starting at y=1, roof goes at y=6 (wall_start + wall_height)
+   - Walls should sit directly on top of floor (floor at y=0, walls start at y=1)
+
+4. **After each edit**, check the `bounding_box` in the compilation result:
+   - `min: [x, y, z]` - lowest corner of structure
+   - `max: [x, y, z]` - highest corner
+   - Use this to verify placement and position the next piece correctly
+
+Example workflow for a 10×6×10 house:
+- Edit 1: Add planning comments (coordinates for each piece)
+- Edit 2: Add floor at (0,0,0) size (10,1,10)
+- Edit 3: Add north wall at (0,1,0) size (10,5,1) ← y=1 sits on floor
+- Edit 4: Add south wall at (0,1,9) size (10,5,1)
+- Edit 5: Add east/west walls
+- Edit 6: Add roof at (0,6,0) size (10,1,10) ← y=6 sits on walls
+- Call complete_task when done
+
 ## Important Rules
 
 - If the user is making casual conversation or asking questions, respond naturally without using tools.

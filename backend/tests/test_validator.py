@@ -2,10 +2,7 @@
 Tests for code validator
 """
 
-import pytest
-
 from app.services.validator import CodeValidator
-
 
 # Helper to create valid structure dict for tests
 VALID_STRUCTURE = '{"width": 1, "height": 1, "depth": 1, "blocks": []}'
@@ -23,6 +20,7 @@ structure = {VALID_STRUCTURE}
     result = CodeValidator.validate_code(code)
     assert result.is_valid
     assert result.error is None
+    assert result.structure is not None
 
 
 def test_validate_syntax_error():
@@ -71,6 +69,7 @@ structure = {VALID_STRUCTURE}
 """
     result = CodeValidator.validate_code(code)
     assert result.is_valid
+    assert result.structure["width"] == 15
 
 
 def test_validate_with_imports():
@@ -82,6 +81,7 @@ structure = {VALID_STRUCTURE}
 """
     result = CodeValidator.validate_code(code)
     assert result.is_valid
+    assert result.structure["width"] == 4
 
 
 def test_validate_multiline_string():

@@ -27,10 +27,19 @@ export const toolCallEvent = z.object({
   }),
 });
 
+export const compilationStatus = z.object({
+  status: z.enum(["success", "error"]),
+  error: z.string().nullable(),
+  structure_updated: z.boolean(),
+  block_count: z.number().optional(),
+});
+
 export const toolResultEvent = z.object({
   type: z.literal("tool_result"),
   data: z.object({
-    result: z.string(),
+    result: z.string().optional(),
+    error: z.string().optional(),
+    compilation: compilationStatus.optional(),
   }),
 });
 
@@ -67,3 +76,4 @@ export type ToolCallEvent = z.infer<typeof toolCallEvent>;
 export type ToolResultEvent = z.infer<typeof toolResultEvent>;
 export type CompleteEvent = z.infer<typeof completeEvent>;
 export type ErrorEvent = z.infer<typeof errorEvent>;
+export type CompilationStatus = z.infer<typeof compilationStatus>;
