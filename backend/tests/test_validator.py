@@ -2,10 +2,7 @@
 Tests for code validator
 """
 
-import pytest
-
 from app.services.validator import CodeValidator
-
 
 # Helper to create valid structure dict for tests
 VALID_STRUCTURE = '{"width": 1, "height": 1, "depth": 1, "blocks": []}'
@@ -68,11 +65,7 @@ def add(a, b):
     return a + b
 
 result = add(5, 10)
-<<<<<<< HEAD
-structure = {"width": result, "height": 1, "depth": 1, "blocks": []}
-=======
 structure = {VALID_STRUCTURE}
->>>>>>> main
 """
     result = CodeValidator.validate_code(code)
     assert result.is_valid
@@ -84,11 +77,7 @@ def test_validate_with_imports():
     code = f"""
 import math
 result = math.sqrt(16)
-<<<<<<< HEAD
-structure = {"width": int(result), "height": 1, "depth": 1, "blocks": []}
-=======
 structure = {VALID_STRUCTURE}
->>>>>>> main
 """
     result = CodeValidator.validate_code(code)
     assert result.is_valid
@@ -103,30 +92,17 @@ This is a multiline
 string for testing
 """
 print(message)
-<<<<<<< HEAD
-structure = {"width": 1, "height": 1, "depth": 1, "blocks": []}
-=======
 structure = {VALID_STRUCTURE}
->>>>>>> main
 '''
     result = CodeValidator.validate_code(code)
     assert result.is_valid
 
 
-<<<<<<< HEAD
-def test_validate_missing_structure():
-    """Test that missing structure variable is caught"""
-    code = """
-x = 10
-y = 20
-result = x + y
-=======
 def test_validate_missing_structure_variable():
     """Test that code without structure variable fails"""
     code = """
 x = 10
 y = 20
->>>>>>> main
 """
     result = CodeValidator.validate_code(code)
     assert not result.is_valid
