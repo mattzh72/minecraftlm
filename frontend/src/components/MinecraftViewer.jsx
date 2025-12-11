@@ -26,23 +26,20 @@ export function MinecraftViewer() {
   const combinedStructureData = useMemo(() => {
     // If we have preview blocks but no structure data, create a minimal structure
     if (previewBlocks.length > 0 && !structureData) {
-      // Calculate bounding box from preview blocks
-      let minX = Infinity, minY = Infinity, minZ = Infinity;
-      let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+      // Calculate max positions from preview blocks
+      // Structure dimensions must be >= max position to contain all blocks
+      let maxX = 0, maxY = 0, maxZ = 0;
 
       previewBlocks.forEach(block => {
-        minX = Math.min(minX, block.start[0]);
-        minY = Math.min(minY, block.start[1]);
-        minZ = Math.min(minZ, block.start[2]);
         maxX = Math.max(maxX, block.end[0]);
         maxY = Math.max(maxY, block.end[1]);
         maxZ = Math.max(maxZ, block.end[2]);
       });
 
       return {
-        width: Math.max(1, maxX - minX),
-        height: Math.max(1, maxY - minY),
-        depth: Math.max(1, maxZ - minZ),
+        width: Math.max(1, maxX),
+        height: Math.max(1, maxY),
+        depth: Math.max(1, maxZ),
         blocks: previewBlocks,
       };
     }

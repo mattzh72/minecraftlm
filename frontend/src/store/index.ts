@@ -20,6 +20,7 @@ export type PreviewBlock = {
   type: string;
   properties: Record<string, string>;
   fill: boolean;
+  variable_name?: string | null; // For deduplication - blocks with same name are updated, not duplicated
 };
 
 export type StoreStateBase = {
@@ -346,10 +347,24 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   // Preview blocks for real-time streaming
+  // Dedupes by variable_name - updates existing block if same name, otherwise appends
   addPreviewBlock: (block: PreviewBlock) => {
-    set((state) => ({
-      previewBlocks: [...state.previewBlocks, block],
-    }));
+    set((state) => {
+      // If block has a variable_name, update existing or add new
+      if (block.variable_name) {
+        const existingIndex = state.previewBlocks.findIndex(
+          (b) => b.variable_name === block.variable_name
+        );
+        if (existingIndex !== -1) {
+          // Update existing block in place
+          const newBlocks = [...state.previewBlocks];
+          newBlocks[existingIndex] = block;
+          return { previewBlocks: newBlocks };
+        }
+      }
+      // No variable_name or not found - append
+      return { previewBlocks: [...state.previewBlocks, block] };
+    });
   },
   clearPreviewBlocks: () => set({ previewBlocks: [] }),
 }));

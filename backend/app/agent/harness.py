@@ -45,6 +45,9 @@ ActivityEventType = Literal[
 
 logger = logging.getLogger(__name__)
 
+# Parse blocks every N bytes of accumulated arguments
+PARSE_INTERVAL_BYTES = 150
+
 
 class TerminateReason(str, Enum):
     """Reasons for agent termination"""
@@ -149,6 +152,42 @@ class MinecraftSchematicAgent:
 
         return template
 
+    def _extract_new_string(self, args_json: str) -> str | None:
+        """Extract new_string value from edit_code tool arguments JSON.
+
+        Handles incomplete JSON by using regex to find the new_string value.
+        Returns the unescaped code content, or None if not found.
+        """
+        # Find where new_string value starts (works with incomplete JSON)
+        start_match = re.search(r'"new_string"\s*:\s*"', args_json)
+        if not start_match:
+            return None
+
+        # Extract everything after the opening quote
+        content_start = start_match.end()
+        remaining = args_json[content_start:]
+
+        # Find the closing quote (handling escapes)
+        code_content = ""
+        i = 0
+        while i < len(remaining):
+            if remaining[i] == "\\" and i + 1 < len(remaining):
+                code_content += remaining[i : i + 2]
+                i += 2
+            elif remaining[i] == '"':
+                break
+            else:
+                code_content += remaining[i]
+                i += 1
+
+        # Unescape the JSON string
+        try:
+            code_content = code_content.encode().decode("unicode_escape")
+        except Exception:
+            pass
+
+        return code_content
+
     async def run(self, user_message: str) -> AsyncIterator[ActivityEvent]:
         """
         Run the agent loop.
@@ -198,6 +237,7 @@ class MinecraftSchematicAgent:
             accumulated_thought = ""
             accumulated_thinking_signature = None
             accumulated_tool_calls = {}  # index -> tool call dict
+            last_parsed_len = {}  # index -> last parsed byte position for block streaming
 
             # Stream response chunks (rebuild system prompt to include latest code)
             async for chunk in self.llm.generate_with_tools_streaming(
@@ -205,8 +245,6 @@ class MinecraftSchematicAgent:
                 messages,
                 self.tool_registry.get_tool_schemas(),
             ):
-                logger.info(f"handling chunk, chunk={chunk}")
-
                 # Stream thought summaries separately when available (Gemini/Anthropic)
                 thought_delta = getattr(chunk, "thought_delta", None)
                 if thought_delta:
@@ -242,12 +280,17 @@ class MinecraftSchematicAgent:
                             accumulated_tool_calls[idx]["function"]["name"] = tc_delta[
                                 "function"
                             ]["name"]
+                            logger.info(f"Tool call: {tc_delta['function']['name']}")
 
                         # Accumulate function arguments
                         if tc_delta.get("function", {}).get("arguments"):
                             accumulated_tool_calls[idx]["function"]["arguments"] += (
                                 tc_delta["function"]["arguments"]
                             )
+                            args_len = len(accumulated_tool_calls[idx]["function"]["arguments"])
+                            tool_name = accumulated_tool_calls[idx]["function"]["name"]
+                            if tool_name == "edit_code":
+                                logger.info(f"edit_code args: {args_len} bytes")
 
                         # Capture provider-specific metadata such as thought signatures
                         extra_content = tc_delta.get("extra_content") or {}
@@ -267,71 +310,29 @@ class MinecraftSchematicAgent:
                         if "id" in tc_delta:
                             accumulated_tool_calls[idx]["id"] = tc_delta["id"]
 
-                        # Parse blocks from edit_code's new_string for preview
-                        func_name = accumulated_tool_calls[idx]["function"].get(
-                            "name", ""
-                        )
-                        args_so_far = accumulated_tool_calls[idx]["function"].get(
-                            "arguments", ""
-                        )
+                        # Parse blocks from edit_code arguments every N bytes
+                        tool_name = accumulated_tool_calls[idx]["function"]["name"]
+                        args_len = len(accumulated_tool_calls[idx]["function"]["arguments"])
+                        prev_len = last_parsed_len.get(idx, 0)
 
-                        # Stream block previews from edit_code's new_string
-                        if func_name == "edit_code":
-                            try:
-                                # Find where new_string value starts (works with incomplete JSON)
-                                start_match = re.search(
-                                    r'"new_string"\s*:\s*"',
-                                    args_so_far,
-                                )
-
-                                if start_match:
-                                    # Extract everything after the opening quote
-                                    content_start = start_match.end()
-                                    remaining = args_so_far[content_start:]
-
-                                    # Find the closing quote (handling escapes)
-                                    code_content = ""
-                                    i = 0
-                                    while i < len(remaining):
-                                        if remaining[i] == "\\" and i + 1 < len(
-                                            remaining
-                                        ):
-                                            code_content += remaining[i : i + 2]
-                                            i += 2
-                                        elif remaining[i] == '"':
-                                            break
-                                        else:
-                                            code_content += remaining[i]
-                                            i += 1
-
-                                    # Unescape the JSON string
-                                    try:
-                                        code_content = code_content.encode().decode(
-                                            "unicode_escape"
+                        if tool_name == "edit_code" and args_len - prev_len >= PARSE_INTERVAL_BYTES:
+                            logger.info(f"Parsing edit_code args at {args_len} bytes")
+                            code_content = self._extract_new_string(
+                                accumulated_tool_calls[idx]["function"]["arguments"]
+                            )
+                            if code_content:
+                                new_blocks = self.block_parser.feed(code_content)
+                                for block in new_blocks:
+                                    logger.info(f"Found block: {block.variable_name}")
+                                    updated = self.block_parser.blocks.get(
+                                        block.variable_name, block
+                                    )
+                                    for block_json in self.block_parser.to_block_json_chunks(updated):
+                                        logger.info(f"Yielding block_preview: {block_json.get('block_id')}")
+                                        yield ActivityEvent(
+                                            type="block_preview", data={"block": block_json}
                                         )
-                                    except Exception:
-                                        # Intentional: unicode decode failure is non-fatal, keep original content
-                                        pass
-
-                                    new_blocks = self.block_parser.feed(code_content)
-                                    for block in new_blocks:
-                                        # Get position from parser's updated state (may have position.set() now)
-                                        updated_block = self.block_parser.blocks.get(
-                                            block.variable_name, block
-                                        )
-                                        # Split large blocks into chunks for faster streaming
-                                        for (
-                                            block_json
-                                        ) in self.block_parser.to_block_json_chunks(
-                                            updated_block
-                                        ):
-                                            yield ActivityEvent(
-                                                type="block_preview",
-                                                data={"block": block_json},
-                                            )
-                            except Exception:
-                                # Best effort - block parsing is non-fatal, don't break streaming
-                                pass
+                            last_parsed_len[idx] = args_len
 
             # Build assistant message from accumulated data
             assistant_message = {"role": "assistant", "content": accumulated_text}

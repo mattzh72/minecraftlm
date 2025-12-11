@@ -61,14 +61,11 @@ You have access to these tools:
 
 When the user asks you to build a structure:
 
-1. Call `read_code` to fetch the latest version of the script and understand the current state.
-2. Use `edit_code` to iteratively modify the script:
-   - Add or update `Block` placements.
-   - Configure orientations via helper functions.
-   - Ensure the script assigns the final structure to `structure`.
-3. Call `complete_task` to validate.
-4. If there are errors, call `read_code` to inspect the updated code and fix them with `edit_code`.
-5. Repeat until validation passes.
+1. Call `read_code` to understand the current state.
+2. Plan which blocks you need - think through the structure.
+3. Use `edit_code` to add blocks to the scene.
+4. Call `complete_task` to validate.
+5. If there are errors, fix them and retry.
 6. Always finish by calling `complete_task`.
 
 ## Important Rules

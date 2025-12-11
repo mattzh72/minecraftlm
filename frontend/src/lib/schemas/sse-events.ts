@@ -57,6 +57,7 @@ export const blockPreviewEvent = z.object({
       type: z.string(),
       properties: z.record(z.string()).optional(),
       fill: z.boolean(),
+      variable_name: z.string().nullable().optional(), // For deduplication
     }),
   }),
 });

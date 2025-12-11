@@ -14,16 +14,10 @@ export function useChat() {
   const selectedModelId = useStore((s) => s.selectedModelId);
 
   const handleSend = async (userMessage: string, sessionId: string) => {
-    console.log(`handleSend`, { userMessage, sessionId, selectedModelId });
     if (!userMessage.trim() || !sessionId) return;
 
     addUserMessage(sessionId, userMessage);
-    clearPreviewBlocks(); // Clear any previous preview blocks
-    console.log(`adding user message`, {
-      sessionId,
-      userMessage,
-      selectedModelId,
-    });
+    clearPreviewBlocks();
 
     try {
       const response = await fetch("/api/chat", {
@@ -52,7 +46,6 @@ export function useChat() {
         lineBuffer += decoder.decode(value, { stream: true });
         const lines = lineBuffer.split(/\r?\n/);
         lineBuffer = lines.pop() || "";
-        console.log({ lines });
 
         for (const line of lines) {
           if (line === "") {
@@ -95,6 +88,7 @@ export function useChat() {
                   addStreamDelta(sessionId, event.data.delta);
                   break;
                 case "block_preview":
+                  console.log("block_preview received:", event.data.block);
                   if (event.data.block) {
                     addPreviewBlock({
                       start: event.data.block.start,
@@ -102,6 +96,7 @@ export function useChat() {
                       type: event.data.block.type,
                       properties: event.data.block.properties || {},
                       fill: event.data.block.fill,
+                      variable_name: event.data.block.variable_name,
                     });
                   }
                   break;

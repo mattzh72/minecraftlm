@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSession } from "@/hooks/useSession";
 import ThumbnailViewer from "./ThumbnailViewer";
@@ -22,6 +22,11 @@ export function ProjectsPage() {
   const hasSessions = useStore((s) => Object.keys(s.sessions).length > 0);
   // Track sessions that have had thumbnails uploaded this session to avoid duplicate uploads
   const [uploadedThumbnails, setUploadedThumbnails] = useState<Set<string>>(new Set());
+
+  // Queue for sequential thumbnail rendering
+  const [thumbnailQueue, setThumbnailQueue] = useState<string[]>([]);
+  const [renderingSessionId, setRenderingSessionId] = useState<string | null>(null);
+  const renderedThumbnails = useRef<Map<string, string>>(new Map()); // sessionId -> dataUrl
 
   // Upload thumbnail to backend for caching
   const uploadThumbnail = useCallback(async (sessionId: string, dataUrl: string) => {
@@ -77,6 +82,31 @@ export function ProjectsPage() {
         setIsLoading(false);
       });
   }, []);
+
+  // Build queue of sessions needing thumbnail renders
+  useEffect(() => {
+    const needsRender = Object.values(sessions)
+      .filter(s => s.has_structure && !s.has_thumbnail && s.structure)
+      .map(s => s.session_id);
+    setThumbnailQueue(needsRender);
+  }, [sessions]);
+
+  // Process queue one at a time
+  useEffect(() => {
+    if (renderingSessionId || thumbnailQueue.length === 0) return;
+
+    // Take next from queue
+    const nextId = thumbnailQueue[0];
+    setRenderingSessionId(nextId);
+    setThumbnailQueue(q => q.slice(1));
+  }, [thumbnailQueue, renderingSessionId]);
+
+  // Called when a thumbnail finishes rendering
+  const handleThumbnailRendered = useCallback((sessionId: string, dataUrl: string) => {
+    renderedThumbnails.current.set(sessionId, dataUrl);
+    uploadThumbnail(sessionId, dataUrl);
+    setRenderingSessionId(null); // Allows next in queue to start
+  }, [uploadThumbnail]);
 
   // Handle creating a new session and navigating to it
   const handleSubmit = async (message: string) => {
@@ -158,20 +188,35 @@ export function ProjectsPage() {
                   {/* Thumbnail */}
                   <div className="w-full h-44 bg-muted flex items-center justify-center border-b border-border">
                     {session.has_thumbnail ? (
-                      // Use cached thumbnail image
+                      // Cached thumbnail from backend
                       <img
                         src={`/api/sessions/${session.session_id}/thumbnail`}
                         alt="Structure preview"
                         className="rounded-lg"
                         style={{ width: Config.thumbnail.defaultSize, height: Config.thumbnail.defaultSize }}
                       />
-                    ) : session.has_structure && session.structure ? (
-                      // Render and cache thumbnail
+                    ) : renderedThumbnails.current.has(session.session_id) ? (
+                      // Just rendered this session - show local dataUrl
+                      <img
+                        src={renderedThumbnails.current.get(session.session_id)}
+                        alt="Structure preview"
+                        className="rounded-lg"
+                        style={{ width: Config.thumbnail.defaultSize, height: Config.thumbnail.defaultSize }}
+                      />
+                    ) : renderingSessionId === session.session_id && session.structure ? (
+                      // Currently rendering this one
                       <ThumbnailViewer
                         structureData={session.structure}
-                        onRenderComplete={(dataUrl) => uploadThumbnail(session.session_id, dataUrl)}
+                        onRenderComplete={(dataUrl) => handleThumbnailRendered(session.session_id, dataUrl)}
                       />
+                    ) : session.has_structure ? (
+                      // Waiting in queue - show placeholder
+                      <div className="text-muted-foreground/50 text-xs flex flex-col items-center gap-2">
+                        <div className="text-3xl">📦</div>
+                        <span>Loading preview...</span>
+                      </div>
                     ) : (
+                      // No structure at all
                       <div className="text-muted-foreground/50 text-5xl text-center">
                         📦
                       </div>

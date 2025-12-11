@@ -181,3 +181,117 @@ stone.position.set(10, 20, 30)'''
 
         assert len(blocks) == 1
         assert blocks[0].fill is False
+
+    def test_eager_emission_before_size(self, parser):
+        """Should emit block immediately when type is seen, even without size"""
+        # Feed just the block type - no closing paren yet
+        code1 = 'stone = Block("minecraft:stone"'
+        blocks1 = parser.feed(code1)
+
+        # Should emit immediately with default size
+        assert len(blocks1) == 1
+        assert blocks1[0].block_id == "minecraft:stone"
+        assert blocks1[0].size == (1, 1, 1)  # Default
+
+    def test_updates_when_size_arrives(self, parser):
+        """Should re-emit when size becomes available"""
+        # First feed - block type only (incomplete)
+        code1 = 'stone = Block("minecraft:stone"'
+        blocks1 = parser.feed(code1)
+        assert len(blocks1) == 1
+        assert blocks1[0].size == (1, 1, 1)  # Default
+
+        # Second feed - full accumulated code with size now visible
+        # (harness passes full accumulated code, not just delta)
+        code2 = 'stone = Block("minecraft:stone", size=(10, 5, 10), catalog=catalog)'
+        blocks2 = parser.feed(code2)
+
+        # Should re-emit with updated size
+        assert len(blocks2) == 1
+        assert blocks2[0].size == (10, 5, 10)
+
+    def test_updates_when_position_arrives(self, parser):
+        """Should re-emit when position.set() is parsed"""
+        # Complete block
+        code1 = 'stone = Block("minecraft:stone", size=(5, 5, 5), catalog=catalog)\n'
+        blocks1 = parser.feed(code1)
+        assert len(blocks1) == 1
+        assert parser.blocks["stone"].position == (0.0, 0.0, 0.0)  # Default
+
+        # Position set
+        code2 = 'stone.position.set(10, 20, 30)'
+        blocks2 = parser.feed(code2)
+
+        # Should re-emit with updated position
+        assert len(blocks2) == 1
+        assert blocks2[0].position == (10.0, 20.0, 30.0)
+
+    def test_no_duplicate_emission_without_changes(self, parser):
+        """Should not re-emit if nothing changed"""
+        code = 'stone = Block("minecraft:stone", size=(5, 5, 5), catalog=catalog)'
+        blocks1 = parser.feed(code)
+        assert len(blocks1) == 1
+
+        # Feed same code again - nothing changed
+        blocks2 = parser.feed("")
+        assert len(blocks2) == 0
+
+    def test_variable_name_in_output(self, parser):
+        """Should include variable_name in JSON output for deduplication"""
+        code = 'myblock = Block("minecraft:stone", size=(5, 5, 5), catalog=catalog)'
+        blocks = parser.feed(code)
+
+        json_output = parser.to_block_json(blocks[0])
+        assert json_output["variable_name"] == "myblock"
+
+    def test_parses_inline_block(self, parser):
+        """Should parse inline Block() without variable assignment"""
+        code = 'scene.add(Block("minecraft:grass_block", size=(16, 1, 16), catalog=catalog))'
+        blocks = parser.feed(code)
+
+        assert len(blocks) == 1
+        assert blocks[0].block_id == "minecraft:grass_block"
+        assert blocks[0].size == (16, 1, 16)
+        assert blocks[0].variable_name.startswith("_inline_")
+
+    def test_parses_multiline_block(self, parser):
+        """Should parse Block() split across multiple lines"""
+        code = '''wall = Block(
+    "minecraft:stone_bricks",
+    size=(10, 4, 1),
+    catalog=catalog,
+)'''
+        blocks = parser.feed(code)
+
+        assert len(blocks) == 1
+        assert blocks[0].block_id == "minecraft:stone_bricks"
+        assert blocks[0].size == (10, 4, 1)
+
+    def test_parses_multiple_blocks_in_sequence(self, parser):
+        """Should parse multiple blocks as they appear in code"""
+        code = '''scene.add(Block(
+    "minecraft:grass_block",
+    size=(16, 1, 16),
+    catalog=catalog,
+))
+
+wall = Block(
+    "minecraft:stone_bricks",
+    size=(10, 4, 1),
+    catalog=catalog,
+)
+wall.position.set(3, 1, 5)
+scene.add(wall)'''
+
+        blocks = parser.feed(code)
+
+        assert len(blocks) == 2
+        # One inline, one assigned
+        block_ids = {b.block_id for b in blocks}
+        assert "minecraft:grass_block" in block_ids
+        assert "minecraft:stone_bricks" in block_ids
+
+        # The assigned one should have position
+        wall_block = next(b for b in blocks if b.block_id == "minecraft:stone_bricks")
+        assert wall_block.position == (3.0, 1.0, 5.0)
+        assert wall_block.variable_name == "wall"
