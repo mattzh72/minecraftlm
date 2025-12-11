@@ -8,10 +8,11 @@ export function useChat() {
   const addStreamDelta = useStore((s) => s.addStreamDelta);
   const addThoughtSummary = useStore((s) => s.addThoughtSummary);
   const addAssistantMessage = useStore((s) => s.addAssistantMessage);
-   // const addToolCall = useStore((s) => s.addToolCall);
-  const selectedModelId = useStore((s) => s.selectedModelId);
+  // const addToolCall = useStore((s) => s.addToolCall);
 
   const handleSend = async (userMessage: string, sessionId: string) => {
+    // Read selectedModelId at call time to avoid stale closure issues
+    const selectedModelId = useStore.getState().selectedModelId;
     console.log(`handleSend`, { userMessage, sessionId, selectedModelId });
     if (!userMessage.trim() || !sessionId) return;
 
