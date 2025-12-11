@@ -74,6 +74,7 @@ x = 10
 y = 20
 result = x + y
 print(result)
+structure = {"width": 1, "height": 1, "depth": 1, "blocks": []}
 """
     SessionService.save_code(session_id, valid_code)
 

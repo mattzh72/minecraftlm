@@ -1,5 +1,5 @@
 """
-OpenAI API service with streaming tool support and reasoning tokens.
+OpenAI API service with streaming tool support and reasoning using the Responses API.
 """
 
 import uuid
@@ -10,55 +10,105 @@ import openai
 from app.agent.llms.base import BaseLLMService, StreamChunk
 from app.config import settings
 
-# Models that support reasoning tokens
+# Models that support reasoning
 REASONING_MODELS = ("gpt-5", "o1", "o3", "o4")
 
 
 class OpenAIService(BaseLLMService):
-    """Service for interacting with OpenAI API."""
+    """Service for interacting with OpenAI API using the Responses API."""
 
     def __init__(self, model_id: str = "gpt-5.1"):
         super().__init__(model_id)
         self.client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
 
     def _is_reasoning_model(self) -> bool:
-        """Check if the model supports reasoning tokens."""
+        """Check if the model supports reasoning."""
         return any(self.model_id.startswith(prefix) for prefix in REASONING_MODELS)
 
-    def _sanitize_messages(self, messages: list[dict]) -> list[dict]:
-        """
-        Sanitize messages for OpenAI compatibility.
+    def _convert_tools(self, tools: list[dict]) -> list[dict]:
+        """Convert OpenAI Chat Completions tool format to Responses API format."""
+        responses_tools = []
+        for tool in tools or []:
+            func_def = tool.get("function") if isinstance(tool, dict) else None
+            if not func_def:
+                continue
 
-        OpenAI requires tool_call IDs to be non-null strings. Conversations
-        from other providers (like Gemini) may have null IDs. This generates
-        consistent IDs and ensures tool messages reference the correct IDs.
-        """
-        sanitized = []
-        pending_tool_call_ids: list[str] = []
+            responses_tools.append(
+                {
+                    "type": "function",
+                    "name": func_def.get("name", ""),
+                    "description": func_def.get("description", ""),
+                    "parameters": func_def.get("parameters", {}),
+                    "strict": True,
+                }
+            )
+        return responses_tools
+
+    def _convert_messages_to_input(
+        self, system_prompt: str, messages: list[dict]
+    ) -> list[dict]:
+        """Convert OpenAI-format conversation to Responses API input format."""
+        input_items = []
+
+        # Add system prompt as instructions (handled separately in Responses API)
+        # We'll pass it as the `instructions` parameter instead
 
         for msg in messages:
-            msg_copy = dict(msg)
+            role = msg.get("role")
 
-            if msg_copy.get("role") == "assistant" and msg_copy.get("tool_calls"):
-                pending_tool_call_ids = []
-                sanitized_tool_calls = []
-                for tc in msg_copy["tool_calls"]:
-                    tc_copy = dict(tc)
-                    if not tc_copy.get("id"):
-                        tc_copy["id"] = f"call_{uuid.uuid4().hex}"
-                    pending_tool_call_ids.append(tc_copy["id"])
-                    sanitized_tool_calls.append(tc_copy)
-                msg_copy["tool_calls"] = sanitized_tool_calls
+            if role == "user":
+                input_items.append(
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": msg.get("content", "")}],
+                    }
+                )
 
-            if msg_copy.get("role") == "tool":
-                if not msg_copy.get("tool_call_id") and pending_tool_call_ids:
-                    msg_copy["tool_call_id"] = pending_tool_call_ids.pop(0)
-                elif not msg_copy.get("tool_call_id"):
-                    msg_copy["tool_call_id"] = f"call_{uuid.uuid4().hex}"
+            elif role == "assistant":
+                content_parts = []
 
-            sanitized.append(msg_copy)
+                # Add text content if present
+                if msg.get("content"):
+                    content_parts.append(
+                        {"type": "output_text", "text": msg["content"]}
+                    )
 
-        return sanitized
+                # Convert tool_calls to function_call items
+                for tool_call in msg.get("tool_calls") or []:
+                    func = tool_call.get("function", {})
+                    call_id = tool_call.get("id") or f"call_{uuid.uuid4().hex}"
+                    input_items.append(
+                        {
+                            "type": "function_call",
+                            "call_id": call_id,
+                            "name": func.get("name", ""),
+                            "arguments": func.get("arguments", "{}"),
+                        }
+                    )
+
+                # Only add message if it has text content
+                if content_parts:
+                    input_items.append(
+                        {
+                            "type": "message",
+                            "role": "assistant",
+                            "content": content_parts,
+                        }
+                    )
+
+            elif role == "tool":
+                # Tool results are function_call_output items
+                tool_call_id = msg.get("tool_call_id") or f"call_{uuid.uuid4().hex}"
+                input_items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": tool_call_id,
+                        "output": msg.get("content", ""),
+                    }
+                )
+
+        return input_items
 
     async def generate_with_tools_streaming(
         self,
@@ -67,89 +117,91 @@ class OpenAIService(BaseLLMService):
         tools: list[dict],
     ) -> AsyncIterator[StreamChunk]:
         """
-        Stream responses from OpenAI with tool calling and reasoning support.
+        Stream responses from OpenAI using the Responses API with tool calling and reasoning.
 
         Args:
             system_prompt: System instructions
             messages: Conversation history in OpenAI format
             tools: Tool definitions in OpenAI format
         """
-        sanitized = self._sanitize_messages(messages)
-        full_messages = [{"role": "system", "content": system_prompt}] + sanitized
+        responses_tools = self._convert_tools(tools)
+        input_items = self._convert_messages_to_input(system_prompt, messages)
 
         # Build request params
         request_params = {
             "model": self.model_id,
-            "messages": full_messages,
+            "instructions": system_prompt,
+            "input": input_items,
             "stream": True,
         }
 
         # Add tools if present
-        if tools:
-            request_params["tools"] = tools
+        if responses_tools:
+            request_params["tools"] = responses_tools
 
         # Enable reasoning for supported models
         if self._is_reasoning_model():
-            request_params["reasoning_effort"] = "medium"
+            request_params["reasoning"] = {
+                "effort": "medium",
+                "summary": "auto",
+            }
 
-        stream = await self.client.chat.completions.create(**request_params)
+        # Track function calls by output_index
+        function_calls: dict[int, dict] = {}
 
-        async for chunk in stream:
-            if not chunk.choices:
-                continue
+        stream = await self.client.responses.create(**request_params)
 
-            choice = chunk.choices[0]
-            delta = choice.delta
-            finish_reason = choice.finish_reason
+        async for event in stream:
+            event_type = event.type
 
-            # Extract text delta
-            text_delta = (
-                delta.content if hasattr(delta, "content") and delta.content else None
-            )
+            # Text content delta
+            if event_type == "response.output_text.delta":
+                yield StreamChunk(text_delta=event.delta)
 
-            # Extract reasoning/thought delta (GPT-5 and reasoning models)
-            thought_delta = None
-            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
-                thought_delta = delta.reasoning_content
-            elif hasattr(delta, "reasoning") and delta.reasoning:
-                thought_delta = delta.reasoning
+            # Reasoning summary delta (thinking)
+            elif event_type == "response.reasoning_summary_text.delta":
+                yield StreamChunk(thought_delta=event.delta)
 
-            # Extract tool calls delta
-            tool_calls_delta = None
-            if hasattr(delta, "tool_calls") and delta.tool_calls:
-                tool_calls_delta = []
-                for tc_delta in delta.tool_calls:
-                    tool_calls_delta.append(
-                        {
-                            "index": tc_delta.index
-                            if hasattr(tc_delta, "index")
-                            else 0,
-                            "id": tc_delta.id if hasattr(tc_delta, "id") else None,
-                            "type": "function",
-                            "thought_signature": None,
-                            "extra_content": {},
-                            "function": {
-                                "name": (
-                                    tc_delta.function.name
-                                    if hasattr(tc_delta, "function")
-                                    and hasattr(tc_delta.function, "name")
-                                    else None
-                                ),
-                                "arguments": (
-                                    tc_delta.function.arguments
-                                    if hasattr(tc_delta, "function")
-                                    and hasattr(tc_delta.function, "arguments")
-                                    else None
-                                ),
-                            },
-                        }
+            # Function call started - capture ID and name
+            elif event_type == "response.output_item.added":
+                item = event.item
+                if getattr(item, "type", None) == "function_call":
+                    output_index = event.output_index
+                    function_calls[output_index] = {
+                        "id": getattr(item, "call_id", None) or getattr(item, "id", None),
+                        "name": getattr(item, "name", ""),
+                        "arguments": "",
+                    }
+
+            # Function call arguments delta
+            elif event_type == "response.function_call_arguments.delta":
+                output_index = event.output_index
+                if output_index in function_calls:
+                    function_calls[output_index]["arguments"] += event.delta
+
+            # Function call arguments complete - emit tool call
+            elif event_type == "response.function_call_arguments.done":
+                output_index = event.output_index
+                if output_index in function_calls:
+                    fc = function_calls[output_index]
+                    # Generate ID if not provided
+                    call_id = fc.get("id") or f"call_{uuid.uuid4().hex}"
+                    yield StreamChunk(
+                        tool_calls_delta=[
+                            {
+                                "index": output_index,
+                                "id": call_id,
+                                "type": "function",
+                                "thought_signature": None,
+                                "extra_content": {},
+                                "function": {
+                                    "name": fc.get("name", ""),
+                                    "arguments": fc.get("arguments", ""),
+                                },
+                            }
+                        ]
                     )
 
-            # Only yield if we have something
-            if text_delta or thought_delta or tool_calls_delta or finish_reason:
-                yield StreamChunk(
-                    text_delta=text_delta,
-                    thought_delta=thought_delta,
-                    tool_calls_delta=tool_calls_delta,
-                    finish_reason=finish_reason,
-                )
+            # Response complete
+            elif event_type == "response.completed":
+                yield StreamChunk(finish_reason="stop")
