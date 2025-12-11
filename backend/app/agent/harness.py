@@ -4,6 +4,7 @@ Agent executor - main agentic loop
 
 import json
 import logging
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -256,16 +257,18 @@ class MinecraftSchematicAgent:
                                 "thought_signature"
                             ]
 
-                        # Update ID if provided
-                        if "id" in tc_delta:
+                        # Update ID if provided and truthy
+                        if tc_delta.get("id"):
                             accumulated_tool_calls[idx]["id"] = tc_delta["id"]
 
             # Build tool calls from accumulated data
             tool_calls_list: list[ToolCall] = []
             for tc_data in accumulated_tool_calls.values():
+                # Generate ID if provider didn't provide one (ensures tool results can be matched)
+                tool_call_id = tc_data.get("id") or f"call_{uuid.uuid4().hex}"
                 tool_calls_list.append(
                     ToolCall(
-                        id=tc_data.get("id"),
+                        id=tool_call_id,
                         type="function",
                         function=ToolCallFunction(
                             name=tc_data.get("function", {}).get("name", ""),
@@ -326,7 +329,7 @@ class MinecraftSchematicAgent:
 
                 yield ActivityEvent(
                     type="tool_call",
-                    data={"name": func_name, "args": func_args},
+                    data={"id": tool_call.id, "name": func_name, "args": func_args},
                 )
 
                 # Execute tool - inject session_id automatically

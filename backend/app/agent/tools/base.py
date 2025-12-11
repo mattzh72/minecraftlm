@@ -41,6 +41,7 @@ def make_tool_schema(
                 "type": "object",
                 "properties": parameters or {},
                 "required": required or [],
+                "additionalProperties": False,  # Required for OpenAI Responses API strict mode
             },
         },
     }

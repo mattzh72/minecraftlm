@@ -8,7 +8,7 @@ export function useChat() {
   const addStreamDelta = useStore((s) => s.addStreamDelta);
   const addThoughtSummary = useStore((s) => s.addThoughtSummary);
   const addAssistantMessage = useStore((s) => s.addAssistantMessage);
-  // const addToolCall = useStore((s) => s.addToolCall);
+  const addToolCall = useStore((s) => s.addToolCall);
 
   const handleSend = async (userMessage: string, sessionId: string) => {
     // Read selectedModelId at call time to avoid stale closure issues
@@ -73,16 +73,17 @@ export function useChat() {
                   addThoughtSummary(sessionId, event.data.delta);
                   break;
                 case "tool_call":
-                  // addToolCall(sessionId, {
-                  //   type: "function",
-                  //   function: {
-                  //     name: event.data.name,
-                  //     arguments: JSON.stringify(event.data.args),
-                  //   },
-                  //   id: "TODO: make the backend give me this",
-                  //   thought_signature: "",
-                  //   extra_content: {},
-                  // });
+                  setAgentState("tool_calling");
+                  addToolCall(sessionId, {
+                    type: "function",
+                    function: {
+                      name: event.data.name,
+                      arguments: JSON.stringify(event.data.args),
+                    },
+                    id: event.data.id,
+                    thought_signature: "",
+                    extra_content: {},
+                  });
                   break;
                 case "tool_result":
                   // Check if this tool result includes a structure update

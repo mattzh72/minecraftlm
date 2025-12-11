@@ -21,6 +21,7 @@ export const textDeltaEvent = z.object({
 export const toolCallEvent = z.object({
   type: z.literal("tool_call"),
   data: z.object({
+    id: z.string(),
     name: z.string(),
     args: z.unknown(),
   }),

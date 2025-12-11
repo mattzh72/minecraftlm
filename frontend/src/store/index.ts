@@ -170,36 +170,12 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   addThoughtSummary: (sessionId: string, thoughtSummary: string) => {
-    console.log(`addThoughtSummary`, { sessionId, thoughtSummary });
     const session = get().sessions[sessionId];
-    console.log(`[addThoughtSummary] session`, session);
     if (!session) return;
-    const latestAssistantMessage = session.conversation?.filter(
-      (msg) => msg.role === "assistant"
-    )?.[session.conversation.length - 1];
-    console.log(
-      `[addThoughtSummary] latestAssistantMessage`,
-      latestAssistantMessage
-    );
 
-    const currentAssistantMessage =
-      latestAssistantMessage || defaultAssistantMessage;
-
-    const newAssistantMessage = {
-      ...currentAssistantMessage,
-      thought_summary:
-        (currentAssistantMessage as RawAssistantMessage).thought_summary +
-        thoughtSummary,
-    };
-
-    console.log(
-      `[addThoughtSummary] current conversation`,
-      session.conversation
-    );
     const newConversation = [...(session.conversation || [])];
-    console.log(`[addThoughtSummary] newConversation`, newConversation);
 
-    // Find the last assistant message
+    // Find the last assistant message by iterating backwards
     let assistantIdx = -1;
     for (let i = newConversation.length - 1; i >= 0; i--) {
       if (newConversation[i]?.role === "assistant") {
@@ -209,11 +185,18 @@ export const useStore = create<StoreState>()((set, get) => ({
     }
 
     if (assistantIdx !== -1) {
-      // Override the found assistant message
-      newConversation[assistantIdx] = newAssistantMessage;
+      // Append to the existing assistant message's thought_summary
+      const currentMessage = newConversation[assistantIdx] as RawAssistantMessage;
+      newConversation[assistantIdx] = {
+        ...currentMessage,
+        thought_summary: (currentMessage.thought_summary || "") + thoughtSummary,
+      };
     } else {
-      // Append as a new assistant message
-      newConversation.push(newAssistantMessage);
+      // No assistant message exists yet, create one
+      newConversation.push({
+        ...defaultAssistantMessage,
+        thought_summary: thoughtSummary,
+      });
     }
 
     set({
@@ -230,16 +213,13 @@ export const useStore = create<StoreState>()((set, get) => ({
     newConversation.push({
       role: "assistant",
       content: message,
+      thought_summary: "",
+      tool_calls: [],
     });
-    const newSession = {
-      ...session,
-      conversation: newConversation,
-    };
-    console.log(`adding assistant message to session`, { newSession });
     set({
       sessions: {
         ...get().sessions,
-        [sessionId]: newSession,
+        [sessionId]: { ...session, conversation: newConversation },
       },
     });
   },
