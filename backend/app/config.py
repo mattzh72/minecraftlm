@@ -2,12 +2,8 @@
 Configuration management using pydantic-settings
 """
 
-from pathlib import Path
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Project root (parent of backend/)
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Model to provider mapping (prefix-based)
 MODEL_PREFIXES = {
@@ -43,10 +39,6 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     log_level: str = "INFO"
-
-    # Storage paths
-    storage_dir: Path = PROJECT_ROOT / ".storage" / "sessions"
-    frontend_build_dir: Path = PROJECT_ROOT / "frontend" / "dist"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=False

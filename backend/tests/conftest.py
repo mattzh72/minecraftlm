@@ -20,11 +20,15 @@ def temp_storage(monkeypatch):
         temp_path = Path(tmpdir) / "sessions"
         temp_path.mkdir(parents=True, exist_ok=True)
 
-        # Monkeypatch the settings.storage_dir
-        from app.config import settings
-        monkeypatch.setattr(settings, "storage_dir", temp_path)
+        # Update the module-level STORAGE_DIR
+        import app.services.session as session_module
+        original_storage_dir = session_module.STORAGE_DIR
+        session_module.STORAGE_DIR = temp_path
 
         yield temp_path
+
+        # Restore original
+        session_module.STORAGE_DIR = original_storage_dir
 
 
 @pytest.fixture

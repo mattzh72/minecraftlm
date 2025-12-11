@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 
 from app.api.models import SessionResponse
-from app.config import settings
 from app.services.session import SessionService
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -28,8 +27,8 @@ async def list_sessions():
     List all available sessions with metadata.
     """
     sessions = []
-    if settings.storage_dir.exists():
-        for session_dir in settings.storage_dir.iterdir():
+    if LOCAL_STORAGE_FOLDER.exists():
+        for session_dir in LOCAL_STORAGE_FOLDER.iterdir():
             if session_dir.is_dir():
                 session_id = session_dir.name
                 # Get basic info
@@ -91,7 +90,7 @@ async def get_session(session_id: str):
     Get session data including conversation history and structure (if exists).
     Used to restore sessions on page reload.
     """
-    session_dir = settings.storage_dir / session_id
+    session_dir = Path(LOCAL_STORAGE_FOLDER) / session_id
     if not session_dir.exists():
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
@@ -145,7 +144,7 @@ async def get_structure(session_id: str):
     Get the generated Minecraft structure JSON for visualization.
     Returns the code.json file which contains the structure data.
     """
-    code_path = settings.storage_dir / session_id / CODE_FNAME
+    code_path = Path(LOCAL_STORAGE_FOLDER) / session_id / CODE_FNAME
     if not code_path.exists():
         raise HTTPException(
             status_code=404, detail=f"Structure not found for session {session_id}"
@@ -211,4 +210,6 @@ async def upload_thumbnail(session_id: str, request: Request):
     except base64.binascii.Error:
         raise HTTPException(status_code=400, detail="Invalid base64 image data")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error saving thumbnail: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error saving thumbnail: {str(e)}"
+        )

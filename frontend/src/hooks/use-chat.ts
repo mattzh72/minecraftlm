@@ -88,7 +88,6 @@ export function useChat() {
                   addStreamDelta(sessionId, event.data.delta);
                   break;
                 case "block_preview":
-                  console.log("block_preview received:", event.data.block);
                   if (event.data.block) {
                     addPreviewBlock({
                       start: event.data.block.start,

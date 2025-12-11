@@ -185,17 +185,6 @@ class GeminiService(BaseLLMService):
                     encoded_signature = self._encode_signature(raw_signature)
                     # Generate stable ID if Gemini doesn't provide one
                     call_id = getattr(function_call, "id", None) or f"call_{uuid.uuid4().hex}"
-
-                    # Convert args to JSON string
-                    args_str = (
-                        json.dumps(args)
-                        if isinstance(args, (dict, list))
-                        else str(args)
-                        if args is not None
-                        else ""
-                    )
-                    tool_name = getattr(function_call, "name", None)
-
                     tool_calls_delta.append(
                         {
                             "index": len(tool_calls_delta),
@@ -208,8 +197,14 @@ class GeminiService(BaseLLMService):
                             if encoded_signature
                             else {},
                             "function": {
-                                "name": tool_name,
-                                "arguments": args_str,
+                                "name": getattr(function_call, "name", None),
+                                "arguments": (
+                                    json.dumps(args)
+                                    if isinstance(args, (dict, list))
+                                    else str(args)
+                                    if args is not None
+                                    else ""
+                                ),
                             },
                         }
                     )

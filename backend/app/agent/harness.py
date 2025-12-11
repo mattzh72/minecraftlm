@@ -280,17 +280,12 @@ class MinecraftSchematicAgent:
                             accumulated_tool_calls[idx]["function"]["name"] = tc_delta[
                                 "function"
                             ]["name"]
-                            logger.info(f"Tool call: {tc_delta['function']['name']}")
 
                         # Accumulate function arguments
                         if tc_delta.get("function", {}).get("arguments"):
                             accumulated_tool_calls[idx]["function"]["arguments"] += (
                                 tc_delta["function"]["arguments"]
                             )
-                            args_len = len(accumulated_tool_calls[idx]["function"]["arguments"])
-                            tool_name = accumulated_tool_calls[idx]["function"]["name"]
-                            if tool_name == "edit_code":
-                                logger.info(f"edit_code args: {args_len} bytes")
 
                         # Capture provider-specific metadata such as thought signatures
                         extra_content = tc_delta.get("extra_content") or {}
@@ -316,19 +311,16 @@ class MinecraftSchematicAgent:
                         prev_len = last_parsed_len.get(idx, 0)
 
                         if tool_name == "edit_code" and args_len - prev_len >= PARSE_INTERVAL_BYTES:
-                            logger.info(f"Parsing edit_code args at {args_len} bytes")
                             code_content = self._extract_new_string(
                                 accumulated_tool_calls[idx]["function"]["arguments"]
                             )
                             if code_content:
                                 new_blocks = self.block_parser.feed(code_content)
                                 for block in new_blocks:
-                                    logger.info(f"Found block: {block.variable_name}")
                                     updated = self.block_parser.blocks.get(
                                         block.variable_name, block
                                     )
                                     for block_json in self.block_parser.to_block_json_chunks(updated):
-                                        logger.info(f"Yielding block_preview: {block_json.get('block_id')}")
                                         yield ActivityEvent(
                                             type="block_preview", data={"block": block_json}
                                         )

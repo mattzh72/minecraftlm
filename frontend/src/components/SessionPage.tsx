@@ -34,7 +34,6 @@ export function SessionPage() {
 
   // Restore session from URL param on mount
   useEffect(() => {
-    console.log(`useEffect`, { activeSessionId });
     if (urlSessionId) {
       restoreSession(urlSessionId);
     }
@@ -56,7 +55,6 @@ export function SessionPage() {
 
   const previewBlocks = useStore((s) => s.previewBlocks);
   const hasContent = structureData || previewBlocks.length > 0;
-  console.log(`[SessionPage] structureData`, structureData, `previewBlocks`, previewBlocks.length);
 
   return (
     <div className="h-screen flex flex-col text-foreground overflow-hidden">

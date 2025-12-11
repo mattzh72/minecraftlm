@@ -63,7 +63,6 @@ async def health():
 
 
 # Serve static files from frontend build (if exists)
-frontend_build = settings.frontend_build_dir
 frontend_build = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
 if frontend_build.exists():
     # Mount static assets
