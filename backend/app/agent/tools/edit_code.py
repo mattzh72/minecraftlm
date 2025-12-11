@@ -78,11 +78,28 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
         if validation.is_valid:
             # Save structure for UI to render immediately
             SessionService.save_structure(self.params.session_id, validation.structure)
+
+            # Calculate bounding box to help agent track spatial extent
+            blocks = validation.structure.get("blocks", [])
+            bounding_box = None
+            if blocks:
+                min_x = min(b["start"][0] for b in blocks)
+                min_y = min(b["start"][1] for b in blocks)
+                min_z = min(b["start"][2] for b in blocks)
+                max_x = max(b["end"][0] for b in blocks)
+                max_y = max(b["end"][1] for b in blocks)
+                max_z = max(b["end"][2] for b in blocks)
+                bounding_box = {
+                    "min": [min_x, min_y, min_z],
+                    "max": [max_x, max_y, max_z],
+                }
+
             return {
                 "status": "success",
                 "error": None,
                 "structure_updated": True,
-                "block_count": len(validation.structure.get("blocks", [])),
+                "block_count": len(blocks),
+                "bounding_box": bounding_box,
             }
         else:
             error_msg = validation.error

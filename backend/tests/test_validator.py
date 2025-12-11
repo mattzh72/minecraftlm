@@ -8,16 +8,17 @@ from app.services.validator import CodeValidator
 
 
 def test_validate_valid_code():
-    """Test that valid code passes validation"""
+    """Test that valid code passes validation with structure variable"""
     code = """
 x = 10
 y = 20
 result = x + y
-print(result)
+structure = {"width": 1, "height": 1, "depth": 1, "blocks": []}
 """
     result = CodeValidator.validate_code(code)
     assert result.is_valid
     assert result.error is None
+    assert result.structure is not None
 
 
 def test_validate_syntax_error():
@@ -62,9 +63,11 @@ def add(a, b):
     return a + b
 
 result = add(5, 10)
+structure = {"width": result, "height": 1, "depth": 1, "blocks": []}
 """
     result = CodeValidator.validate_code(code)
     assert result.is_valid
+    assert result.structure["width"] == 15
 
 
 def test_validate_with_imports():
@@ -72,9 +75,11 @@ def test_validate_with_imports():
     code = """
 import math
 result = math.sqrt(16)
+structure = {"width": int(result), "height": 1, "depth": 1, "blocks": []}
 """
     result = CodeValidator.validate_code(code)
     assert result.is_valid
+    assert result.structure["width"] == 4
 
 
 def test_validate_multiline_string():
@@ -85,6 +90,19 @@ This is a multiline
 string for testing
 """
 print(message)
+structure = {"width": 1, "height": 1, "depth": 1, "blocks": []}
 '''
     result = CodeValidator.validate_code(code)
     assert result.is_valid
+
+
+def test_validate_missing_structure():
+    """Test that missing structure variable is caught"""
+    code = """
+x = 10
+y = 20
+result = x + y
+"""
+    result = CodeValidator.validate_code(code)
+    assert not result.is_valid
+    assert "structure" in result.error.lower()

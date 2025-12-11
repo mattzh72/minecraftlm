@@ -243,3 +243,70 @@ Note: `minecraft:grass_block` has only `snowy=true|false` variants in the assets
 set `snowy` explicitly (usually `"false"`) or the renderer may drop the block.
 
 For block‑specific configuration (stairs, slabs, logs, doors, etc.) see `03-blocks-reference.md`.
+
+---
+
+## Quick Method Reference
+
+All methods that return `self` support fluent chaining (e.g., `block.at(1,2,3).facing("north")`).
+
+### Block
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `Block(id, size=(w,h,d), properties={}, fill=True, catalog=catalog)` | Block | Constructor |
+| `.at(x, y, z)` | self | Set position |
+| `.with_size(w, h, d)` | self | Set size |
+| `.filled(bool)` | self | Set fill mode |
+| `.hollow()` | self | Make hollow (outline only) |
+| `.facing(direction)` | self | Set facing property (north/south/east/west) |
+| `.set_properties(props)` | self | Replace all properties |
+| `.merge_properties(props)` | self | Merge with existing properties |
+| `.clone()` | Block | Create a copy |
+| `.position.set(x, y, z)` | Vector3 | Set position directly |
+
+### Object3D / Scene
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `.add(*objects)` | self | Add children to scene |
+| `.at(x, y, z)` | self | Set position |
+| `.move(dx, dy, dz)` | self | Translate by offset |
+| `scene.to_structure(padding=0)` | dict | Export structure dictionary |
+
+### Vector3
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `.set(x, y, z)` | self | Set all coordinates |
+| `.add(vec)` | self | Add in-place |
+| `.added(vec)` | Vector3 | Add non-mutating |
+| `.translate(x, y, z)` | self | Translate |
+| `.clone()` / `.copy()` | Vector3 | Create a copy |
+| `.to_tuple()` | tuple | Convert to (x, y, z) |
+
+### Fluent Chaining Examples
+
+```python
+# Fluent style (recommended)
+scene.add(
+    Block("minecraft:stone_bricks", catalog=catalog)
+        .with_size(10, 4, 1)
+        .at(3, 1, 5)
+)
+
+# Stair with facing
+scene.add(
+    Block("minecraft:oak_stairs", catalog=catalog,
+          properties=stair_properties(facing="south"))
+        .at(5, 1, 0)
+)
+
+# Hollow walls
+scene.add(
+    Block("minecraft:oak_planks", catalog=catalog)
+        .with_size(12, 5, 12)
+        .at(2, 1, 2)
+        .hollow()
+)
+```

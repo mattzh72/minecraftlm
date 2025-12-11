@@ -189,6 +189,10 @@ class Vector3:
     def translate_z(self, z: float) -> "Vector3":
         return self.translate(z=z)
 
+    def copy(self) -> "Vector3":
+        """Alias for clone() - some APIs use this name."""
+        return self.clone()
+
 
 class Object3D:
     """
@@ -207,6 +211,16 @@ class Object3D:
 
     def add(self, *objects: "Object3D") -> "Object3D":
         self.children.extend(objects)
+        return self
+
+    def at(self, x: float, y: float, z: float) -> "Object3D":
+        """Set position and return self for chaining."""
+        self.position.set(x, y, z)
+        return self
+
+    def move(self, dx: float = 0, dy: float = 0, dz: float = 0) -> "Object3D":
+        """Translate by offset and return self for chaining."""
+        self.position.translate(dx, dy, dz)
         return self
 
     def _flatten_blocks(
@@ -280,6 +294,33 @@ class Block(Object3D):
         new_block.position = self.position.clone()
         # Blocks don't carry children, but honor the signature.
         return new_block
+
+    # --- Fluent methods for chaining ---
+
+    def at(self, x: float, y: float, z: float) -> "Block":
+        """Set position and return self for chaining."""
+        self.position.set(x, y, z)
+        return self
+
+    def with_size(self, width: int, height: int, depth: int) -> "Block":
+        """Set size and return self for chaining."""
+        self.size = (int(width), int(height), int(depth))
+        return self
+
+    def filled(self, fill: bool = True) -> "Block":
+        """Set fill mode and return self for chaining."""
+        self.fill = fill
+        return self
+
+    def hollow(self) -> "Block":
+        """Make block hollow (outline only). Returns self for chaining."""
+        self.fill = False
+        return self
+
+    def facing(self, direction: str) -> "Block":
+        """Set facing direction (north/south/east/west). Returns self for chaining."""
+        self.merge_properties({"facing": direction})
+        return self
 
 
 class Scene(Object3D):

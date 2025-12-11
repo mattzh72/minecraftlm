@@ -47,30 +47,36 @@ def build_structure() -> dict:
 
     # TODO: Add Block instances to the scene, e.g.:
     #
-    # ground = Block(
-    #     "minecraft:grass_block",
-    #     size=(16, 1, 16),
-    #     properties={"snowy": "false"},
-    #     catalog=catalog,
+    # # Fluent style (recommended):
+    # scene.add(
+    #     Block("minecraft:grass_block", catalog=catalog)
+    #         .with_size(16, 1, 16)
+    #         .set_properties({"snowy": "false"})
     # )
-    # scene.add(ground)
     #
-    # wall = Block(
-    #     "minecraft:oak_planks",
-    #     size=(12, 4, 1),
-    #     fill=False,
-    #     catalog=catalog,
+    # scene.add(
+    #     Block("minecraft:stone_bricks", catalog=catalog)
+    #         .with_size(10, 4, 1)
+    #         .at(3, 1, 5)
     # )
+    #
+    # scene.add(
+    #     Block("minecraft:oak_planks", catalog=catalog)
+    #         .with_size(12, 5, 12)
+    #         .at(2, 1, 2)
+    #         .hollow()
+    # )
+    #
+    # scene.add(
+    #     Block("minecraft:oak_stairs", catalog=catalog,
+    #           properties=stair_properties(facing="south"))
+    #         .at(5, 1, 0)
+    # )
+    #
+    # # Traditional style (also works):
+    # wall = Block("minecraft:oak_planks", size=(12, 4, 1), catalog=catalog)
     # wall.position.set(2, 1, 2)
     # scene.add(wall)
-    #
-    # stair = Block(
-    #     "minecraft:oak_stairs",
-    #     catalog=catalog,
-    #     properties=stair_properties(facing="south"),
-    # )
-    # stair.position.set(8, 1, 1)
-    # scene.add(stair)
 
     structure = scene.to_structure(padding=0)
     return structure
