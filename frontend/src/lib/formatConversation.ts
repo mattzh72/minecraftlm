@@ -81,7 +81,10 @@ export function formatConversationToUIMessages(
       const hasThoughtSummary =
         msg.thought_summary && msg.thought_summary.trim();
 
-      if (hasContent || hasToolCalls || hasThoughtSummary) {
+      // Also keep the last assistant message even if empty (it might be streaming)
+      const isLastMessage = conversation.indexOf(msg) === conversation.length - 1;
+
+      if (hasContent || hasToolCalls || hasThoughtSummary || isLastMessage) {
         uiMessages.push({
           type: "assistant",
           content: msg.content || "",

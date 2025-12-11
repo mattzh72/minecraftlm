@@ -32,11 +32,16 @@ class GeminiService(BaseLLMService):
             if not func_def:
                 continue
 
+            # Copy parameters and strip additionalProperties (not supported by Gemini)
+            parameters = func_def.get("parameters")
+            if parameters and isinstance(parameters, dict):
+                parameters = {k: v for k, v in parameters.items() if k != "additionalProperties"}
+
             declarations.append(
                 FunctionDeclaration(
                     name=func_def.get("name", ""),
                     description=func_def.get("description", ""),
-                    parameters=func_def.get("parameters"),
+                    parameters=parameters,
                 )
             )
         return declarations
