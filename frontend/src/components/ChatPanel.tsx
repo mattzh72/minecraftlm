@@ -257,9 +257,12 @@ export function ChatPanel() {
 
   const activeSessionId = useStore((s) => s.activeSessionId);
   const sessions = useStore((s) => s.sessions);
+  const agentState = useStore((s) => s.agentState);
   const activeSession = useMemo(() => {
     return activeSessionId ? sessions[activeSessionId] : null;
   }, [activeSessionId, sessions]);
+
+  const isAgentBusy = agentState !== "idle" && agentState !== "error";
 
   const handleSubmit = (value: string) => {
     if (activeSession?.session_id) {
@@ -282,7 +285,7 @@ export function ChatPanel() {
 
       <PromptBox
         onSubmit={handleSubmit}
-        disabled={!activeSession?.session_id}
+        disabled={!activeSession?.session_id || isAgentBusy}
         placeholder="Describe your Minecraft structure..."
       />
     </Frame>
