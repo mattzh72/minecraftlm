@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "preinstall": "cd ../packages/deepslate-opt && npm install && npm run build",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",

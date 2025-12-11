@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run the Minecraft Schematic Generator in development mode with hot reload
-# Usage: ./run.sh [dev]
-#   dev - Run with deepslate-opt in watch mode
+# Usage: ./run.sh [--watch-deepslate]
+#   --watch-deepslate - Run deepslate-opt in watch mode for development
 
 set -e
 
@@ -15,8 +15,8 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
-# Check if dev mode is enabled
-if [ "$1" = "dev" ]; then
+# Check if deepslate watch mode is enabled
+if [ "$1" = "--watch-deepslate" ]; then
     echo "Starting deepslate-opt in watch mode..."
     cd packages/deepslate-opt
     npm run dev &
