@@ -1,5 +1,6 @@
 # Common Pitfalls
 
-- `minecraft:grass_block` has only `snowy=true|false` blockstates in the assets. Always set `properties={"snowy": "false"}` for normal grass or the block may render as missing.
-- Block ids are validated. Typos such as `minecraft:gras_block` raise `ValueError` when constructing `Block`; check against `BlockCatalog.block_ids` if unsure.
-- `start` is inclusive and `end` is exclusive in the exported structure. Off-by-one errors can leave gaps or overlap; double-check sizes vs. positions.
+- Stair-based roofs built from hollow rings of stairs can leave visible gaps and a “floating” feel. When the user wants everything connected, add solid `Block` volumes or slabs under each ring (and at the corners) so every visible stair has face-adjacent support.
+- Do not rely on diagonal contact for structural support. Lanterns, finials, horns, and other ornaments should attach via full blocks, stairs, slabs, or fences so they are clearly connected rather than hovering or only touching at corners.
+- Stair corner shapes are not inferred automatically from neighbors. If you want turned stair corners instead of straight seams with tiny gaps, set an appropriate `shape` in the stair properties.
+- For symmetric builds, compute true centers from the structure dimensions (for example `cx = width // 2`, `cz = depth // 2`) when placing “centered” details like a roof finial. Reusing loop indices such as `current_min` often points at the last ring’s corner instead of the actual center, which visibly misaligns decorations.
