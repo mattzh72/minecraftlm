@@ -13,7 +13,7 @@ export const Config = {
     zoomSensitivity: 1,
   },
   renderer: {
-    chunkSize: 8,
+    chunkSize: 16,
     drawDistance: 256,
     useInvisibleBlockBuffer: false,
   },

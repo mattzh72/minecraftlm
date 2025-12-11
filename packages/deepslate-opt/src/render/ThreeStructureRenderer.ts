@@ -169,7 +169,7 @@ export class ThreeStructureRenderer {
 
 	public setViewport(x: number, y: number, width: number, height: number) {
 		this.renderer.setViewport(x, y, width, height)
-		this.renderer.setSize(width, height, false)
+		this.renderer.setSize(width, height, true)
 		this.camera.aspect = width / Math.max(height, 1)
 		this.camera.updateProjectionMatrix()
 	}
@@ -254,7 +254,11 @@ export class ThreeStructureRenderer {
 		this.camera.lookAt(this.targetCenter[0], this.targetCenter[1], this.targetCenter[2])
 		this.camera.updateMatrixWorld(true)
 
-		this.chunkMeshes.forEach(mesh => mesh.visible = true)
+		if (this.drawDistance) {
+			this.applyDrawDistance(camPos, this.drawDistance)
+		} else {
+			this.chunkMeshes.forEach(mesh => mesh.visible = true)
+		}
 	}
 
 	private rebuildChunkObjects() {
