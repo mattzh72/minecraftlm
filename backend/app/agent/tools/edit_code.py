@@ -4,8 +4,14 @@ EditCode tool - Make precise edits to SDK code using old_string/new_string
 
 from pydantic import BaseModel
 
+from app.agent.tools.base import (
+    BaseDeclarativeTool,
+    BaseToolInvocation,
+    ToolResult,
+    make_tool_schema,
+)
 from app.services.session import SessionService
-from app.agent.tools.base import BaseDeclarativeTool, BaseToolInvocation, ToolResult, make_tool_schema
+from app.services.validator import CodeValidator
 
 
 class EditCodeParams(BaseModel):
@@ -52,12 +58,41 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
             # Save updated code
             SessionService.save_code(self.params.session_id, new_code)
 
-            return ToolResult(output="Code edited successfully")
+            # Auto-compile and validate for immediate feedback
+            compilation = self._compile_and_validate(new_code)
+
+            return ToolResult(output="Code edited successfully", compilation=compilation)
 
         except FileNotFoundError:
             return ToolResult(error=f"Session {self.params.session_id} not found")
         except Exception as e:
             return ToolResult(error=f"Error editing code: {str(e)}")
+
+    def _compile_and_validate(self, code: str) -> dict:
+        """
+        Compile and validate the code, returning compilation status.
+        If valid, saves the structure for immediate UI rendering.
+        """
+        validation = CodeValidator.validate_code(code)
+
+        if validation.is_valid:
+            # Save structure for UI to render immediately
+            SessionService.save_structure(self.params.session_id, validation.structure)
+            return {
+                "status": "success",
+                "error": None,
+                "structure_updated": True,
+                "block_count": len(validation.structure.get("blocks", [])),
+            }
+        else:
+            error_msg = validation.error
+            if validation.error_line:
+                error_msg += f" (line {validation.error_line})"
+            return {
+                "status": "error",
+                "error": error_msg,
+                "structure_updated": False,
+            }
 
 
 class EditCodeTool(BaseDeclarativeTool):

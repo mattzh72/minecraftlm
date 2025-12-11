@@ -50,9 +50,15 @@ def make_tool_schema(
 class ToolResult:
     """Result from tool execution"""
 
-    def __init__(self, output: Any = None, error: str | None = None):
+    def __init__(
+        self,
+        output: Any = None,
+        error: str | None = None,
+        compilation: dict | None = None,
+    ):
         self.output = output
         self.error = error
+        self.compilation = compilation
 
     def is_success(self) -> bool:
         return self.error is None
@@ -61,7 +67,10 @@ class ToolResult:
         """Convert to dictionary for function response"""
         if self.error:
             return {"error": self.error}
-        return {"result": self.output}
+        result = {"result": self.output}
+        if self.compilation:
+            result["compilation"] = self.compilation
+        return result
 
 
 class BaseToolInvocation(ABC, Generic[TParams, TResult]):

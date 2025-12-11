@@ -83,10 +83,22 @@ export function useChat() {
                   //   extra_content: {},
                   // });
                   break;
-                // case "tool_result":
-                //   console.log(`TODO: HANDLE TOOL RESULT`, { event });
-
-                //   break;
+                case "tool_result":
+                  // Check if this tool result includes a structure update
+                  if (event.data.compilation?.structure_updated) {
+                    try {
+                      const structureRes = await fetch(
+                        `/api/sessions/${sessionId}/structure`
+                      );
+                      if (structureRes.ok) {
+                        const structureData = await structureRes.json();
+                        addStructureData(sessionId, structureData);
+                      }
+                    } catch (err) {
+                      console.error("Error fetching intermediate structure:", err);
+                    }
+                  }
+                  break;
                 case "text_delta":
                   setAgentState("streaming_text");
                   addStreamDelta(sessionId, event.data.delta);

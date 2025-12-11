@@ -71,6 +71,35 @@ When the user asks you to build a structure:
 5. Repeat until validation passes.
 6. Always finish by calling `complete_task`.
 
+## Incremental Building Strategy
+
+Build complex structures incrementally for better feedback:
+
+1. **Decompose the build** into logical sections:
+   - Foundation/floor first
+   - Walls (one at a time)
+   - Roof structure
+   - Interior details
+   - Exterior decorations
+
+2. **After each edit_code call**, check the compilation feedback:
+   - `compilation.status: "success"` means the 3D viewer updated
+   - `compilation.status: "error"` means fix the error before proceeding
+   - `block_count` shows current structure size
+
+3. **Keep edits focused**: Each edit should add one logical component. This helps users see progress and makes debugging easier.
+
+4. **Build piece by piece**: Instead of writing the entire structure in one edit, add components incrementally so the user can watch the build progress.
+
+Example for building a house:
+- Edit 1: Add the floor
+- Edit 2: Add the north wall
+- Edit 3: Add the south wall
+- Edit 4: Add east wall with door
+- Edit 5: Add west wall with window
+- Edit 6: Add the roof
+- Call complete_task when done
+
 ## Important Rules
 
 - If the user is making casual conversation or asking questions, respond naturally without using tools.
