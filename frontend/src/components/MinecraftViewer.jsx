@@ -1,8 +1,7 @@
-import { useRef, useMemo, useCallback, useState, useLayoutEffect } from "react";
+import { useRef, useMemo, useCallback, useLayoutEffect, useState, useEffect } from "react";
 import { useStore } from "../store";
-import useDeepslateResources from "../hooks/useDeepslateResources";
 import useCamera from "../hooks/useCamera";
-import useRenderLoop from "../hooks/useRenderLoop";
+import useThreeRenderer from "../hooks/useThreeRenderer";
 import useMouseControls from "../hooks/useMouseControls";
 
 export function MinecraftViewer() {
@@ -12,30 +11,48 @@ export function MinecraftViewer() {
     return activeSessionId ? sessions[activeSessionId] : null;
   }, [activeSessionId, sessions]);
 
-
+  const structureData = activeSession?.structure || null;
 
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
-
-  // Load rendering resources
-  const { resources, isLoading, error } = useDeepslateResources();
+  const [isReady, setIsReady] = useState(false);
 
   // Calculate structure size for camera initialization
   const structureSize = useMemo(() => {
-    if (!activeSession?.structure) return null;
-    return [activeSession.structure.width, activeSession.structure.height, activeSession.structure.depth];
-  }, [activeSession]);
+    if (!structureData) return null;
+    return [structureData.width, structureData.height, structureData.depth];
+  }, [structureData]);
 
   // Camera controls
   const camera = useCamera(structureSize);
 
-  // Render loop - recreate renderer when canvasSize changes
-  const { requestRender, resize } = useRenderLoop(
+  // Track when we need to re-render after scene is ready
+  const pendingRenderRef = useRef(false);
+
+  // Callback when scene is ready - trigger re-render to sync camera
+  const handleSceneReady = useCallback(() => {
+    pendingRenderRef.current = true;
+  }, []);
+
+  // Three.js render loop - replaces deepslate
+  const { requestRender, resize } = useThreeRenderer(
     canvasRef,
-    activeSession?.structure,
-    resources,
-    camera
+    structureData,
+    camera,
+    handleSceneReady
   );
+
+  // Handle pending render after scene is ready
+  useEffect(() => {
+    if (pendingRenderRef.current && requestRender) {
+      pendingRenderRef.current = false;
+      // Small delay to ensure camera state is synchronized
+      const timer = setTimeout(() => {
+        requestRender();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [requestRender, structureData]);
 
   // Store resize in ref to avoid dependency issues
   const resizeRef = useRef(resize);
@@ -56,6 +73,7 @@ export function MinecraftViewer() {
 
     // Update viewport and re-render
     resizeRef.current();
+    setIsReady(true);
   }, []);
 
   useLayoutEffect(() => {
@@ -79,19 +97,13 @@ export function MinecraftViewer() {
         ref={canvasRef}
         className="block w-full h-full"
         style={{
-          display: isLoading || error ? "none" : "block",
+          display: isReady ? "block" : "none",
         }}
       />
 
-      {isLoading && (
+      {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center text-gray-500">
-          Loading resources...
-        </div>
-      )}
-
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center text-red-500">
-          Error: {error}
+          Initializing renderer...
         </div>
       )}
     </div>

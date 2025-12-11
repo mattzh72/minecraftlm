@@ -21,8 +21,9 @@ export default function useCamera(structureSize) {
   useEffect(() => {
     if (structureSize) {
       const maxDim = Math.max(structureSize[0], structureSize[1], structureSize[2]);
+      // Scene is now centered at origin, so camera target is (0,0,0)
       const pos = vec3.create();
-      vec3.set(pos, -structureSize[0] / 2, -structureSize[1] / 2, -structureSize[2] / 2);
+      vec3.set(pos, 0, 0, 0);
       cameraState.current.cameraPos = pos;
       // Reset rotation and distance when structure changes
       cameraState.current.xRotation = cam.defaultRotationX;

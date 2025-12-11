@@ -1,13 +1,12 @@
-import { useRef, useEffect } from 'react';
-import { StructureRenderer } from 'deepslate';
-import useDeepslateResources from '../hooks/useDeepslateResources';
-import { structureFromJsonData, mat4, vec3 } from '../utils/deepslate';
+import { useRef, useEffect, useState } from 'react';
+import * as THREE from 'three';
+import { getBlockColor } from '../utils/blockColors';
 import { Config } from '../config';
 
-const { thumbnail: thumb, renderer: rend } = Config;
+const { thumbnail: thumb } = Config;
 
 /**
- * Static thumbnail viewer for Minecraft structures
+ * Static thumbnail viewer for Minecraft structures using Three.js
  * Renders a fixed-angle view without controls
  * @param {Object} structureData - The structure data to render
  * @param {number} size - Canvas size in pixels (default: 180)
@@ -15,57 +14,120 @@ const { thumbnail: thumb, renderer: rend } = Config;
  */
 export default function ThumbnailViewer({ structureData, size = thumb.defaultSize, onRenderComplete }) {
   const canvasRef = useRef(null);
-  const { resources, isLoading, error } = useDeepslateResources();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!structureData || !resources || !canvasRef.current) return;
+    if (!structureData || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const gl = canvas.getContext('webgl');
-    if (!gl) {
-      console.error('WebGL not supported');
-      return;
-    }
+    setIsLoading(true);
+    setError(null);
 
     try {
-      // Create structure from JSON data
-      const structure = structureFromJsonData(structureData);
-
       // Create renderer
-      const renderer = new StructureRenderer(
-        gl,
-        structure,
-        resources,
-        { chunkSize: rend.chunkSize }
-      );
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        preserveDrawingBuffer: true, // Required for toDataURL
+      });
+      renderer.setSize(size, size, false);
+      renderer.setClearColor(0x1a1a2e);
 
-      // Set up camera with isometric view
-      const view = mat4.create();
+      // Create scene
+      const scene = new THREE.Scene();
 
-      // Calculate structure size
+      // Add lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(50, 100, 50);
+      scene.add(dirLight);
+
+      // Group blocks by type
+      const blocksByType = new Map();
+
+      structureData.blocks.forEach((block) => {
+        const { start, end, type, fill } = block;
+        const [startX, startY, startZ] = start;
+        const [endX, endY, endZ] = end;
+
+        for (let x = startX; x < endX; x++) {
+          for (let y = startY; y < endY; y++) {
+            for (let z = startZ; z < endZ; z++) {
+              if (
+                fill ||
+                x === startX ||
+                x === endX - 1 ||
+                y === startY ||
+                y === endY - 1 ||
+                z === startZ ||
+                z === endZ - 1
+              ) {
+                if (!blocksByType.has(type)) {
+                  blocksByType.set(type, []);
+                }
+                blocksByType.get(type).push({ x, y, z });
+              }
+            }
+          }
+        }
+      });
+
+      // Create instanced meshes
+      const geometry = new THREE.BoxGeometry(1, 1, 1);
+
+      blocksByType.forEach((positions, blockType) => {
+        const color = getBlockColor(blockType);
+        const material = new THREE.MeshLambertMaterial({ color });
+
+        const instancedMesh = new THREE.InstancedMesh(
+          geometry,
+          material,
+          positions.length
+        );
+
+        const matrix = new THREE.Matrix4();
+        positions.forEach((pos, i) => {
+          matrix.setPosition(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+          instancedMesh.setMatrixAt(i, matrix);
+        });
+
+        instancedMesh.instanceMatrix.needsUpdate = true;
+        scene.add(instancedMesh);
+      });
+
+      // Set up camera
       const width = structureData.width || thumb.fallbackDimension;
       const height = structureData.height || thumb.fallbackDimension;
       const depth = structureData.depth || thumb.fallbackDimension;
 
-      // Calculate viewing distance - scale with structure size
       const maxDim = Math.max(width, height, depth);
       const viewDist = maxDim * thumb.distanceMultiplier;
 
-      // Center the structure
-      const cameraPos = vec3.create();
-      vec3.set(cameraPos, -width / 2, -height / 2, -depth / 2);
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
 
-      // Apply transformations: first translate back, then rotate, then center structure
-      mat4.translate(view, view, [0, 0, -viewDist]);
-      mat4.rotateX(view, view, thumb.tiltAngle);
-      mat4.rotateY(view, view, thumb.rotateAngle);
-      mat4.translate(view, view, cameraPos);
+      // Position camera for isometric-ish view
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const centerZ = depth / 2;
 
-      // Render once (static)
-      renderer.drawStructure(view);
-      renderer.drawGrid(view);
+      // Apply rotation angles from config
+      const tiltAngle = thumb.tiltAngle;
+      const rotateAngle = thumb.rotateAngle;
 
-      // Capture canvas and call callback if provided
+      camera.position.set(
+        centerX + viewDist * Math.sin(rotateAngle) * Math.cos(tiltAngle),
+        centerY + viewDist * Math.sin(tiltAngle),
+        centerZ + viewDist * Math.cos(rotateAngle) * Math.cos(tiltAngle)
+      );
+      camera.lookAt(centerX, centerY, centerZ);
+
+      // Render
+      renderer.render(scene, camera);
+
+      // Capture and callback
       if (onRenderComplete) {
         try {
           const dataUrl = canvas.toDataURL('image/png');
@@ -74,13 +136,26 @@ export default function ThumbnailViewer({ structureData, size = thumb.defaultSiz
           console.error('Error capturing thumbnail:', captureErr);
         }
       }
+
+      setIsLoading(false);
+
+      // Cleanup
+      return () => {
+        geometry.dispose();
+        blocksByType.forEach((_, blockType) => {
+          // Materials are disposed with the scene
+        });
+        renderer.dispose();
+      };
     } catch (err) {
       console.error('Error rendering thumbnail:', err);
+      setError(err.message);
+      setIsLoading(false);
     }
-  }, [structureData, resources, onRenderComplete]);
+  }, [structureData, size, onRenderComplete]);
 
   // Loading state
-  if (isLoading) {
+  if (isLoading && !structureData) {
     return (
       <div
         className="flex items-center justify-center bg-gray-100 rounded-lg text-gray-400 text-xs"
