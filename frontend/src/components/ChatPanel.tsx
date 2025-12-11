@@ -259,7 +259,7 @@ export function ChatPanel() {
   const sessions = useStore((s) => s.sessions);
   const activeSession = useMemo(() => {
     return activeSessionId ? sessions[activeSessionId] : null;
-  }, []);
+  }, [activeSessionId, sessions]);
 
   const handleSubmit = (value: string) => {
     if (activeSession?.session_id) {
