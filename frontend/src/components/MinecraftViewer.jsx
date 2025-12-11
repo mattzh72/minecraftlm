@@ -50,7 +50,7 @@ export function MinecraftViewer() {
     const { clientWidth, clientHeight } = container;
     if (clientWidth === 0 || clientHeight === 0) return;
 
-    // Update canvas buffer dimensions (Three.js setPixelRatio handles DPR)
+    // Update canvas buffer dimensions
     canvas.width = clientWidth;
     canvas.height = clientHeight;
 
