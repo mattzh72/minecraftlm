@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { StructureRenderer } from 'deepslate';
+import { ThreeStructureRenderer } from 'deepslate-opt';
 import useDeepslateResources from '../hooks/useDeepslateResources';
 import { structureFromJsonData, mat4, vec3 } from '../utils/deepslate';
 import { Config } from '../config';
@@ -27,17 +27,20 @@ export default function ThumbnailViewer({ structureData, size = thumb.defaultSiz
       return;
     }
 
+    let renderer = null;
+
     try {
       // Create structure from JSON data
       const structure = structureFromJsonData(structureData);
 
       // Create renderer
-      const renderer = new StructureRenderer(
-        gl,
+      renderer = new ThreeStructureRenderer(
+        canvas,
         structure,
         resources,
-        { chunkSize: rend.chunkSize }
+        { chunkSize: rend.chunkSize, drawDistance: rend.drawDistance }
       );
+      renderer.setViewport(0, 0, canvas.width, canvas.height);
 
       // Set up camera with isometric view
       const view = mat4.create();
@@ -64,6 +67,7 @@ export default function ThumbnailViewer({ structureData, size = thumb.defaultSiz
       // Render once (static)
       renderer.drawStructure(view);
       renderer.drawGrid(view);
+      console.log('[ThumbnailViewer] rendered thumbnail');
 
       // Capture canvas and call callback if provided
       if (onRenderComplete) {
@@ -77,6 +81,12 @@ export default function ThumbnailViewer({ structureData, size = thumb.defaultSiz
     } catch (err) {
       console.error('Error rendering thumbnail:', err);
     }
+
+    return () => {
+      if (renderer && renderer.dispose) {
+        renderer.dispose();
+      }
+    };
   }, [structureData, resources, onRenderComplete]);
 
   // Loading state

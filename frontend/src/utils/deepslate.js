@@ -1,7 +1,7 @@
 // Deepslate utilities for Minecraft rendering
 // Adapted from legacy implementation
 
-import { BlockDefinition, BlockModel, TextureAtlas, Structure } from 'deepslate';
+import { BlockDefinition, BlockModel, TextureAtlas, Structure } from 'deepslate-opt';
 import { mat4, vec3 } from 'gl-matrix';
 
 let deepslateResources = null;
@@ -73,6 +73,7 @@ export function loadDeepslateResources(textureImage, assets, blockFlags = {}) {
 
   const opaqueBlocks = blockFlags.opaque ?? new Set();
   const transparentBlocks = blockFlags.transparent ?? new Set();
+  const nonOpaqueBlocks = blockFlags.nonOpaque ?? new Set();
   const nonSelfCullingBlocks = blockFlags.nonSelfCulling ?? new Set();
 
   deepslateResources = {
@@ -91,7 +92,9 @@ export function loadDeepslateResources(textureImage, assets, blockFlags = {}) {
     getBlockFlags(id) {
       const key = normalizeId(id);
       const isTransparent = transparentBlocks.has(key);
-      const isOpaque = !isTransparent && opaqueBlocks.has(key);
+      const isExplicitOpaque = opaqueBlocks.has(key);
+      const isExplicitNonOpaque = nonOpaqueBlocks.has(key);
+      const isOpaque = !isTransparent && !isExplicitNonOpaque && (isExplicitOpaque || opaqueBlocks.size === 0);
       const isNonSelfCulling = nonSelfCullingBlocks.has(key);
 
       return {
@@ -152,6 +155,7 @@ export function structureFromJsonData(data) {
   });
 
   let blockCount = 0;
+  const typeCounts = new Map();
   blockMap.forEach((value, key) => {
     const [x, y, z] = key.split(",").map(Number);
     try {
@@ -160,6 +164,7 @@ export function structureFromJsonData(data) {
       } else {
         structure.addBlock([x, y, z], value.type);
       }
+      typeCounts.set(value.type, (typeCounts.get(value.type) ?? 0) + 1);
       blockCount++;
     } catch (err) {
       console.warn(
@@ -168,7 +173,7 @@ export function structureFromJsonData(data) {
     }
   });
 
-  console.log("Structure created:", blockCount, "blocks");
+  console.log("Structure created:", blockCount, "blocks", Object.fromEntries(typeCounts.entries()));
   return structure;
 }
 
