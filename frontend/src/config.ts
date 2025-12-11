@@ -14,6 +14,8 @@ export const Config = {
   },
   renderer: {
     chunkSize: 8,
+    drawDistance: 256,
+    useInvisibleBlockBuffer: false,
   },
   thumbnail: {
     defaultSize: 180,

@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect } from 'react';
-import { StructureRenderer } from 'deepslate';
+import { ThreeStructureRenderer } from 'deepslate-opt';
 import { structureFromJsonData } from '../utils/deepslate';
 import { Config } from '../config';
 
@@ -9,7 +9,6 @@ import { Config } from '../config';
  */
 export default function useRenderLoop(canvasRef, structureData, resources, camera) {
   const rendererRef = useRef(null);
-  const glRef = useRef(null);
   const animationFrameRef = useRef(null);
 
   // Render function
@@ -19,6 +18,7 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     const view = camera.getViewMatrix();
     rendererRef.current.drawStructure(view);
     rendererRef.current.drawGrid(view);
+    console.log('[useRenderLoop] render frame');
   }, [camera]);
 
   // Request a render frame
@@ -38,29 +38,33 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     const hasValidDimensions = canvas.width > 0 && canvas.height > 0;
     if (!hasValidDimensions) return;
 
-    const gl = canvas.getContext('webgl');
-    if (!gl) {
-      console.error('WebGL not supported');
-      return;
-    }
-    glRef.current = gl;
-
     // Create structure from JSON data
     const structure = structureFromJsonData(structureData);
+    console.log('[useRenderLoop] structure blocks', structureData.blocks?.length);
 
     // Clean up old animation frame
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
 
+    // Dispose previous renderer
+    if (rendererRef.current && rendererRef.current.dispose) {
+      rendererRef.current.dispose();
+    }
+
     // Create new renderer
-    const renderer = new StructureRenderer(
-      gl,
+    const renderer = new ThreeStructureRenderer(
+      canvas,
       structure,
       resources,
-      { chunkSize: Config.renderer.chunkSize }
+      {
+        chunkSize: Config.renderer.chunkSize,
+        drawDistance: Config.renderer.drawDistance,
+        useInvisibleBlockBuffer: Config.renderer.useInvisibleBlockBuffer,
+      }
     );
     rendererRef.current = renderer;
+    console.log('[useRenderLoop] created renderer', renderer);
 
     // Set viewport and projection matrix to match canvas dimensions
     renderer.setViewport(0, 0, canvas.width, canvas.height);
@@ -74,8 +78,10 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
+      if (rendererRef.current && rendererRef.current.dispose) {
+        rendererRef.current.dispose();
+      }
       rendererRef.current = null;
-      glRef.current = null;
     };
   }, [structureData, resources, render]);
 
