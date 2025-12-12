@@ -23,6 +23,18 @@ type FogOptions = {
 	heightFalloff?: number,
 }
 
+type EmissiveOptions = {
+	range?: number,
+	intensity?: number,
+	tint?: Color,
+}
+
+type StarsOptions = {
+	enabled?: boolean,
+	density?: number,
+	brightness?: number,
+}
+
 type SkyOptions = {
 	zenithColor?: Color,
 	horizonColor?: Color,
@@ -30,6 +42,7 @@ type SkyOptions = {
 	sunGlowColor?: Color,
 	sunGlowIntensity?: number,
 	sunGlowExponent?: number,
+	stars?: StarsOptions,
 }
 
 type ShadowOptions = {
@@ -82,19 +95,22 @@ type SunlightOptions = {
 	fog?: FogOptions,
 	shadow?: ShadowOptions,
 	postProcess?: PostProcessOptions,
+	emissive?: EmissiveOptions,
 }
 
 type SunDiscSettings = Required<SunDiscOptions>
 type FogSettings = Required<FogOptions>
-type SkySettings = Required<SkyOptions>
+type StarsSettings = Required<StarsOptions>
+type SkySettings = Required<Omit<SkyOptions, 'stars'>> & { stars: StarsSettings }
 type ShadowSettings = Required<ShadowOptions>
+type EmissiveSettings = Required<EmissiveOptions>
 type PostProcessSettings = {
 	enabled: boolean,
 	ao: Required<NonNullable<PostProcessOptions['ao']>>,
 	bloom: Required<NonNullable<PostProcessOptions['bloom']>>,
 	godRays: Required<NonNullable<PostProcessOptions['godRays']>>,
 }
-type SunlightSettings = Required<Omit<SunlightOptions, 'sky' | 'disc' | 'fog' | 'shadow' | 'postProcess'>> & { sky: SkySettings, disc: SunDiscSettings, fog: FogSettings, shadow: ShadowSettings, postProcess: PostProcessSettings }
+type SunlightSettings = Required<Omit<SunlightOptions, 'sky' | 'disc' | 'fog' | 'shadow' | 'postProcess' | 'emissive'>> & { sky: SkySettings, disc: SunDiscSettings, fog: FogSettings, shadow: ShadowSettings, postProcess: PostProcessSettings, emissive: EmissiveSettings }
 
 type ThreeStructureRendererOptions = {
 	chunkSize?: number,
@@ -122,6 +138,11 @@ const DEFAULT_SUNLIGHT: Omit<SunlightSettings, 'direction'> & { direction: [numb
 		sunGlowColor: [1.0, 0.45, 0.15],
 		sunGlowIntensity: 0.6,
 		sunGlowExponent: 6.0,
+		stars: {
+			enabled: false,
+			density: 0.003,
+			brightness: 0.6,
+		},
 	},
 	disc: {
 		size: 35,
@@ -168,6 +189,11 @@ const DEFAULT_SUNLIGHT: Omit<SunlightSettings, 'direction'> & { direction: [numb
 			samples: 60,
 		},
 	},
+	emissive: {
+		range: 8.0,
+		intensity: 1.0,
+		tint: [1.0, 0.85, 0.6],
+	},
 }
 
 // Maximum number of emissive point lights supported
@@ -199,6 +225,11 @@ function buildSunlightSettings(options?: SunlightOptions): SunlightSettings {
 			sunGlowColor: options?.sky?.sunGlowColor ?? DEFAULT_SUNLIGHT.sky.sunGlowColor,
 			sunGlowIntensity: options?.sky?.sunGlowIntensity ?? DEFAULT_SUNLIGHT.sky.sunGlowIntensity,
 			sunGlowExponent: options?.sky?.sunGlowExponent ?? DEFAULT_SUNLIGHT.sky.sunGlowExponent,
+			stars: {
+				enabled: options?.sky?.stars?.enabled ?? DEFAULT_SUNLIGHT.sky.stars.enabled,
+				density: options?.sky?.stars?.density ?? DEFAULT_SUNLIGHT.sky.stars.density,
+				brightness: options?.sky?.stars?.brightness ?? DEFAULT_SUNLIGHT.sky.stars.brightness,
+			},
 		},
 		disc: {
 			size: options?.disc?.size ?? DEFAULT_SUNLIGHT.disc.size,
@@ -244,6 +275,11 @@ function buildSunlightSettings(options?: SunlightOptions): SunlightSettings {
 				density: options?.postProcess?.godRays?.density ?? DEFAULT_SUNLIGHT.postProcess.godRays.density,
 				samples: options?.postProcess?.godRays?.samples ?? DEFAULT_SUNLIGHT.postProcess.godRays.samples,
 			},
+		},
+		emissive: {
+			range: options?.emissive?.range ?? DEFAULT_SUNLIGHT.emissive.range,
+			intensity: options?.emissive?.intensity ?? DEFAULT_SUNLIGHT.emissive.intensity,
+			tint: options?.emissive?.tint ?? DEFAULT_SUNLIGHT.emissive.tint,
 		},
 	}
 }
@@ -768,6 +804,9 @@ export class ThreeStructureRenderer {
 				uniform vec3 emissiveLightColors[MAX_EMISSIVE_LIGHTS];
 				uniform float emissiveLightIntensities[MAX_EMISSIVE_LIGHTS];
 				uniform int numEmissiveLights;
+				uniform float emissiveRange;
+				uniform float emissiveGlobalIntensity;
+				uniform vec3 emissiveTint;
 
 				float sampleShadow(vec2 uv, float compare) {
 					float depth = texture2D(shadowMap, uv).r;
@@ -821,17 +860,18 @@ export class ThreeStructureRenderer {
 						float dist = length(lightDir);
 						lightDir = normalize(lightDir);
 
-						// Minecraft-style light falloff (linear with range ~15 blocks)
-						float lightRange = 8.0;
-						float attenuation = max(0.0, 1.0 - dist / lightRange);
+						// Use configurable range for light falloff
+						float attenuation = max(0.0, 1.0 - dist / emissiveRange);
 						attenuation = attenuation * attenuation; // Quadratic falloff for softer edges
 
 						// Simple diffuse contribution
 						float ndl = max(dot(normal, lightDir), 0.0);
 						// Add some ambient to simulate light bouncing around corners
-						float wrappedNdl = ndl * 0.7 + 0.3;
+						float wrappedNdl = ndl * 0.6 + 0.4;
 
-						totalLight += lightColor * intensity * attenuation * wrappedNdl * 0.5;
+						// Apply tint and global intensity
+						vec3 tintedColor = lightColor * emissiveTint;
+						totalLight += tintedColor * intensity * attenuation * wrappedNdl * emissiveGlobalIntensity;
 					}
 
 					return totalLight;
@@ -944,6 +984,10 @@ export class ThreeStructureRenderer {
 			emissiveLightColors: { value: emissiveLightColors },
 			emissiveLightIntensities: { value: emissiveLightIntensities },
 			numEmissiveLights: { value: 0 },
+			// Global emissive settings
+			emissiveRange: { value: this.sunlight.emissive.range },
+			emissiveGlobalIntensity: { value: this.sunlight.emissive.intensity },
+			emissiveTint: { value: makeColor(this.sunlight.emissive.tint) },
 		}
 	}
 
@@ -957,6 +1001,28 @@ export class ThreeStructureRenderer {
 		this.applySunlightUniforms(this.opaqueMaterial)
 		this.applySunlightUniforms(this.transparentMaterial)
 		this.applySkyUniforms()
+		this.applySunDiscUniforms()
+	}
+
+	private applySunDiscUniforms() {
+		if (!this.sunDisc) return
+		const material = this.sunDisc.material as THREE.ShaderMaterial
+		const uniforms = material.uniforms
+		if (!uniforms) return
+
+		uniforms.coreColor.value.setRGB(
+			this.sunlight.disc.coreColor[0],
+			this.sunlight.disc.coreColor[1],
+			this.sunlight.disc.coreColor[2]
+		)
+		uniforms.glowColor.value.setRGB(
+			this.sunlight.disc.glowColor[0],
+			this.sunlight.disc.glowColor[1],
+			this.sunlight.disc.glowColor[2]
+		)
+		uniforms.coreIntensity.value = this.sunlight.disc.coreIntensity
+		uniforms.glowIntensity.value = this.sunlight.disc.glowIntensity
+		uniforms.softness.value = this.sunlight.disc.softness
 	}
 
 	private applySkyUniforms() {
@@ -986,6 +1052,11 @@ export class ThreeStructureRenderer {
 
 		if (uniforms.sunGlowIntensity) uniforms.sunGlowIntensity.value = this.sunlight.sky.sunGlowIntensity
 		if (uniforms.sunGlowExponent) uniforms.sunGlowExponent.value = this.sunlight.sky.sunGlowExponent
+
+		// Star settings
+		if (uniforms.starsEnabled) uniforms.starsEnabled.value = this.sunlight.sky.stars.enabled
+		if (uniforms.starsDensity) uniforms.starsDensity.value = this.sunlight.sky.stars.density
+		if (uniforms.starsBrightness) uniforms.starsBrightness.value = this.sunlight.sky.stars.brightness
 	}
 
 	private applySunlightUniforms(material: THREE.RawShaderMaterial) {
@@ -1018,6 +1089,11 @@ export class ThreeStructureRenderer {
 		if (uniforms.exposure) uniforms.exposure.value = this.sunlight.exposure
 		if (uniforms.fogDensity) uniforms.fogDensity.value = this.sunlight.fog.density
 		if (uniforms.fogHeightFalloff) uniforms.fogHeightFalloff.value = this.sunlight.fog.heightFalloff
+
+		// Emissive settings
+		if (uniforms.emissiveRange) uniforms.emissiveRange.value = this.sunlight.emissive.range
+		if (uniforms.emissiveGlobalIntensity) uniforms.emissiveGlobalIntensity.value = this.sunlight.emissive.intensity
+		setColor('emissiveTint', this.sunlight.emissive.tint)
 	}
 
 	private createColoredMaterial() {
@@ -1258,6 +1334,10 @@ export class ThreeStructureRenderer {
 				sunGlowExponent: { value: this.sunlight.sky.sunGlowExponent },
 				invViewMatrix: { value: new THREE.Matrix4() },
 				invProjectionMatrix: { value: new THREE.Matrix4() },
+				// Star uniforms
+				starsEnabled: { value: this.sunlight.sky.stars.enabled },
+				starsDensity: { value: this.sunlight.sky.stars.density },
+				starsBrightness: { value: this.sunlight.sky.stars.brightness },
 			},
 			vertexShader: `
 				varying vec2 vUv;
@@ -1279,6 +1359,94 @@ export class ThreeStructureRenderer {
 				uniform float sunGlowExponent;
 				uniform mat4 invViewMatrix;
 				uniform mat4 invProjectionMatrix;
+
+				// Star uniforms
+				uniform bool starsEnabled;
+				uniform float starsDensity;
+				uniform float starsBrightness;
+
+				// Hash function for procedural star generation
+				float hash(vec3 p) {
+					p = fract(p * vec3(443.8975, 397.2973, 491.1871));
+					p += dot(p.xyz, p.yxz + 19.19);
+					return fract(p.x * p.y * p.z);
+				}
+
+				// Generate stars based on ray direction
+				float stars(vec3 rayDir) {
+					if (!starsEnabled) return 0.0;
+
+					// Only show stars above horizon
+					if (rayDir.y < 0.0) return 0.0;
+
+					vec3 dir = normalize(rayDir);
+					float starField = 0.0;
+
+					// Large bright stars (sparse)
+					{
+						vec3 gridPos = dir * 70.0;
+						vec3 cellId = floor(gridPos);
+						vec3 cellUv = fract(gridPos);
+
+						float h = hash(cellId);
+						if (h < starsDensity * 0.25) {
+							vec3 starPos = vec3(hash(cellId + 1.0), hash(cellId + 2.0), hash(cellId + 3.0));
+							float dist = length(cellUv - starPos);
+							float star = smoothstep(0.15, 0.0, dist);
+							starField += star * 0.9;
+						}
+					}
+
+					// Medium stars
+					{
+						vec3 gridPos = dir * 130.0;
+						vec3 cellId = floor(gridPos);
+						vec3 cellUv = fract(gridPos);
+
+						float h = hash(cellId + 50.0);
+						if (h < starsDensity * 0.5) {
+							vec3 starPos = vec3(hash(cellId + 51.0), hash(cellId + 52.0), hash(cellId + 53.0));
+							float dist = length(cellUv - starPos);
+							float star = smoothstep(0.10, 0.0, dist);
+							starField += star * 0.6;
+						}
+					}
+
+					// Small stars (dense)
+					{
+						vec3 gridPos = dir * 250.0;
+						vec3 cellId = floor(gridPos);
+						vec3 cellUv = fract(gridPos);
+
+						float h = hash(cellId + 100.0);
+						if (h < starsDensity * 1.0) {
+							vec3 starPos = vec3(hash(cellId + 101.0), hash(cellId + 102.0), hash(cellId + 103.0));
+							float dist = length(cellUv - starPos);
+							float star = smoothstep(0.065, 0.0, dist);
+							starField += star * 0.4;
+						}
+					}
+
+					// Tiny stars (very dense)
+					{
+						vec3 gridPos = dir * 450.0;
+						vec3 cellId = floor(gridPos);
+						vec3 cellUv = fract(gridPos);
+
+						float h = hash(cellId + 200.0);
+						if (h < starsDensity * 1.8) {
+							vec3 starPos = vec3(hash(cellId + 201.0), hash(cellId + 202.0), hash(cellId + 203.0));
+							float dist = length(cellUv - starPos);
+							float star = smoothstep(0.04, 0.0, dist);
+							starField += star * 0.2;
+						}
+					}
+
+					// Fade out near horizon
+					float horizonFade = smoothstep(0.0, 0.15, rayDir.y);
+
+					return starField * starsBrightness * horizonFade;
+				}
 
 				void main() {
 					// Convert UV to clip space coordinates
@@ -1311,10 +1479,16 @@ export class ThreeStructureRenderer {
 					// Add sun atmospheric glow (more spread out)
 					float atmosphericGlow = pow(sunDot, 2.5) * 0.25;
 
-					// Horizon haze - more glow near horizon
-					float horizonHaze = (1.0 - abs(elevation)) * pow(sunDot, 3.0) * 0.3;
+					// Horizon haze - more glow near horizon and below
+					float horizonHaze = (1.0 - max(elevation, 0.0)) * pow(sunDot, 3.0) * 0.3;
 
 					finalColor += sunGlowColor * (sunGlow + atmosphericGlow + horizonHaze);
+
+					// Add stars
+					float starLight = stars(rayDir);
+					// Stars are white/slightly blue-white
+					vec3 starColor = vec3(0.85, 0.9, 1.0);
+					finalColor += starColor * starLight;
 
 					// Slight exposure adjustment
 					finalColor = 1.0 - exp(-finalColor * 1.2);

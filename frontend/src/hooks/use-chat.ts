@@ -9,6 +9,7 @@ export function useChat() {
   const addThoughtSummary = useStore((s) => s.addThoughtSummary);
   const addAssistantMessage = useStore((s) => s.addAssistantMessage);
   const addToolCall = useStore((s) => s.addToolCall);
+  const requestThumbnailCapture = useStore((s) => s.requestThumbnailCapture);
 
   const handleSend = async (userMessage: string, sessionId: string) => {
     // Read selectedModelId at call time to avoid stale closure issues
@@ -42,6 +43,7 @@ export function useChat() {
       const decoder = new TextDecoder();
       let lineBuffer = "";
       let eventLines: string[] = [];
+      let sawCompleteTaskCall = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -74,6 +76,9 @@ export function useChat() {
                   break;
                 case "tool_call":
                   setAgentState("tool_calling");
+                  if (event.data.name === "complete_task") {
+                    sawCompleteTaskCall = true;
+                  }
                   addToolCall(sessionId, {
                     type: "function",
                     function: {
@@ -107,7 +112,7 @@ export function useChat() {
                   break;
                 case "complete":
                   setAgentState("idle");
-                  if (event.data.success) {
+                  if (event.data.success && sawCompleteTaskCall) {
                     try {
                       const structureRes = await fetch(
                         `/api/sessions/${sessionId}/structure`
@@ -125,6 +130,8 @@ export function useChat() {
                       // If 404, simply do nothing (don't throw or log)
                     } catch (err) {
                       console.error("Error fetching structure:", err);
+                    } finally {
+                      requestThumbnailCapture(sessionId);
                     }
                   }
                   break;

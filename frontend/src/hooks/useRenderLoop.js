@@ -1,13 +1,18 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { ThreeStructureRenderer } from 'deepslate-opt';
 import { structureFromJsonData } from '../utils/deepslate';
-import { Config } from '../config';
+import { Config, TimePresets } from '../config';
 
 /**
  * Hook to manage WebGL rendering loop
  * Recreates renderer when canvas size changes to ensure correct projection
+ * @param {React.RefObject} canvasRef - Reference to the canvas element
+ * @param {object} structureData - Structure data to render
+ * @param {object} resources - Deepslate resources
+ * @param {object} camera - Camera object
+ * @param {string} timeOfDay - Time of day preset ('day', 'sunset', 'night')
  */
-export default function useRenderLoop(canvasRef, structureData, resources, camera, onStructureRendered) {
+export default function useRenderLoop(canvasRef, structureData, resources, camera, timeOfDay = 'sunset') {
   const rendererRef = useRef(null);
   const animationFrameRef = useRef(null);
 
@@ -73,10 +78,6 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     // Render
     animationFrameRef.current = requestAnimationFrame(() => {
       render();
-      // Call callback after initial render of new structure
-      if (onStructureRendered) {
-        onStructureRendered(canvas);
-      }
     });
 
     // Cleanup
@@ -92,6 +93,15 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     };
   }, [structureData, resources, render]);
 
+  // Update sunlight when timeOfDay changes
+  useEffect(() => {
+    if (!rendererRef.current || !timeOfDay) return;
+    const preset = TimePresets[timeOfDay];
+    if (preset) {
+      rendererRef.current.setSunlight(preset);
+      requestRender();
+    }
+  }, [timeOfDay, requestRender]);
 
   // Resize viewport AND update projection matrix, then re-render
   const resize = useCallback(() => {

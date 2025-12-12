@@ -5,6 +5,7 @@ import type {
   ToolCall,
   RawAssistantMessage,
 } from "@/lib/schemas";
+import type { TimeOfDay } from "@/config";
 
 export type AgentState =
   | "idle"
@@ -19,6 +20,12 @@ export type StoreStateBase = {
   // session state
   sessions: Record<string, StoreSession>;
   activeSessionId: string | null;
+
+  // thumbnail capture request (triggered on complete_task)
+  thumbnailCaptureRequest: { sessionId: string; nonce: number } | null;
+
+  // renderer time of day
+  timeOfDay: TimeOfDay;
 
   // chat state
   agentState: AgentState;
@@ -61,6 +68,11 @@ export type StoreActions = {
   addStreamDelta: (sessionId: string, delta: string) => void;
   addToolCall: (sessionId: string, toolCall: ToolCall) => void;
 
+  requestThumbnailCapture: (sessionId: string) => void;
+  clearThumbnailCaptureRequest: () => void;
+
+  setTimeOfDay: (time: TimeOfDay) => void;
+
   // todo: add tool result
 
   addThoughtSummary: (sessionId: string, thoughtSummary: string) => void;
@@ -92,6 +104,15 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   sessions: {},
   activeSessionId: null,
+  thumbnailCaptureRequest: null,
+  requestThumbnailCapture: (sessionId: string) =>
+    set({
+      thumbnailCaptureRequest: { sessionId, nonce: Date.now() },
+    }),
+  clearThumbnailCaptureRequest: () => set({ thumbnailCaptureRequest: null }),
+
+  timeOfDay: "sunset",
+  setTimeOfDay: (time) => set({ timeOfDay: time }),
   activeSession: () => {
     const activeSessionId = get().activeSessionId;
     return activeSessionId ? get().sessions[activeSessionId] : null;

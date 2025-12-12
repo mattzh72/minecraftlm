@@ -4,24 +4,28 @@ import useDeepslateResources from "../hooks/useDeepslateResources";
 import useCamera from "../hooks/useCamera";
 import useRenderLoop from "../hooks/useRenderLoop";
 import useMouseControls from "../hooks/useMouseControls";
+import useThumbnailCaptureOnComplete from "../hooks/useThumbnailCaptureOnComplete";
 
 export function MinecraftViewer() {
   const activeSessionId = useStore((s) => s.activeSessionId);
   const sessions = useStore((s) => s.sessions);
+  const thumbnailCaptureRequest = useStore((s) => s.thumbnailCaptureRequest);
+  const clearThumbnailCaptureRequest = useStore(
+    (s) => s.clearThumbnailCaptureRequest
+  );
+  const timeOfDay = useStore((s) => s.timeOfDay);
   const activeSession = useMemo(() => {
     return activeSessionId ? sessions[activeSessionId] : null;
   }, [activeSessionId, sessions]);
 
-
-
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
 
-  // Upload thumbnail to backend
-  const uploadThumbnail = useCallback(async (canvas) => {
-    if (!activeSessionId || !canvas) return;
+  // Capture current canvas and upload thumbnail to backend
+  const captureAndUploadThumbnail = useCallback(async () => {
+    if (!activeSessionId || !canvasRef.current) return;
     try {
-      const dataUrl = canvas.toDataURL('image/png');
+      const dataUrl = canvasRef.current.toDataURL('image/png');
       await fetch(`/api/sessions/${activeSessionId}/thumbnail`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -50,8 +54,20 @@ export function MinecraftViewer() {
     activeSession?.structure,
     resources,
     camera,
-    uploadThumbnail
+    timeOfDay
   );
+
+  useThumbnailCaptureOnComplete({
+    thumbnailCaptureRequest,
+    activeSessionId,
+    structureData: activeSession?.structure,
+    isLoading,
+    error,
+    canvasRef,
+    requestRender,
+    captureAndUploadThumbnail,
+    clearThumbnailCaptureRequest,
+  });
 
   // Store resize in ref to avoid dependency issues
   const resizeRef = useRef(resize);

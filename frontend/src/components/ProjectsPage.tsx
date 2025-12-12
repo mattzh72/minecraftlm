@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSession } from "@/hooks/useSession";
 import ThumbnailViewer from "./ThumbnailViewer";
@@ -7,7 +7,6 @@ import { PromptBox } from "./PromptBox";
 import { cn } from "@/lib/utils";
 import { listSessionsResponseSchema, storeSessionSchema } from "@/lib/schemas";
 import { useStore } from "@/store";
-import { Config } from "@/config";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
@@ -18,27 +17,6 @@ export function ProjectsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const hasSessions = useStore((s) => Object.keys(s.sessions).length > 0);
-  // Track sessions that have had thumbnails uploaded this session to avoid duplicate uploads
-  const [uploadedThumbnails, setUploadedThumbnails] = useState<Set<string>>(new Set());
-
-  // Upload thumbnail to backend for caching
-  const uploadThumbnail = useCallback(async (sessionId: string, dataUrl: string) => {
-    // Skip if already uploaded this session
-    if (uploadedThumbnails.has(sessionId)) return;
-
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}/thumbnail`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: dataUrl }),
-      });
-      if (response.ok) {
-        setUploadedThumbnails((prev) => new Set(prev).add(sessionId));
-      }
-    } catch (err) {
-      console.error(`Error uploading thumbnail for ${sessionId}:`, err);
-    }
-  }, [uploadedThumbnails]);
 
   // Fetch all sessions on mount
   useEffect(() => {
@@ -128,7 +106,7 @@ export function ProjectsPage() {
           <h1 className="text-6xl font-medium text-foreground/90 mb-5 tracking-tight font-display leading-tight">
             MinecraftLM
           </h1>
-          <p className="text-xl text-muted-foreground/80 mb-16 font-normal text-center max-w-lg leading-relaxed">
+          <p className="text-xl text-muted-foreground/80 mb-8 font-normal text-center max-w-lg leading-relaxed">
             What would you like to build?
           </p>
 
@@ -180,7 +158,6 @@ export function ProjectsPage() {
                     ) : session.has_structure && session.structure ? (
                       <ThumbnailViewer
                         structureData={session.structure}
-                        onRenderComplete={(dataUrl) => uploadThumbnail(session.session_id, dataUrl)}
                       />
                     ) : (
                       <div className="text-white/30 text-4xl">
