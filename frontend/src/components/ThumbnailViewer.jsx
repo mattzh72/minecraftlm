@@ -38,7 +38,11 @@ export default function ThumbnailViewer({ structureData, size = thumb.defaultSiz
         canvas,
         structure,
         resources,
-        { chunkSize: rend.chunkSize, drawDistance: rend.drawDistance }
+        {
+          chunkSize: rend.chunkSize,
+          drawDistance: rend.drawDistance,
+          sunlight: rend.sunlight,
+        }
       );
       renderer.setViewport(0, 0, canvas.width, canvas.height);
 

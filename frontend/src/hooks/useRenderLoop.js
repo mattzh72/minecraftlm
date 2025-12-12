@@ -61,6 +61,7 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
         chunkSize: Config.renderer.chunkSize,
         drawDistance: Config.renderer.drawDistance,
         useInvisibleBlockBuffer: Config.renderer.useInvisibleBlockBuffer,
+        sunlight: Config.renderer.sunlight,
       }
     );
     rendererRef.current = renderer;
