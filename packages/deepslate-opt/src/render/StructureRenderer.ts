@@ -1,4 +1,5 @@
-import { mat4, vec3 } from 'gl-matrix'
+import type { vec3 } from 'gl-matrix'
+import { mat4 } from 'gl-matrix'
 import type { Identifier, StructureProvider } from '../core/index.js'
 import { BlockState } from '../core/index.js'
 import type { Color } from '../index.js'
@@ -62,9 +63,6 @@ export type BlockFlags = {
 	opaque?: boolean,
 	semi_transparent?: boolean,
 	self_culling?: boolean,
-	emissive?: boolean,
-	emissiveIntensity?: number,
-	emissiveConditional?: string,
 }
 
 export interface BlockFlagsProvider {
@@ -82,7 +80,6 @@ interface StructureRendererOptions {
 	facesPerBuffer?: number,
 	chunkSize?: number,
 	useInvisibleBlockBuffer?: boolean,
-	drawDistance?: number,
 }
 
 export class StructureRenderer extends Renderer {
@@ -94,7 +91,6 @@ export class StructureRenderer extends Renderer {
 	private invisibleBlocksMesh: Mesh = new Mesh()
 	private readonly atlasTexture: WebGLTexture
 	public useInvisibleBlocks: boolean
-	private readonly drawDistance?: number
 
 	private readonly chunkBuilder: ChunkBuilder
 
@@ -114,7 +110,6 @@ export class StructureRenderer extends Renderer {
 			console.warn('[deepslate renderer warning]: facesPerBuffer option has been removed in favor of chunkSize')
 		}
 		this.useInvisibleBlocks = options?.useInvisibleBlockBuffer ?? true
-		this.drawDistance = options?.drawDistance
 
 		this.gridShaderProgram = new ShaderProgram(gl, vsGrid, fsGrid).getProgram()
 		this.colorShaderProgram = new ShaderProgram(gl, vsColor, fsColor).getProgram()
@@ -158,13 +153,13 @@ export class StructureRenderer extends Renderer {
 		for (let x = 1; x <= X; x += 1) mesh.addLine(x, 0, 0, x, 0, Z, c)
 		for (let z = 1; z <= Z; z += 1) mesh.addLine(0, 0, z, X, 0, z, c)
 
-		return mesh.rebuild(this.gl, { pos: true, color: true, usage: this.gl.STATIC_DRAW })
+		return mesh.rebuild(this.gl, { pos: true, color: true })
 	}
 
 	private getOutlineMesh(): Mesh {
 		return new Mesh()
 			.addLineCube(0, 0, 0, 1, 1, 1, [1, 1, 1])
-			.rebuild(this.gl, { pos: true, color: true, usage: this.gl.STATIC_DRAW })
+			.rebuild(this.gl, { pos: true, color: true })
 	}
 
 	private getInvisibleBlocksMesh(): Mesh {
@@ -192,7 +187,7 @@ export class StructureRenderer extends Renderer {
 			}
 		}
 
-		return mesh.rebuild(this.gl, { pos: true, color: true, usage: this.gl.STATIC_DRAW })
+		return mesh.rebuild(this.gl, { pos: true, color: true })
 	}
 
 	public drawGrid(viewMatrix: mat4) {
@@ -217,8 +212,7 @@ export class StructureRenderer extends Renderer {
 		this.setTexture(this.atlasTexture, this.resources.getPixelSize?.())
 		this.prepareDraw(viewMatrix)
 
-		const meshes = this.selectMeshes(viewMatrix)
-		meshes.forEach(mesh => {
+		this.chunkBuilder.getMeshes().forEach(mesh => {
 			this.drawMesh(mesh, { pos: true, color: true, texture: true, normal: true })
 		})
 	}
@@ -227,8 +221,7 @@ export class StructureRenderer extends Renderer {
 		this.setShader(this.colorShaderProgram)
 		this.prepareDraw(viewMatrix)
 
-		const meshes = this.selectMeshes(viewMatrix)
-		meshes.forEach(mesh => {
+		this.chunkBuilder.getMeshes().forEach(mesh => {
 			this.drawMesh(mesh, { pos: true, color: true, normal: true, blockPos: true })
 		})
 	}
@@ -242,24 +235,5 @@ export class StructureRenderer extends Renderer {
 		this.prepareDraw(translatedMatrix)
 
 		this.drawMesh(this.outlineMesh, { pos: true, color: true })
-	}
-
-	private selectMeshes(viewMatrix: mat4): Mesh[] {
-		if (!this.drawDistance) {
-			return this.chunkBuilder.getMeshes()
-		}
-		const camPos = this.getCameraPosition(viewMatrix)
-		if (!camPos) {
-			return this.chunkBuilder.getMeshes()
-		}
-		return this.chunkBuilder.getMeshesInRange(camPos, this.drawDistance)
-	}
-
-	private getCameraPosition(viewMatrix: mat4): vec3 | null {
-		const inv = mat4.create()
-		if (!mat4.invert(inv, viewMatrix)) {
-			return null
-		}
-		return vec3.fromValues(inv[12], inv[13], inv[14])
 	}
 }

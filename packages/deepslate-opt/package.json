@@ -1,6 +1,6 @@
 {
-  "name": "deepslate-opt",
-  "description": "Optimized fork of deepslate - Library for rendering and emulating parts of Minecraft",
+  "name": "deepslate",
+  "description": "Library for rendering and emulating parts of Minecraft",
   "version": "0.24.0",
   "author": "Misode",
   "license": "MIT",
@@ -61,13 +61,11 @@
   "dependencies": {
     "gl-matrix": "^3.3.0",
     "md5": "^2.3.0",
-    "pako": "^2.0.3",
-    "three": "^0.164.1"
+    "pako": "^2.0.3"
   },
   "devDependencies": {
     "@types/md5": "^2.3.1",
     "@types/pako": "^1.0.1",
-    "@types/three": "^0.164.0",
     "@typescript-eslint/eslint-plugin": "^5.42.1",
     "@typescript-eslint/parser": "^5.42.1",
     "benny": "^3.7.1",

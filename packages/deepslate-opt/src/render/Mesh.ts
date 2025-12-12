@@ -92,9 +92,7 @@ export class Mesh {
 		}
 	}
 
-	public rebuild(gl: WebGLRenderingContext, options: { pos?: boolean, color?: boolean, texture?: boolean, normal?: boolean, blockPos?: boolean, usage?: number }) {
-		const usage = options.usage ?? gl.DYNAMIC_DRAW
-
+	public rebuild(gl: WebGLRenderingContext, options: { pos?: boolean, color?: boolean, texture?: boolean, normal?: boolean, blockPos?: boolean }) {
 		const rebuildBuffer = (buffer: WebGLBuffer | undefined, type: number, data: BufferSource): WebGLBuffer | undefined => {
 			if (!buffer) {
 				buffer = gl.createBuffer() ?? undefined
@@ -103,7 +101,7 @@ export class Mesh {
 				throw new Error('Cannot create new buffer')
 			}
 			gl.bindBuffer(type, buffer)
-			gl.bufferData(type, data, usage)
+			gl.bufferData(type, data, gl.DYNAMIC_DRAW)
 			return buffer
 		}
 		const rebuildBufferV = (array: Quad[] | Line[], buffer: WebGLBuffer | undefined, mapper: (v: Vertex) => number[] | undefined): WebGLBuffer | undefined => {

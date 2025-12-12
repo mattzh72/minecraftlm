@@ -13,7 +13,6 @@ export class Vertex {
 		public textureLimit: [number, number, number, number] | undefined,
 		public normal: Vector | undefined,
 		public blockPos: Vector | undefined,
-		public emissive: number = 0,
 	) {}
 
 	public transform(transformation: mat4) {
@@ -26,6 +25,6 @@ export class Vertex {
 	}
 
 	public static fromPos(pos: Vector) {
-		return new Vertex(pos, [0, 0, 0], [0, 0], [0, 0, 0, 0], undefined, undefined, 0)
+		return new Vertex(pos, [0, 0, 0], [0, 0], [0, 0, 0, 0], undefined, undefined)
 	}
 }
