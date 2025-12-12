@@ -5,6 +5,7 @@ import { useSession } from "@/hooks/useSession";
 import { MinecraftViewer } from "./MinecraftViewer";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/store";
+import { TimeOfDayToggle } from "./TimeOfDayToggle";
 /**
  * Session page - displays chat panel and 3D viewer for a specific session
  */
@@ -99,6 +100,11 @@ export function SessionPage() {
         >
           ← Projects
         </Button>
+      </div>
+
+      {/* Time of day toggle */}
+      <div className="absolute top-16 left-4 z-20">
+        <TimeOfDayToggle />
       </div>
 
       {/* Floating Chat Panel - glass overlay, slightly narrower */}
