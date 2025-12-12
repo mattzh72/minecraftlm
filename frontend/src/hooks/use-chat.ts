@@ -92,15 +92,13 @@ export function useChat() {
                   });
                   break;
                 case "tool_result": {
-                  // Add tool result to conversation (if we have the ID to match it)
-                  if (event.data.tool_call_id) {
-                    const hasError = !!event.data.error;
-                    const resultContent = JSON.stringify({
-                      result: event.data.result,
-                      error: event.data.error,
-                    });
-                    addToolResult(sessionId, event.data.tool_call_id, resultContent, hasError);
-                  }
+                  // Add tool result to conversation
+                  const hasError = !!event.data.error;
+                  const resultContent = JSON.stringify({
+                    result: event.data.result,
+                    error: event.data.error,
+                  });
+                  addToolResult(sessionId, event.data.tool_call_id, resultContent, hasError);
 
                   // Check if this tool result includes a structure update
                   if (event.data.compilation?.structure_updated) {
