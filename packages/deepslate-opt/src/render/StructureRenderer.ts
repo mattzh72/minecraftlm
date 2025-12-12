@@ -62,6 +62,9 @@ export type BlockFlags = {
 	opaque?: boolean,
 	semi_transparent?: boolean,
 	self_culling?: boolean,
+	emissive?: boolean,
+	emissiveIntensity?: number,
+	emissiveConditional?: string,
 }
 
 export interface BlockFlagsProvider {

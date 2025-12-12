@@ -1,5 +1,5 @@
 import { mat4, vec3 } from 'gl-matrix'
-import type { PlacedBlock, Resources, StructureProvider } from '../index.js'
+import type { Identifier, PlacedBlock, Resources, StructureProvider } from '../index.js'
 import { BlockPos, Direction, Vector } from '../index.js'
 import { Mesh } from './Mesh.js'
 import { SpecialRenderers } from './SpecialRenderer.js'
@@ -84,8 +84,8 @@ export class ChunkBuilder {
 				if (!specialMesh.isEmpty()) {
 					mesh.merge(specialMesh)
 				}
-				if (!mesh.isEmpty()) {	
-					this.finishChunkMesh(mesh, b.pos)
+				if (!mesh.isEmpty()) {
+					this.finishChunkMesh(mesh, b.pos, blockName, blockProps)
 					if (this.resources.getBlockFlags(b.state.getName())?.semi_transparent){
 						chunk.transparentMesh.merge(mesh)
 					} else {
@@ -181,15 +181,35 @@ export class ChunkBuilder {
 		return true
 	}
 
-	private finishChunkMesh(mesh: Mesh, pos: vec3) {
+	private finishChunkMesh(mesh: Mesh, pos: vec3, blockName: Identifier, blockProps: Record<string, string>) {
 		const t = mat4.create()
 		mat4.translate(t, t, pos)
 		mesh.transform(t)
 
+		// Determine emissive value based on block flags
+		const flags = this.resources.getBlockFlags(blockName)
+		let emissive = 0
+		if (flags?.emissive) {
+			// Check for conditional emission (e.g., lit property)
+			const conditional = flags.emissiveConditional
+			if (conditional) {
+				const propValue = blockProps[conditional]
+				// Only emit if the conditional property is true or not specified
+				if (propValue === undefined || propValue === 'true') {
+					emissive = flags.emissiveIntensity ?? 1.0
+				}
+			} else {
+				emissive = flags.emissiveIntensity ?? 1.0
+			}
+		}
+
 		for (const q of mesh.quads) {
 			const normal = q.normal()
-			q.forEach(v => v.normal = normal)
-			q.forEach(v => v.blockPos = new Vector(pos[0], pos[1], pos[2]))
+			q.forEach(v => {
+				v.normal = normal
+				v.blockPos = new Vector(pos[0], pos[1], pos[2])
+				v.emissive = emissive
+			})
 		}
 	}
 

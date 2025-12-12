@@ -161,7 +161,7 @@ const DEFAULT_SUNLIGHT: Omit<SunlightSettings, 'direction'> & { direction: [numb
 			radius: 0.6,
 		},
 		godRays: {
-			enabled: true,
+			enabled: false,
 			intensity: 0.4,
 			decay: 0.95,
 			density: 0.8,
@@ -258,6 +258,7 @@ function meshToBufferGeometry(mesh: Mesh) {
 	const colors: number[] = []
 	const texLimits: number[] = []
 	const blockPositions: number[] = []
+	const emissives: number[] = []
 	const indices: number[] = []
 
 	let offset = 0
@@ -277,6 +278,7 @@ function meshToBufferGeometry(mesh: Mesh) {
 			colors.push(color[0], color[1], color[2])
 			const pos = v.blockPos ?? v.pos
 			blockPositions.push(pos.x, pos.y, pos.z)
+			emissives.push(v.emissive ?? 0)
 		}
 		indices.push(
 			offset, offset + 1, offset + 2,
@@ -291,6 +293,7 @@ function meshToBufferGeometry(mesh: Mesh) {
 	geometry.setAttribute('texLimit', new THREE.Float32BufferAttribute(texLimits, 4))
 	geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
 	geometry.setAttribute('blockPos', new THREE.Float32BufferAttribute(blockPositions, 3))
+	geometry.setAttribute('emissive', new THREE.Float32BufferAttribute(emissives, 1))
 	const indexArray = indices.length > 65535 ? new Uint32Array(indices) : new Uint16Array(indices)
 	geometry.setIndex(new THREE.BufferAttribute(indexArray, 1))
 	geometry.computeBoundingSphere()
@@ -658,6 +661,7 @@ export class ThreeStructureRenderer {
 				attribute vec4 texLimit;
 				attribute vec3 color;
 				attribute vec3 normal;
+				attribute float emissive;
 
 				varying highp vec2 vTexCoord;
 				varying highp vec4 vTexLimit;
@@ -665,12 +669,14 @@ export class ThreeStructureRenderer {
 				varying highp vec3 vNormal;
 				varying highp vec4 vShadowCoord;
 				varying highp vec3 vWorldPos;
+				varying highp float vEmissive;
 
 				void main(void) {
 					vTexCoord = uv;
 					vTexLimit = texLimit;
 					vTintColor = color;
 					vNormal = normalize(normalMatrix * normal);
+					vEmissive = emissive;
 
 					vec4 worldPos = modelMatrix * vec4(position, 1.0);
 					vWorldPos = worldPos.xyz;
@@ -687,6 +693,7 @@ export class ThreeStructureRenderer {
 				varying highp vec3 vNormal;
 				varying highp vec4 vShadowCoord;
 				varying highp vec3 vWorldPos;
+				varying highp float vEmissive;
 
 				uniform sampler2D atlas;
 				uniform sampler2D shadowMap;
@@ -778,11 +785,16 @@ export class ThreeStructureRenderer {
 					vec3 baseColor = texColor.xyz * vTintColor;
 					vec3 finalColor = baseColor * lighting * exposure;
 
+					// Add emissive contribution (subtle glow for bloom effect)
+					vec3 emissiveContrib = baseColor * vEmissive * 0.8;
+					finalColor = finalColor + emissiveContrib;
+
 					// Height + distance fog approximated in view space
 					float depth = gl_FragCoord.z / gl_FragCoord.w;
 					float fog = 1.0 - exp(-depth * fogDensity - max(0.0, vTexCoord.y) * fogHeightFalloff);
 					fog = clamp(fog, 0.0, 1.0);
-					vec3 fogged = mix(finalColor, fogColor, fog);
+					// Slightly reduce fog on emissive blocks
+					vec3 fogged = mix(finalColor, fogColor, fog * (1.0 - vEmissive * 0.3));
 
 					gl_FragColor = vec4(fogged, texColor.a);
 				}
