@@ -17,15 +17,19 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
   const animationFrameRef = useRef(null);
   const structureRef = useRef(null);
   const resourcesRef = useRef(null);
+  const cameraRef = useRef(camera);
 
-  // Render function
+  // Keep camera ref updated
+  cameraRef.current = camera;
+
+  // Render function - uses ref to avoid recreating when camera changes
   const render = useCallback(() => {
-    if (!rendererRef.current || !camera) return;
+    if (!rendererRef.current || !cameraRef.current) return;
 
-    const view = camera.getViewMatrix();
+    const view = cameraRef.current.getViewMatrix();
     rendererRef.current.drawStructure(view);
     rendererRef.current.drawGrid(view);
-  }, [camera]);
+  }, []);
 
   // Request a render frame
   const requestRender = useCallback(() => {

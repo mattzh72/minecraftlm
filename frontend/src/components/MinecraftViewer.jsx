@@ -11,7 +11,10 @@ import useThumbnailCaptureOnComplete from "../hooks/useThumbnailCaptureOnComplet
 
 export function MinecraftViewer() {
   const activeSessionId = useStore((s) => s.activeSessionId);
-  const sessions = useStore((s) => s.sessions);
+  // Only subscribe to the structure data, not the entire session (avoids re-renders on conversation updates)
+  const structureData = useStore((s) =>
+    s.activeSessionId ? s.sessions[s.activeSessionId]?.structure : null
+  );
   const thumbnailCaptureRequest = useStore((s) => s.thumbnailCaptureRequest);
   const clearThumbnailCaptureRequest = useStore(
     (s) => s.clearThumbnailCaptureRequest
@@ -19,9 +22,6 @@ export function MinecraftViewer() {
   const timeOfDay = useStore((s) => s.timeOfDay);
   const viewerMode = useStore((s) => s.viewerMode);
   const setViewerMode = useStore((s) => s.setViewerMode);
-  const activeSession = useMemo(() => {
-    return activeSessionId ? sessions[activeSessionId] : null;
-  }, [activeSessionId, sessions]);
 
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -46,9 +46,9 @@ export function MinecraftViewer() {
 
   // Calculate structure size for camera initialization
   const structureSize = useMemo(() => {
-    if (!activeSession?.structure) return null;
-    return [activeSession.structure.width, activeSession.structure.height, activeSession.structure.depth];
-  }, [activeSession]);
+    if (!structureData) return null;
+    return [structureData.width, structureData.height, structureData.depth];
+  }, [structureData]);
 
   // Orbit camera (for orbit mode)
   const orbitCamera = useCamera(structureSize);
@@ -62,7 +62,7 @@ export function MinecraftViewer() {
   // Render loop - recreate renderer when canvasSize changes
   const { render, requestRender, resize, structureRef, resourcesRef } = useRenderLoop(
     canvasRef,
-    activeSession?.structure,
+    structureData,
     resources,
     activeCamera,
     timeOfDay
@@ -86,7 +86,7 @@ export function MinecraftViewer() {
   useThumbnailCaptureOnComplete({
     thumbnailCaptureRequest,
     activeSessionId,
-    structureData: activeSession?.structure,
+    structureData,
     isLoading,
     error,
     canvasRef,

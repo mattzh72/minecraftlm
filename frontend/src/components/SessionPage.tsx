@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChatPanel } from "./ChatPanel";
 import { useSession } from "@/hooks/useSession";
@@ -25,6 +25,9 @@ export function SessionPage() {
   const { isLoading, restoreSession, clearActiveSession } = useSession();
   const urlSessionId = useSessionIdFromUrl();
 
+  const [chatExpanded, setChatExpanded] = useState(true);
+  const [chatWidth, setChatWidth] = useState(320);
+  const [isResizing, setIsResizing] = useState(false);
 
   // restore session from URL param on mount
   useEffect(() => {
@@ -75,8 +78,8 @@ export function SessionPage() {
                 {isLoading
                   ? "Loading session..."
                   : activeSessionId
-                  ? "Start chatting to design your Minecraft structure!"
-                  : "Initializing..."}
+                    ? "Start chatting to design your Minecraft structure!"
+                    : "Initializing..."}
               </p>
               <div className="glass-panel rounded-xl text-xs leading-relaxed p-4 text-white/70">
                 <p className="font-medium text-white/80 mb-2">
@@ -114,8 +117,18 @@ export function SessionPage() {
       </div>
 
       {/* Floating Chat Panel - glass overlay, slightly narrower */}
-      <div className="absolute top-4 right-4 bottom-4 z-10 w-80">
-        <ChatPanel />
+      <div
+        className={`absolute top-4 right-4 bottom-4 z-10 ${!isResizing ? 'transition-all duration-300 ease-in-out' : ''}`}
+        style={{ width: chatExpanded ? chatWidth : 32 }}
+      >
+        <ChatPanel
+          expanded={chatExpanded}
+          setExpanded={setChatExpanded}
+          width={chatWidth}
+          onWidthChange={setChatWidth}
+          onResizeStart={() => setIsResizing(true)}
+          onResizeEnd={() => setIsResizing(false)}
+        />
       </div>
     </div>
   );
