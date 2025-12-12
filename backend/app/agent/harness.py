@@ -16,6 +16,7 @@ from app.agent.llms import (
     GeminiService,
     OpenAIService,
 )
+from app.agent.tools.base import ToolResult
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.read_code import ReadCodeTool
@@ -341,22 +342,22 @@ class MinecraftSchematicAgent:
                 )
 
                 if not invocation:
-                    tool_result = {"error": f"Tool {func_name} not found"}
+                    result = ToolResult(error=f"Tool {func_name} not found", tool_call_id=tool_call.id)
                 else:
                     result = await invocation.execute()
-                    tool_result = result.to_dict()
+                    result.tool_call_id = tool_call.id
 
                     # Check if this is complete_task
                     if func_name == "complete_task" and result.is_success():
                         task_completed = True
 
-                yield ActivityEvent(type="tool_result", data=tool_result)
+                yield ActivityEvent(type="tool_result", data=result.to_dict())
 
-                # Build tool response
+                # Build tool response (without tool_call_id in content, it's in the message itself)
                 tool_response = ToolMessage(
                     role="tool",
                     tool_call_id=tool_call.id,
-                    content=json.dumps(tool_result),
+                    content=json.dumps({k: v for k, v in result.to_dict().items() if k != "tool_call_id"}),
                     name=func_name,
                 ).model_dump()
                 serialized_responses.append(tool_response)

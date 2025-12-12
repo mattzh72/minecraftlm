@@ -62,13 +62,17 @@ export function formatConversationToUIMessages(
             arguments: tc.function?.arguments || "{}",
           };
 
-          // Attach result by ID if available
-          const result = tc.id ? toolResultMap.get(tc.id) : null;
-          if (result) {
-            toolCallWithResult.result = {
-              content: result.content,
-              hasError: result.hasError,
-            };
+          // Check for inline result first (added during streaming), then fall back to result map
+          if (tc.result) {
+            toolCallWithResult.result = tc.result;
+          } else {
+            const result = tc.id ? toolResultMap.get(tc.id) : null;
+            if (result) {
+              toolCallWithResult.result = {
+                content: result.content,
+                hasError: result.hasError,
+              };
+            }
           }
 
           tool_calls.push(toolCallWithResult);

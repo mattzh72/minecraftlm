@@ -9,6 +9,7 @@ export function useChat() {
   const addThoughtSummary = useStore((s) => s.addThoughtSummary);
   const addAssistantMessage = useStore((s) => s.addAssistantMessage);
   const addToolCall = useStore((s) => s.addToolCall);
+  const addToolResult = useStore((s) => s.addToolResult);
   const requestThumbnailCapture = useStore((s) => s.requestThumbnailCapture);
 
   const handleSend = async (userMessage: string, sessionId: string) => {
@@ -90,7 +91,15 @@ export function useChat() {
                     extra_content: {},
                   });
                   break;
-                case "tool_result":
+                case "tool_result": {
+                  // Add tool result to conversation
+                  const hasError = !!event.data.error;
+                  const resultContent = JSON.stringify({
+                    result: event.data.result,
+                    error: event.data.error,
+                  });
+                  addToolResult(sessionId, event.data.tool_call_id, resultContent, hasError);
+
                   // Check if this tool result includes a structure update
                   if (event.data.compilation?.structure_updated) {
                     try {
@@ -106,6 +115,7 @@ export function useChat() {
                     }
                   }
                   break;
+                }
                 case "text_delta":
                   setAgentState("streaming_text");
                   addStreamDelta(sessionId, event.data.delta);

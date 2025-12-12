@@ -1,8 +1,9 @@
 """Storage schemas for conversation messages"""
 
+import uuid
 from typing import Literal, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ToolCallFunction(BaseModel):
@@ -15,7 +16,7 @@ class ToolCallFunction(BaseModel):
 class ToolCall(BaseModel):
     """Tool call made by the assistant"""
 
-    id: str | None = None
+    id: str = Field(default_factory=lambda: f"call_{uuid.uuid4().hex}")
     type: Literal["function"]
     function: ToolCallFunction
     thought_signature: str | None = None

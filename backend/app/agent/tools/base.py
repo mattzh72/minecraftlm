@@ -56,19 +56,25 @@ class ToolResult:
         output: Any = None,
         error: str | None = None,
         compilation: dict | None = None,
+        tool_call_id: str | None = None,
     ):
         self.output = output
         self.error = error
         self.compilation = compilation
+        self.tool_call_id = tool_call_id
 
     def is_success(self) -> bool:
         return self.error is None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for function response"""
+        """Convert to dictionary for SSE event / function response"""
+        result: dict[str, Any] = {}
+        if self.tool_call_id:
+            result["tool_call_id"] = self.tool_call_id
         if self.error:
-            return {"error": self.error}
-        result = {"result": self.output}
+            result["error"] = self.error
+        else:
+            result["result"] = self.output
         if self.compilation:
             result["compilation"] = self.compilation
         return result

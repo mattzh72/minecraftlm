@@ -72,14 +72,13 @@ export type StoreActions = {
   addAssistantMessage: (sessionId: string, message: string) => void;
   addStreamDelta: (sessionId: string, delta: string) => void;
   addToolCall: (sessionId: string, toolCall: ToolCall) => void;
+  addToolResult: (sessionId: string, toolCallId: string, result: string, hasError: boolean) => void;
 
   requestThumbnailCapture: (sessionId: string) => void;
   clearThumbnailCaptureRequest: () => void;
 
   setTimeOfDay: (time: TimeOfDay) => void;
   setViewerMode: (mode: ViewerMode) => void;
-
-  // todo: add tool result
 
   addThoughtSummary: (sessionId: string, thoughtSummary: string) => void;
 };
@@ -190,6 +189,38 @@ export const useStore = create<StoreState>()((set, get) => ({
     console.log(`addToolCall: newAssistantMessage`, newAssistantMessage);
     newConversation[newConversation.length - 1] = newAssistantMessage;
     console.log(`addToolCall: newConversation`, newConversation);
+    set({
+      sessions: {
+        ...get().sessions,
+        [sessionId]: { ...session, conversation: newConversation },
+      },
+    });
+  },
+
+  addToolResult: (sessionId: string, toolCallId: string, result: string, hasError: boolean) => {
+    const session = get().sessions[sessionId];
+    if (!session) return;
+
+    const newConversation = [...(session.conversation || [])];
+
+    // Find and update the tool call in the assistant message
+    for (let i = newConversation.length - 1; i >= 0; i--) {
+      const msg = newConversation[i];
+      if (msg.role === "assistant" && msg.tool_calls) {
+        const tcIndex = msg.tool_calls.findIndex((t) => t.id === toolCallId);
+        if (tcIndex !== -1) {
+          // Update the tool call with its result
+          const updatedToolCalls = [...msg.tool_calls];
+          updatedToolCalls[tcIndex] = {
+            ...updatedToolCalls[tcIndex],
+            result: { content: result, hasError },
+          };
+          newConversation[i] = { ...msg, tool_calls: updatedToolCalls };
+          break;
+        }
+      }
+    }
+
     set({
       sessions: {
         ...get().sessions,
