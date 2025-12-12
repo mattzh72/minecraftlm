@@ -123,8 +123,8 @@ class MinecraftSchematicAgent:
             "[[SDK_API_SCENE]]": f"02-api-scene.md\n\n{(docs_dir / '02-api-scene.md').read_text()}",
             "[[SDK_BLOCKS_REFERENCE]]": f"03-blocks-reference.md\n\n{(docs_dir / '03-blocks-reference.md').read_text()}",
             "[[SDK_BLOCK_LIST]]": f"04-block-list.md\n\n{(docs_dir / '04-block-list.md').read_text()}",
-            "[[SDK_PITFALLS]]": f"05-pitfalls.md\n\n{(docs_dir / '05-pitfalls.md').read_text()}",
-            "[[SDK_TERRAIN]]": f"06-terrain-guide.md\n\n{(docs_dir / '06-terrain-guide.md').read_text()}",
+            "[[SDK_TERRAIN]]": f"05-terrain-guide.md\n\n{(docs_dir / '05-terrain-guide.md').read_text()}",
+            "[[SDK_GUIDELINES]]": f"06-implementation-guidelines.md\n\n{(docs_dir / '06-implementation-guidelines.md').read_text()}",
         }
 
     def _build_system_prompt(self) -> str:

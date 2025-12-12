@@ -15,6 +15,8 @@ import { Config, TimePresets } from '../config';
 export default function useRenderLoop(canvasRef, structureData, resources, camera, timeOfDay = 'sunset') {
   const rendererRef = useRef(null);
   const animationFrameRef = useRef(null);
+  const structureRef = useRef(null);
+  const resourcesRef = useRef(null);
 
   // Render function
   const render = useCallback(() => {
@@ -23,7 +25,6 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     const view = camera.getViewMatrix();
     rendererRef.current.drawStructure(view);
     rendererRef.current.drawGrid(view);
-    console.log('[useRenderLoop] render frame');
   }, [camera]);
 
   // Request a render frame
@@ -45,6 +46,8 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
 
     // Create structure from JSON data
     const structure = structureFromJsonData(structureData);
+    structureRef.current = structure;
+    resourcesRef.current = resources;
     console.log('[useRenderLoop] structure blocks', structureData.blocks?.length);
 
     // Clean up old animation frame
@@ -114,8 +117,10 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
 
   return {
     rendererRef,
-    render,
-    requestRender,
+    structureRef,
+    resourcesRef,
+    render,          // Direct render (use when already in animation frame)
+    requestRender,   // Scheduled render (use from event handlers)
     animationFrameRef,
     resize,
   };

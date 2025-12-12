@@ -609,10 +609,17 @@ export class ThreeStructureRenderer {
 	}
 
 	private prepareCamera(viewMatrix: mat4) {
+		// Respect the incoming view matrix instead of always aiming at targetCenter.
+		// This keeps first-person yaw/pitch (pointer lock) aligned with the rendered view.
+		const threeView = new THREE.Matrix4().fromArray(viewMatrix as number[])
+		const worldMatrix = new THREE.Matrix4().copy(threeView).invert()
+
+		// Decompose into the camera transform so orbit and first-person cameras both work.
+		this.camera.position.setFromMatrixPosition(worldMatrix)
+		this.camera.quaternion.setFromRotationMatrix(worldMatrix)
+		this.camera.updateMatrixWorld(true)
+
 		const camPos = this.getCameraPosition(viewMatrix) ?? vec3.fromValues(0, 0, 10)
-		this.camera.position.set(camPos[0], camPos[1], camPos[2])
-		this.camera.up.set(0, 1, 0)
-		this.camera.lookAt(this.targetCenter[0], this.targetCenter[1], this.targetCenter[2])
 		this.camera.updateMatrixWorld(true)
 
 		if (this.drawDistance) {

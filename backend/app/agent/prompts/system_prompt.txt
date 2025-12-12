@@ -32,11 +32,11 @@ writing or editing the Python script.
 ```
 
 ```md
-[[SDK_PITFALLS]]
+[[SDK_TERRAIN]]
 ```
 
 ```md
-[[SDK_TERRAIN]]
+[[SDK_GUIDELINES]]
 ```
 
 ## Available Tools

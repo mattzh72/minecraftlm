@@ -1,4 +1,19 @@
 export const Config = {
+  playable: {
+    // Physics
+    gravity: -20,           // blocks/s^2
+    jumpVelocity: 8,        // blocks/s
+    moveSpeed: 5.5,         // blocks/s (slightly faster for snappier feel)
+    terminalVelocity: -78,  // max fall speed
+    // Player dimensions
+    playerHeight: 1.62,     // eye level above feet
+    playerWidth: 0.6,       // hitbox width
+    playerDepth: 0.6,       // hitbox depth
+    // Controls
+    lookSensitivity: 0.002, // mouse sensitivity
+    // Spawn
+    spawnHeightOffset: 5,   // blocks above structure top
+  },
   camera: {
     defaultDistance: 12,
     minDistance: 4,

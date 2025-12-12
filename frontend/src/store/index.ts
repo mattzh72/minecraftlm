@@ -7,6 +7,8 @@ import type {
 } from "@/lib/schemas";
 import type { TimeOfDay } from "@/config";
 
+export type ViewerMode = "orbit" | "playable";
+
 export type AgentState =
   | "idle"
   | "thinking"
@@ -26,6 +28,9 @@ export type StoreStateBase = {
 
   // renderer time of day
   timeOfDay: TimeOfDay;
+
+  // viewer mode (orbit camera vs playable first-person)
+  viewerMode: ViewerMode;
 
   // chat state
   agentState: AgentState;
@@ -72,6 +77,7 @@ export type StoreActions = {
   clearThumbnailCaptureRequest: () => void;
 
   setTimeOfDay: (time: TimeOfDay) => void;
+  setViewerMode: (mode: ViewerMode) => void;
 
   // todo: add tool result
 
@@ -113,6 +119,8 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   timeOfDay: "sunset",
   setTimeOfDay: (time) => set({ timeOfDay: time }),
+  viewerMode: "orbit",
+  setViewerMode: (mode) => set({ viewerMode: mode }),
   activeSession: () => {
     const activeSessionId = get().activeSessionId;
     return activeSessionId ? get().sessions[activeSessionId] : null;

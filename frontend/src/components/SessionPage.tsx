@@ -6,6 +6,7 @@ import { MinecraftViewer } from "./MinecraftViewer";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/store";
 import { TimeOfDayToggle } from "./TimeOfDayToggle";
+import { ViewerModeToggle } from "./ViewerModeToggle";
 /**
  * Session page - displays chat panel and 3D viewer for a specific session
  */
@@ -105,6 +106,11 @@ export function SessionPage() {
       {/* Time of day toggle */}
       <div className="absolute top-16 left-4 z-20">
         <TimeOfDayToggle />
+      </div>
+
+      {/* Viewer mode toggle */}
+      <div className="absolute top-28 left-4 z-20">
+        <ViewerModeToggle />
       </div>
 
       {/* Floating Chat Panel - glass overlay, slightly narrower */}

@@ -4,14 +4,15 @@ import { Config } from '../config';
 /**
  * Hook to handle mouse controls for camera
  * Handles drag rotation and wheel zoom
+ * @param {boolean} enabled - Whether mouse controls are active (default true)
  */
-export default function useMouseControls(canvasRef, camera, requestRender) {
+export default function useMouseControls(canvasRef, camera, requestRender, enabled = true) {
   const clickPosRef = useRef(null);
   const modeRef = useRef('rotate'); // 'rotate' or 'pan'
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !camera || !requestRender) return;
+    if (!canvas || !camera || !requestRender || !enabled) return;
 
     const handleMouseDown = (evt) => {
       evt.preventDefault();
@@ -67,5 +68,5 @@ export default function useMouseControls(canvasRef, camera, requestRender) {
       canvas.removeEventListener('contextmenu', handleContext);
       canvas.removeEventListener('wheel', handleWheel);
     };
-  }, [canvasRef, camera, requestRender]);
+  }, [canvasRef, camera, requestRender, enabled]);
 }

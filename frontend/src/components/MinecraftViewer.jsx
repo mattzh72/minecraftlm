@@ -2,8 +2,11 @@ import { useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import { useStore } from "../store";
 import useDeepslateResources from "../hooks/useDeepslateResources";
 import useCamera from "../hooks/useCamera";
+import useFirstPersonCamera from "../hooks/useFirstPersonCamera";
 import useRenderLoop from "../hooks/useRenderLoop";
 import useMouseControls from "../hooks/useMouseControls";
+import useFirstPersonControls from "../hooks/useFirstPersonControls";
+import usePhysics from "../hooks/usePhysics";
 import useThumbnailCaptureOnComplete from "../hooks/useThumbnailCaptureOnComplete";
 
 export function MinecraftViewer() {
@@ -14,6 +17,8 @@ export function MinecraftViewer() {
     (s) => s.clearThumbnailCaptureRequest
   );
   const timeOfDay = useStore((s) => s.timeOfDay);
+  const viewerMode = useStore((s) => s.viewerMode);
+  const setViewerMode = useStore((s) => s.setViewerMode);
   const activeSession = useMemo(() => {
     return activeSessionId ? sessions[activeSessionId] : null;
   }, [activeSessionId, sessions]);
@@ -45,17 +50,38 @@ export function MinecraftViewer() {
     return [activeSession.structure.width, activeSession.structure.height, activeSession.structure.depth];
   }, [activeSession]);
 
-  // Camera controls
-  const camera = useCamera(structureSize);
+  // Orbit camera (for orbit mode)
+  const orbitCamera = useCamera(structureSize);
+
+  // First-person camera (for playable mode)
+  const fpCamera = useFirstPersonCamera(structureSize);
+
+  // Use the appropriate camera based on mode
+  const activeCamera = viewerMode === 'orbit' ? orbitCamera : fpCamera;
 
   // Render loop - recreate renderer when canvasSize changes
-  const { requestRender, resize } = useRenderLoop(
+  const { render, requestRender, resize, structureRef, resourcesRef } = useRenderLoop(
     canvasRef,
     activeSession?.structure,
     resources,
-    camera,
+    activeCamera,
     timeOfDay
   );
+
+  // Physics (only active in playable mode)
+  // Pass render directly since physics runs in its own animation frame
+  const physics = usePhysics(
+    fpCamera.cameraState,
+    structureRef,
+    resourcesRef,
+    viewerMode === 'playable',
+    render
+  );
+
+  // Exit callback for when pointer lock is lost
+  const exitPlayableMode = useCallback(() => {
+    setViewerMode('orbit');
+  }, [setViewerMode]);
 
   useThumbnailCaptureOnComplete({
     thumbnailCaptureRequest,
@@ -102,8 +128,18 @@ export function MinecraftViewer() {
     return () => observer.disconnect();
   }, [updateCanvasSize]);
 
-  // Mouse controls
-  useMouseControls(canvasRef, camera, requestRender);
+  // Mouse controls (orbit mode only)
+  useMouseControls(canvasRef, orbitCamera, requestRender, viewerMode === 'orbit');
+
+  // First-person controls (playable mode only)
+  useFirstPersonControls(
+    canvasRef,
+    fpCamera,
+    physics,
+    requestRender,
+    viewerMode === 'playable',
+    exitPlayableMode
+  );
 
   return (
     <div ref={containerRef} className="w-full h-full relative">

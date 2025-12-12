@@ -117,7 +117,7 @@ block.position.set(64, height + 1, 64)
 # Flatten area - can be called before or after generate()
 # If called before, heightmap is auto-generated first
 terrain.flatten_for_structure(
-    x=50, z=50,           # Position
+    x=50, z=50,           # WARNING: min/corner of area (not center)
     width=20, depth=20,   # Area size
     target_height=65,     # Target height (None = use average)
     falloff=4,            # Edge blending distance
@@ -129,18 +129,37 @@ terrain.generate()  # Will use the flattened heightmap
 
 The `drop_to_surface` function places a structure on the terrain surface.
 
+> **WARNING (Important)**  
+> `drop_to_surface(structure, terrain, x, z, ...)` interprets `x,z` as the **min/corner of the structure footprint**.  
+> If you pass a “center” point directly, the structure will be offset into one quadrant of that point.  
+> This is especially noticeable when your structure is built around `(0,0,0)` and includes negative local coordinates.
+
 ### Basic Usage
 
 ```python
 from app.agent.minecraft.terrain import drop_to_surface
 
-# Drop structure onto terrain at (x=64, z=64)
+# Drop structure so its footprint corner starts at (x=64, z=64)
 dropped = drop_to_surface(my_structure, terrain, 64, 64)
 
 scene = Scene()
 scene.add(terrain)
 scene.add(dropped)
 ```
+
+### Centering a Structure on a Pad
+
+If you want your structure centered on a location `(cx, cz)` (for example, the center of a flattened area), compute the corner first:
+
+```python
+# If you know your structure width/depth in blocks:
+place_x = cx - struct_width // 2
+place_z = cz - struct_depth // 2
+
+dropped = drop_to_surface(my_structure, terrain, place_x, place_z)
+```
+
+If your structure is built around `(0,0,0)` using negative coordinates (common for symmetric builds), this corner conversion is required to avoid quadrant offsets.
 
 ### With Gap Filling
 
