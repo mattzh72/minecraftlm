@@ -3,7 +3,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-
 /* Shimmer animation for thinking state */
 @keyframes shimmer {
   0% {
@@ -114,6 +113,46 @@
   --success-foreground: var(--color-emerald-700);
   --warning: var(--color-amber-500);
   --warning-foreground: var(--color-amber-700);
+
+  /* === VisionOS Spatial Design System === */
+
+  /* Background gradient (warm neutral atmospheric) */
+  --spatial-bg-from: oklch(0.985 0.005 90);
+  --spatial-bg-via: oklch(0.975 0.008 75);
+  --spatial-bg-to: oklch(0.965 0.012 85);
+
+  /* Glass surface colors */
+  --glass-bg: oklch(1 0 0 / 65%);
+  --glass-bg-hover: oklch(1 0 0 / 75%);
+  --glass-border: oklch(1 0 0 / 40%);
+
+  /* Floating shadows */
+  --shadow-glass:
+    0 2px 4px oklch(0 0 0 / 2%),
+    0 8px 24px oklch(0 0 0 / 4%),
+    0 16px 48px oklch(0 0 0 / 3%);
+  --shadow-glass-hover:
+    0 4px 8px oklch(0 0 0 / 3%),
+    0 12px 32px oklch(0 0 0 / 6%),
+    0 24px 64px oklch(0 0 0 / 4%);
+  --shadow-glass-elevated:
+    0 8px 16px oklch(0 0 0 / 4%),
+    0 24px 48px oklch(0 0 0 / 8%);
+
+  /* Inner glow */
+  --glass-inner-glow: inset 0 1px 1px oklch(1 0 0 / 60%);
+
+  /* Spring easing */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Typography */
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+
+  /* Blur values */
+  --blur-glass: 24px;
+  --blur-glass-heavy: 40px;
 }
 
 .dark {
@@ -163,5 +202,71 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Glass morphism panel */
+  .glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--blur-glass));
+    -webkit-backdrop-filter: blur(var(--blur-glass));
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-glass), var(--glass-inner-glow);
+  }
+
+  .glass-panel-elevated {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--blur-glass-heavy));
+    -webkit-backdrop-filter: blur(var(--blur-glass-heavy));
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-glass-elevated), var(--glass-inner-glow);
+  }
+
+  /* Hero glass surface for main prompt bar */
+  .glass-panel-hero {
+    background: var(--glass-bg-hover);
+    backdrop-filter: blur(var(--blur-glass-heavy)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--blur-glass-heavy)) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-glass-hover), var(--glass-inner-glow);
+  }
+
+  /* Continuous edge blur vignette for media cards */
+  .glass-edge-vignette {
+    -webkit-mask-image: radial-gradient(120% 120% at 50% 50%, transparent 56%, black 100%);
+    mask-image: radial-gradient(120% 120% at 50% 50%, transparent 56%, black 100%);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+  }
+
+  /* Atmospheric gradient background */
+  .bg-spatial {
+    background: linear-gradient(
+      180deg,
+      var(--spatial-bg-from) 0%,
+      var(--spatial-bg-via) 50%,
+      var(--spatial-bg-to) 100%
+    );
+  }
+
+  /* Spring transitions */
+  .transition-spring {
+    transition-timing-function: var(--ease-spring);
+  }
+
+  .transition-spring-soft {
+    transition-timing-function: var(--ease-spring-soft);
+  }
+
+  /* Typography utilities */
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-text {
+    font-family: var(--font-text);
   }
 }

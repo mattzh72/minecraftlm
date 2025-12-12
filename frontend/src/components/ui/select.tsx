@@ -54,11 +54,14 @@ function SelectPopup({
   children,
   sideOffset = 4,
   alignItemWithTrigger = true,
+  variant = "default",
   ...props
 }: SelectPrimitive.Popup.Props & {
   sideOffset?: SelectPrimitive.Positioner.Props["sideOffset"];
   alignItemWithTrigger?: SelectPrimitive.Positioner.Props["alignItemWithTrigger"];
+  variant?: "default" | "dark";
 }) {
+  const isDark = variant === "dark";
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Positioner
@@ -70,18 +73,27 @@ function SelectPopup({
         <SelectPrimitive.Popup
           className="origin-(--transform-origin) transition-[scale,opacity] has-data-[side=none]:scale-100 has-data-starting-style:scale-98 has-data-starting-style:opacity-0 has-data-[side=none]:transition-none"
           data-slot="select-popup"
+          data-variant={variant}
           {...props}
         >
           <SelectPrimitive.ScrollUpArrow
-            className="top-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:top-px before:h-[200%] before:rounded-t-[calc(var(--radius-lg)-1px)] before:bg-linear-to-b before:from-50% before:from-popover"
+            className={cn(
+              "top-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:top-px before:h-[200%] before:rounded-t-[calc(var(--radius-lg)-1px)] before:bg-linear-to-b before:from-50%",
+              isDark ? "before:from-black/70 text-white/60" : "before:from-popover"
+            )}
             data-slot="select-scroll-up-arrow"
           >
             <ChevronUpIcon className="relative size-4" />
           </SelectPrimitive.ScrollUpArrow>
-          <span className="relative block h-full rounded-lg border bg-popover bg-clip-padding before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-lg dark:not-in-data-[slot=group]:bg-clip-border">
+          <span className={cn(
+            "relative block h-full rounded-lg border bg-clip-padding before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-lg dark:not-in-data-[slot=group]:bg-clip-border",
+            isDark
+              ? "bg-black/70 backdrop-blur-xl border-white/15"
+              : "bg-popover"
+          )}>
             <SelectPrimitive.List
               className={cn(
-                "max-h-(--available-height) min-w-(--anchor-width) overflow-y-auto p-1",
+                "max-h-(--available-height) min-w-(--anchor-width) overflow-y-auto p-1 pb-2",
                 className,
               )}
               data-slot="select-list"
@@ -90,7 +102,10 @@ function SelectPopup({
             </SelectPrimitive.List>
           </span>
           <SelectPrimitive.ScrollDownArrow
-            className="bottom-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:bottom-px before:h-[200%] before:rounded-b-[calc(var(--radius-lg)-1px)] before:bg-linear-to-t before:from-50% before:from-popover"
+            className={cn(
+              "bottom-0 z-50 flex h-6 w-full cursor-default items-center justify-center before:pointer-events-none before:absolute before:inset-x-px before:bottom-px before:h-[200%] before:rounded-b-[calc(var(--radius-lg)-1px)] before:bg-linear-to-t before:from-50%",
+              isDark ? "before:from-black/70 text-white/60" : "before:from-popover"
+            )}
             data-slot="select-scroll-down-arrow"
           >
             <ChevronDownIcon className="relative size-4" />
@@ -104,12 +119,17 @@ function SelectPopup({
 function SelectItem({
   className,
   children,
+  variant = "default",
   ...props
-}: SelectPrimitive.Item.Props) {
+}: SelectPrimitive.Item.Props & { variant?: "default" | "dark" }) {
+  const isDark = variant === "dark";
   return (
     <SelectPrimitive.Item
       className={cn(
-        "grid in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-default grid-cols-[1rem_1fr] items-center gap-2 rounded-sm py-1 ps-2 pe-4 text-base outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:text-sm [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "grid in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-default grid-cols-[1rem_1fr] items-center gap-2 rounded-sm py-1 ps-2 pe-4 text-base outline-none data-disabled:pointer-events-none data-disabled:opacity-64 sm:text-sm [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        isDark
+          ? "text-white/80 data-highlighted:bg-white/15 data-highlighted:text-white"
+          : "data-highlighted:bg-accent data-highlighted:text-accent-foreground",
         className,
       )}
       data-slot="select-item"
@@ -139,11 +159,16 @@ function SelectItem({
 
 function SelectSeparator({
   className,
+  variant = "default",
   ...props
-}: SelectPrimitive.Separator.Props) {
+}: SelectPrimitive.Separator.Props & { variant?: "default" | "dark" }) {
   return (
     <SelectPrimitive.Separator
-      className={cn("mx-2 my-1 h-px bg-border", className)}
+      className={cn(
+        "mx-2 my-1 h-px",
+        variant === "dark" ? "bg-white/10" : "bg-border",
+        className
+      )}
       data-slot="select-separator"
       {...props}
     />
@@ -154,10 +179,18 @@ function SelectGroup(props: SelectPrimitive.Group.Props) {
   return <SelectPrimitive.Group data-slot="select-group" {...props} />;
 }
 
-function SelectGroupLabel(props: SelectPrimitive.GroupLabel.Props) {
+function SelectGroupLabel({
+  className,
+  variant = "default",
+  ...props
+}: SelectPrimitive.GroupLabel.Props & { variant?: "default" | "dark" }) {
   return (
     <SelectPrimitive.GroupLabel
-      className="px-2 py-1.5 font-medium text-muted-foreground text-xs"
+      className={cn(
+        "px-2 py-1.5 font-medium text-xs",
+        variant === "dark" ? "text-white/50" : "text-muted-foreground",
+        className
+      )}
       data-slot="select-group-label"
       {...props}
     />

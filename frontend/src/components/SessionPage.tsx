@@ -4,7 +4,6 @@ import { ChatPanel } from "./ChatPanel";
 import { useSession } from "@/hooks/useSession";
 import { MinecraftViewer } from "./MinecraftViewer";
 import { Button } from "@/components/ui/button";
-import { Card, CardPanel } from "@/components/ui/card";
 import { useStore } from "@/store";
 /**
  * Session page - displays chat panel and 3D viewer for a specific session
@@ -56,50 +55,54 @@ export function SessionPage() {
   console.log(`[SessionPage] structureData`, structureData);
 
   return (
-    <div className="h-screen flex flex-col text-foreground overflow-hidden">
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="absolute top-4 left-4 z-10">
-          <Button variant="outline" size="sm" onClick={handleBackToProjects}>
-            ← Projects
-          </Button>
-        </div>
-
-        {/* 3D Viewer Panel */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0">
-          <div className="flex-1 w-full relative min-h-0">
-            {structureData ? (
-              <div className="absolute inset-0">
-                <MinecraftViewer />
+    <div className="h-screen w-screen relative overflow-hidden">
+      {/* 3D Viewer - Full screen background, extended left to center content accounting for chat panel */}
+      <div
+        className="absolute inset-y-0 right-0"
+        style={{ left: "-320px" }}
+      >
+        {structureData ? (
+          <MinecraftViewer />
+        ) : (
+          <div className="flex items-center justify-center h-full text-center text-white/70 p-6 bg-gradient-to-b from-zinc-700 to-zinc-900">
+            <div className="max-w-xs">
+              <h2 className="text-xl font-semibold text-white/90 mb-3">
+                MinecraftLM
+              </h2>
+              <p className="mb-6 text-sm text-white/60">
+                {isLoading
+                  ? "Loading session..."
+                  : activeSessionId
+                  ? "Start chatting to design your Minecraft structure!"
+                  : "Initializing..."}
+              </p>
+              <div className="glass-panel rounded-xl text-xs leading-relaxed p-4 text-white/70">
+                <p className="font-medium text-white/80 mb-2">
+                  Controls
+                </p>
+                <p>Mouse drag: Rotate view</p>
+                <p>Scroll: Zoom in/out</p>
+                <p>Shift/Space: Move up/down</p>
               </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-center text-muted-foreground p-6">
-                <div className="max-w-xs">
-                  <h2 className="text-xl font-semibold text-foreground mb-3">
-                    MinecraftLM
-                  </h2>
-                  <p className="mb-6 text-sm">
-                    {isLoading
-                      ? "Loading session..."
-                      : activeSessionId
-                      ? "Start chatting to design your Minecraft structure!"
-                      : "Initializing..."}
-                  </p>
-                  <Card className="text-xs leading-relaxed p-4">
-                    <CardPanel className="p-0">
-                      <p className="font-medium text-muted-foreground mb-2">
-                        Controls
-                      </p>
-                      <p>Mouse drag: Rotate view</p>
-                      <p>Scroll: Zoom in/out</p>
-                      <p>Shift/Space: Move up/down</p>
-                    </CardPanel>
-                  </Card>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
+      </div>
 
+      {/* Floating back button - dark glass treatment */}
+      <div className="absolute top-4 left-4 z-20">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleBackToProjects}
+          className="bg-black/40 border-white/15 text-white/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] backdrop-blur-xl hover:bg-black/50 hover:text-white"
+        >
+          ← Projects
+        </Button>
+      </div>
+
+      {/* Floating Chat Panel - glass overlay, slightly narrower */}
+      <div className="absolute top-4 right-4 bottom-4 z-10 w-80">
         <ChatPanel />
       </div>
     </div>

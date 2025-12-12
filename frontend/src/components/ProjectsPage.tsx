@@ -4,8 +4,6 @@ import { useSession } from "@/hooks/useSession";
 import ThumbnailViewer from "./ThumbnailViewer";
 import { SuggestionButtons } from "./SuggestionButton.tsx";
 import { PromptBox } from "./PromptBox";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { listSessionsResponseSchema, storeSessionSchema } from "@/lib/schemas";
 import { useStore } from "@/store";
@@ -96,36 +94,42 @@ export function ProjectsPage() {
     navigate(`/session/${sessionId}`);
   };
 
-  const formatDate = (isoString: string) => {
+  const formatRelativeTime = (isoString: string) => {
     if (!isoString) return "Unknown";
     const date = new Date(isoString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffDays >= 7) return "over a week ago";
+    if (diffDays >= 1) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    if (diffHours >= 1) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffMins >= 1) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+    return "just now";
   };
 
   return (
     <div
       className={cn(
-        "min-h-screen bg-background grid",
+        "min-h-screen bg-spatial grid font-text",
         hasSessions ? "grid-rows-[auto_1fr]" : "grid-rows-1"
       )}
     >
       {/* Hero Section with Chat Bar */}
       <div
         className={cn(
-          "flex flex-col items-center justify-center px-6",
-          hasSessions ? "py-20 pb-10" : "min-h-screen py-10"
+          "flex flex-col items-center justify-center px-8",
+          hasSessions ? "py-24 pb-12" : "min-h-screen py-12"
         )}
       >
         <div className="w-full max-w-5xl flex flex-col items-center">
-          <h1 className="text-5xl font-semibold text-foreground mb-4 tracking-tight">
+          <h1 className="text-6xl font-medium text-foreground/90 mb-5 tracking-tight font-display leading-tight">
             MinecraftLM
           </h1>
-          <p className="text-lg text-muted-foreground mb-12 font-normal text-center max-w-md">
-            Design and export Minecraft schematics with natural language
+          <p className="text-xl text-muted-foreground/80 mb-16 font-normal text-center max-w-lg leading-relaxed">
+            What would you like to build?
           </p>
 
           {/* Chat Input */}
@@ -133,6 +137,7 @@ export function ProjectsPage() {
             onSubmit={handleSubmit}
             disabled={isCreating}
             placeholder="Describe what you want to build..."
+            variant="hero"
             className="max-w-2xl"
           />
 
@@ -142,59 +147,71 @@ export function ProjectsPage() {
 
       {/* Previous Sessions Section */}
       {!isLoading && hasSessions && (
-        <div className="px-6 pb-16 flex justify-center items-start">
+        <div className="px-8 pb-16 flex justify-center items-start">
           <div className="w-full max-w-5xl">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-6">
-              Recent Projects
+            <h2 className="text-sm font-medium text-muted-foreground/70 uppercase tracking-widest mb-8">
+              Past Projects
             </h2>
 
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-5">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-5">
               {Object.values(sessions).map((session) => (
-                <Card
+                <div
                   key={session.session_id}
                   onClick={() => handleSelectSession(session.session_id)}
-                  className="cursor-pointer overflow-hidden p-0 hover:border-border/80 transition-colors"
+                  className={cn(
+                    "cursor-pointer overflow-hidden",
+                    "relative aspect-square rounded-3xl",
+                    "shadow-xl shadow-black/25",
+                    "transition-all duration-500 transition-spring-soft",
+                    "hover:shadow-2xl hover:shadow-black/40",
+                    "hover:scale-[1.03]",
+                    "active:scale-[0.98]",
+                    "group"
+                  )}
                 >
-                  {/* Thumbnail */}
-                  <div className="w-full h-44 bg-muted flex items-center justify-center border-b border-border">
+                  {/* Thumbnail - full bleed */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-zinc-600 to-zinc-800">
                     {session.has_thumbnail ? (
-                      // Use cached thumbnail image
                       <img
                         src={`/api/sessions/${session.session_id}/thumbnail`}
                         alt="Structure preview"
-                        className="rounded-lg"
-                        style={{ width: Config.thumbnail.defaultSize, height: Config.thumbnail.defaultSize }}
+                        className="w-full h-full object-cover"
                       />
                     ) : session.has_structure && session.structure ? (
-                      // Render and cache thumbnail
                       <ThumbnailViewer
                         structureData={session.structure}
                         onRenderComplete={(dataUrl) => uploadThumbnail(session.session_id, dataUrl)}
                       />
                     ) : (
-                      <div className="text-muted-foreground/50 text-5xl text-center">
+                      <div className="text-white/30 text-4xl">
                         📦
                       </div>
                     )}
                   </div>
 
-                  {/* Metadata */}
-                  <div className="p-3.5">
-                    <div className="flex justify-between items-center text-sm text-muted-foreground mb-1.5">
-                      <span>{session.message_count ?? 0} messages</span>
-                      {session.has_structure && (
-                        <Badge
-                          variant="success"
-                          className="h-1.5 w-1.5 p-0 rounded-full"
-                        />
-                      )}
-                    </div>
+                  {/* Glass edge material - continuous blur vignette */}
+                  <div
+                    className={cn(
+                      "absolute inset-0 pointer-events-none rounded-3xl glass-edge-vignette",
+                      "backdrop-blur-2xl backdrop-saturate-150",
+                      "bg-gradient-to-b from-white/[0.18] via-white/[0.08] to-white/[0.02]",
+                      "dark:from-white/[0.12] dark:via-white/[0.05] dark:to-white/[0.01]"
+                    )}
+                  />
 
-                    <div className="text-xs text-muted-foreground/70">
-                      {formatDate(session.updated_at)}
+                  {/* Gradient overlay for text readability */}
+                  <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/50 via-black/20 to-transparent pointer-events-none" />
+
+                  {/* Metadata overlay */}
+                  <div className="absolute top-0 right-0 p-3 text-white">
+                    <div className="text-[11px] text-white/70">
+                      {formatRelativeTime(session.updated_at)}
                     </div>
                   </div>
-                </Card>
+
+                  {/* Subtle ring */}
+                  <div className="absolute inset-0 rounded-3xl ring-1 ring-inset ring-white/10 pointer-events-none" />
+                </div>
               ))}
             </div>
           </div>
