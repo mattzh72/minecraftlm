@@ -23,7 +23,8 @@ import { getToolCallLabel } from "@/lib/formatConversation";
 import type { ToolCallWithResult } from "@/lib/schemas";
 import { useStore } from "@/store/index.ts";
 import { formatConversationToUIMessages } from "@/lib/formatConversation";
-import { useMemo, useCallback, useRef } from "react";
+import { useMemo } from "react";
+import { useResizable } from "@/hooks/useResizable";
 
 type UserMessageProps = {
   content: string;
@@ -265,9 +266,16 @@ type ChatPanelProps = {
 const MIN_WIDTH = 280;
 const MAX_WIDTH = 600;
 
+const GLASS_PANEL_CLASSES = cn(
+  "bg-black/30 backdrop-blur-2xl backdrop-saturate-150",
+  "border border-white/15",
+  "shadow-xl shadow-black/20",
+  "ring-1 ring-inset ring-white/10",
+  "rounded-2xl"
+);
+
 export function ChatPanel({ expanded, setExpanded, width, onWidthChange, onResizeStart, onResizeEnd }: ChatPanelProps) {
   const { handleSend } = useChat();
-  const isResizing = useRef(false);
 
   const activeSessionId = useStore((s) => s.activeSessionId);
   const sessions = useStore((s) => s.sessions);
@@ -278,6 +286,15 @@ export function ChatPanel({ expanded, setExpanded, width, onWidthChange, onResiz
 
   const isAgentBusy = agentState !== "idle" && agentState !== "error";
 
+  const { handleResizeStart } = useResizable({
+    width,
+    minWidth: MIN_WIDTH,
+    maxWidth: MAX_WIDTH,
+    onWidthChange,
+    onResizeStart,
+    onResizeEnd,
+  });
+
   const handleSubmit = (value: string) => {
     if (activeSession?.session_id) {
       handleSend(value, activeSession.session_id);
@@ -286,39 +303,14 @@ export function ChatPanel({ expanded, setExpanded, width, onWidthChange, onResiz
     }
   };
 
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    onResizeStart?.();
-    const startX = e.clientX;
-    const startWidth = width;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing.current) return;
-      const delta = startX - e.clientX;
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + delta));
-      onWidthChange(newWidth);
-    };
-
-    const handleMouseUp = () => {
-      isResizing.current = false;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      onResizeEnd?.();
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.body.style.cursor = 'ew-resize';
-    document.body.style.userSelect = 'none';
-  }, [width, onWidthChange, onResizeStart, onResizeEnd]);
-
   if (!expanded) {
     return (
       <div
-        className="group w-full h-full bg-black/30 backdrop-blur-2xl backdrop-saturate-150 border border-white/15 shadow-xl shadow-black/20 ring-1 ring-inset ring-white/10 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-black/40 transition-colors"
+        className={cn(
+          GLASS_PANEL_CLASSES,
+          "group w-full h-full flex items-center justify-center",
+          "cursor-pointer hover:bg-black/40 transition-colors"
+        )}
         onClick={() => setExpanded(true)}
         aria-label="Expand chat"
         role="button"
@@ -348,16 +340,7 @@ export function ChatPanel({ expanded, setExpanded, width, onWidthChange, onResiz
       </button>
 
       {/* Main chat panel */}
-      <div
-        className={cn(
-          "flex flex-col h-full",
-          "rounded-2xl p-1.5",
-          "bg-black/30 backdrop-blur-2xl backdrop-saturate-150",
-          "border border-white/15",
-          "shadow-xl shadow-black/20",
-          "ring-1 ring-inset ring-white/10"
-        )}
-      >
+      <div className={cn(GLASS_PANEL_CLASSES, "flex flex-col h-full p-1.5")}>
         {/* Header */}
         <div className="px-4 py-3 border-b border-white/10">
           <h2 className="font-semibold text-sm text-white/90">Chat</h2>
