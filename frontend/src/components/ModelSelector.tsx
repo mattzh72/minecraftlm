@@ -97,7 +97,7 @@ export function ModelSelector() {
           render={
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-lg border border-input bg-background text-xs text-muted-foreground cursor-not-allowed opacity-60"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-lg bg-black/30 border border-white/10 text-xs text-white/40 cursor-not-allowed shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]"
             >
               {selectedModel
                 ? getModelDisplayName(selectedModel.id)
@@ -142,22 +142,25 @@ export function ModelSelector() {
       }}
       disabled={!!hasConversation}
     >
-      <SelectTrigger size="sm" className="w-auto min-w-0 h-8 text-xs">
+      <SelectTrigger
+        size="sm"
+        className="w-auto min-w-0 h-8 py-1.5 text-xs bg-black/70 backdrop-blur-xl border-white/15 text-white/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] hover:bg-black/80 hover:text-white/90"
+      >
         <SelectValue>
            {selectedModel ? getModelDisplayName(selectedModel.id) : "Select model"}
         </SelectValue>
       </SelectTrigger>
-      <SelectPopup>
+      <SelectPopup variant="dark">
         {Object.keys(modelsByProvider).map((provider, idx) => (
           <SelectGroup key={provider}>
-            {idx > 0 && <SelectSeparator />}
-            <SelectGroupLabel>
+            {idx > 0 && <SelectSeparator variant="dark" />}
+            <SelectGroupLabel variant="dark">
               {PROVIDER_LABELS[provider as keyof typeof PROVIDER_LABELS] ||
                 provider}
             </SelectGroupLabel>
             {modelsByProvider[provider as keyof typeof modelsByProvider].map(
               (model) => (
-                <SelectItem key={model.id} value={model.id}>
+                <SelectItem key={model.id} value={model.id} variant="dark">
                   {getModelDisplayName(model.id)}
                 </SelectItem>
               )

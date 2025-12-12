@@ -134,8 +134,7 @@ export default function ThumbnailViewer({ structureData, size = thumb.defaultSiz
       ref={canvasRef}
       width={size}
       height={size}
-      className="rounded-lg block"
-      style={{ width: size, height: size }}
+      className="w-full h-full object-cover rounded-lg block"
     />
   );
 }

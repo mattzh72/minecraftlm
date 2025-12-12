@@ -13,7 +13,7 @@ function ShimmerText({ children }) {
     <span
       className={cn(
         "inline-block",
-        "bg-linear-to-r from-muted-foreground via-foreground/50 to-muted-foreground",
+        "bg-linear-to-r from-white/40 via-white/70 to-white/40",
         "bg-size-[200%_100%]",
         "bg-clip-text text-transparent",
         "animate-shimmer"
@@ -26,7 +26,7 @@ function ShimmerText({ children }) {
 
 export function ThinkingIndicator() {
   return (
-    <div className="text-sm flex items-center gap-2 text-muted-foreground">
+    <div className="text-sm flex items-center gap-2 text-white/60">
       <BlockAnimation size={12} />
       <ShimmerText>Thinking</ShimmerText>
     </div>
@@ -42,7 +42,7 @@ export function ThoughtDisplay({ content, isStreaming }) {
 
   return (
     <Collapsible defaultOpen={isStreaming}>
-      <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-left py-1">
+      <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-white/50 hover:text-white/80 transition-colors w-full text-left py-1">
         <ChevronDown
           size={12}
           className="transition-transform shrink-0 group-data-[panel-open]:rotate-180"
@@ -55,8 +55,8 @@ export function ThoughtDisplay({ content, isStreaming }) {
         </span>
       </CollapsibleTrigger>
       <CollapsiblePanel>
-        <div className="pl-4 border-l-2 border-border py-2">
-          <div className="prose prose-sm prose-slate max-w-none max-h-64 overflow-y-auto text-muted-foreground text-xs dark:prose-invert">
+        <div className="pl-4 border-l-2 border-white/20 py-2">
+          <div className="max-w-none max-h-64 overflow-y-auto text-white/60 text-xs">
             <Streamdown mode={isStreaming ? "streaming" : "static"}>
               {content}
             </Streamdown>
