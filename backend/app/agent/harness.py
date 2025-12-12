@@ -350,7 +350,10 @@ class MinecraftSchematicAgent:
                     if func_name == "complete_task" and result.is_success():
                         task_completed = True
 
-                yield ActivityEvent(type="tool_result", data=tool_result)
+                yield ActivityEvent(type="tool_result", data={
+                    **tool_result,
+                    "tool_call_id": tool_call.id,
+                })
 
                 # Build tool response
                 tool_response = ToolMessage(

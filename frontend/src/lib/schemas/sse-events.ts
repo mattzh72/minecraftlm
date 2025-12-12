@@ -37,6 +37,7 @@ export const compilationStatus = z.object({
 export const toolResultEvent = z.object({
   type: z.literal("tool_result"),
   data: z.object({
+    tool_call_id: z.string().optional(),
     result: z.string().optional(),
     error: z.string().optional(),
     compilation: compilationStatus.optional(),
