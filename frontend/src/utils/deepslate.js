@@ -75,6 +75,7 @@ export function loadDeepslateResources(textureImage, assets, blockFlags = {}) {
   const transparentBlocks = blockFlags.transparent ?? new Set();
   const nonOpaqueBlocks = blockFlags.nonOpaque ?? new Set();
   const nonSelfCullingBlocks = blockFlags.nonSelfCulling ?? new Set();
+  const emissiveBlocks = blockFlags.emissive ?? {};
 
   deepslateResources = {
     getBlockDefinition(id) {
@@ -97,10 +98,16 @@ export function loadDeepslateResources(textureImage, assets, blockFlags = {}) {
       const isOpaque = !isTransparent && !isExplicitNonOpaque && (isExplicitOpaque || opaqueBlocks.size === 0);
       const isNonSelfCulling = nonSelfCullingBlocks.has(key);
 
+      // Get emissive properties
+      const emissiveData = emissiveBlocks[key];
+
       return {
         opaque: isOpaque,
         semi_transparent: isTransparent,
         self_culling: !isNonSelfCulling,
+        emissive: !!emissiveData,
+        emissiveIntensity: emissiveData?.intensity ?? 1.0,
+        emissiveConditional: emissiveData?.conditional,
       };
     },
     getBlockProperties(id) {
