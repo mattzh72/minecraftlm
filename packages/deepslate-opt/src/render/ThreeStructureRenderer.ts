@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import type { StructureProvider } from '../core/index.js'
 import { BlockState } from '../core/index.js'
 import type { Color } from '../index.js'
-import { ChunkBuilder } from './ChunkBuilder.js'
+import { ChunkBuilder, EmissiveLight } from './ChunkBuilder.js'
 import { Mesh } from './Mesh.js'
 import type { Resources } from './StructureRenderer.js'
 
@@ -169,6 +169,9 @@ const DEFAULT_SUNLIGHT: Omit<SunlightSettings, 'direction'> & { direction: [numb
 		},
 	},
 }
+
+// Maximum number of emissive point lights supported
+const MAX_EMISSIVE_LIGHTS = 32
 
 function buildSunlightSettings(options?: SunlightOptions): SunlightSettings {
 	const direction = vec3.clone(options?.direction ?? vec3.fromValues(...DEFAULT_SUNLIGHT.direction))
@@ -609,9 +612,49 @@ export class ThreeStructureRenderer {
 			}
 		})
 
+		// Update emissive light uniforms
+		this.updateEmissiveLightUniforms()
+
 		console.log('[ThreeStructureRenderer] rebuilt chunks', {
 			count: this.chunkMeshes.length,
 		})
+	}
+
+	private updateEmissiveLightUniforms() {
+		const lights = this.chunkBuilder.getEmissiveLights()
+		const numLights = Math.min(lights.length, MAX_EMISSIVE_LIGHTS)
+
+		const updateMaterial = (material: THREE.RawShaderMaterial) => {
+			const uniforms = material.uniforms
+			if (!uniforms.emissiveLightPositions || !uniforms.emissiveLightColors ||
+				!uniforms.emissiveLightIntensities || !uniforms.numEmissiveLights) return
+
+			const positions = uniforms.emissiveLightPositions.value as THREE.Vector3[]
+			const colors = uniforms.emissiveLightColors.value as THREE.Vector3[]
+			const intensities = uniforms.emissiveLightIntensities.value as number[]
+
+			for (let i = 0; i < MAX_EMISSIVE_LIGHTS; i++) {
+				if (i < numLights) {
+					const light = lights[i]
+					positions[i].set(light.position[0], light.position[1], light.position[2])
+					colors[i].set(light.color[0], light.color[1], light.color[2])
+					intensities[i] = light.intensity
+				} else {
+					positions[i].set(0, 0, 0)
+					colors[i].set(0, 0, 0)
+					intensities[i] = 0
+				}
+			}
+
+			uniforms.numEmissiveLights.value = numLights
+		}
+
+		updateMaterial(this.opaqueMaterial)
+		updateMaterial(this.transparentMaterial)
+
+		if (numLights > 0) {
+			console.log('[ThreeStructureRenderer] emissive lights', { count: numLights })
+		}
 	}
 
 	private rebuildOverlay() {
@@ -719,6 +762,13 @@ export class ThreeStructureRenderer {
 				uniform highp vec2 shadowMapSize;
 				uniform bool shadowEnabled;
 
+				// Emissive point lights
+				#define MAX_EMISSIVE_LIGHTS 32
+				uniform vec3 emissiveLightPositions[MAX_EMISSIVE_LIGHTS];
+				uniform vec3 emissiveLightColors[MAX_EMISSIVE_LIGHTS];
+				uniform float emissiveLightIntensities[MAX_EMISSIVE_LIGHTS];
+				uniform int numEmissiveLights;
+
 				float sampleShadow(vec2 uv, float compare) {
 					float depth = texture2D(shadowMap, uv).r;
 					return step(compare, depth);
@@ -757,6 +807,36 @@ export class ThreeStructureRenderer {
 					return mix(1.0 - shadowIntensity, 1.0, shadow);
 				}
 
+				vec3 calcEmissiveLighting(vec3 worldPos, vec3 normal) {
+					vec3 totalLight = vec3(0.0);
+
+					for (int i = 0; i < MAX_EMISSIVE_LIGHTS; i++) {
+						if (i >= numEmissiveLights) break;
+
+						vec3 lightPos = emissiveLightPositions[i];
+						vec3 lightColor = emissiveLightColors[i];
+						float intensity = emissiveLightIntensities[i];
+
+						vec3 lightDir = lightPos - worldPos;
+						float dist = length(lightDir);
+						lightDir = normalize(lightDir);
+
+						// Minecraft-style light falloff (linear with range ~15 blocks)
+						float lightRange = 8.0;
+						float attenuation = max(0.0, 1.0 - dist / lightRange);
+						attenuation = attenuation * attenuation; // Quadratic falloff for softer edges
+
+						// Simple diffuse contribution
+						float ndl = max(dot(normal, lightDir), 0.0);
+						// Add some ambient to simulate light bouncing around corners
+						float wrappedNdl = ndl * 0.7 + 0.3;
+
+						totalLight += lightColor * intensity * attenuation * wrappedNdl * 0.5;
+					}
+
+					return totalLight;
+				}
+
 				void main(void) {
 					vec2 clampedUv = clamp(vTexCoord,
 						vTexLimit.xy + vec2(0.5, 0.5) * pixelSize,
@@ -782,19 +862,26 @@ export class ThreeStructureRenderer {
 					float rim = pow(1.0 - max(dot(normal, lightDir), 0.0), 3.0) * rimIntensity * shadow;
 
 					vec3 lighting = ambient + sunColor * sunTerm + fillColor * backFill + rimColor * rim;
+
+					// Add emissive point light contribution
+					vec3 emissivePointLight = calcEmissiveLighting(vWorldPos, normal);
+					lighting += emissivePointLight;
+
 					vec3 baseColor = texColor.xyz * vTintColor;
 					vec3 finalColor = baseColor * lighting * exposure;
 
-					// Add emissive contribution (subtle glow for bloom effect)
-					vec3 emissiveContrib = baseColor * vEmissive * 0.8;
+					// Add emissive contribution for self-illumination (warm, muted glow like Minecraft)
+					vec3 warmTint = vec3(1.0, 0.85, 0.6); // Warm orange-yellow tint
+					vec3 emissiveContrib = baseColor * warmTint * vEmissive * 0.35;
 					finalColor = finalColor + emissiveContrib;
 
 					// Height + distance fog approximated in view space
 					float depth = gl_FragCoord.z / gl_FragCoord.w;
 					float fog = 1.0 - exp(-depth * fogDensity - max(0.0, vTexCoord.y) * fogHeightFalloff);
 					fog = clamp(fog, 0.0, 1.0);
-					// Slightly reduce fog on emissive blocks
-					vec3 fogged = mix(finalColor, fogColor, fog * (1.0 - vEmissive * 0.3));
+					// Slightly reduce fog on emissive blocks and areas lit by emissive
+					float emissiveFogReduce = max(vEmissive, length(emissivePointLight) * 0.3);
+					vec3 fogged = mix(finalColor, fogColor, fog * (1.0 - emissiveFogReduce * 0.3));
 
 					gl_FragColor = vec4(fogged, texColor.a);
 				}
@@ -815,6 +902,16 @@ export class ThreeStructureRenderer {
 			direction.set(0, 1, 0)
 		}
 		direction.normalize()
+
+		// Initialize emissive light arrays
+		const emissiveLightPositions: THREE.Vector3[] = []
+		const emissiveLightColors: THREE.Vector3[] = []
+		const emissiveLightIntensities: number[] = []
+		for (let i = 0; i < MAX_EMISSIVE_LIGHTS; i++) {
+			emissiveLightPositions.push(new THREE.Vector3(0, 0, 0))
+			emissiveLightColors.push(new THREE.Vector3(1, 0.85, 0.6))
+			emissiveLightIntensities.push(0)
+		}
 
 		return {
 			atlas: { value: this.atlasTexture },
@@ -842,6 +939,11 @@ export class ThreeStructureRenderer {
 			shadowSoftness: { value: this.sunlight.shadow.softness },
 			shadowMapSize: { value: new THREE.Vector2(this.sunlight.shadow.mapSize, this.sunlight.shadow.mapSize) },
 			shadowEnabled: { value: this.sunlight.shadow.enabled },
+			// Emissive point light uniforms
+			emissiveLightPositions: { value: emissiveLightPositions },
+			emissiveLightColors: { value: emissiveLightColors },
+			emissiveLightIntensities: { value: emissiveLightIntensities },
+			numEmissiveLights: { value: 0 },
 		}
 	}
 

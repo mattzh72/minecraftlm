@@ -6,12 +6,14 @@ import { SpecialRenderers } from './SpecialRenderer.js'
 
 type Chunk = { mesh: Mesh, transparentMesh: Mesh, origin: vec3 }
 type ChunkEntry = { mesh: Mesh, origin: vec3, transparent: boolean }
+export type EmissiveLight = { position: vec3, intensity: number, color: [number, number, number] }
 
 export class ChunkBuilder {
 	private chunks: (Chunk | null)[][][] = []
 	private readonly chunkSize: vec3
 	private meshesDirty = true
 	private meshCache: ChunkEntry[] = []
+	private emissiveLights: EmissiveLight[] = []
 
 	constructor(
 		private readonly gl: WebGLRenderingContext,
@@ -32,8 +34,10 @@ export class ChunkBuilder {
 		if (!this.structure)
 			return
 		this.markDirty()
-		
+
+		// Clear emissive lights when doing full rebuild
 		if (!chunkPositions) {
+			this.emissiveLights = []
 			this.chunks.forEach(x => x.forEach(y => y.forEach(chunk => {
 				if (!chunk) return
 				chunk.mesh.clear()
@@ -203,6 +207,16 @@ export class ChunkBuilder {
 			}
 		}
 
+		// Collect emissive blocks as point lights
+		if (emissive > 0) {
+			// Place light at center of block
+			this.emissiveLights.push({
+				position: [pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5],
+				intensity: emissive,
+				color: [1.0, 0.85, 0.6], // Warm light color
+			})
+		}
+
 		for (const q of mesh.quads) {
 			const normal = q.normal()
 			q.forEach(v => {
@@ -211,6 +225,10 @@ export class ChunkBuilder {
 				v.emissive = emissive
 			})
 		}
+	}
+
+	public getEmissiveLights(): EmissiveLight[] {
+		return this.emissiveLights
 	}
 
 	private getChunk(chunkPos: vec3): Chunk {
