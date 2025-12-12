@@ -17,7 +17,7 @@ REASONING_MODELS = ("gpt-5", "o1", "o3", "o4")
 class OpenAIService(BaseLLMService):
     """Service for interacting with OpenAI API using the Responses API."""
 
-    def __init__(self, model_id: str = "gpt-5.1"):
+    def __init__(self, model_id: str = "gpt-5.2"):
         super().__init__(model_id)
         self.client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
 

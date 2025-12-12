@@ -4,7 +4,6 @@ Configuration management using pydantic-settings
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 # Model to provider mapping (prefix-based)
 MODEL_PREFIXES = {
     "gpt-": "openai",

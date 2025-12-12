@@ -342,7 +342,9 @@ class MinecraftSchematicAgent:
                 )
 
                 if not invocation:
-                    result = ToolResult(error=f"Tool {func_name} not found", tool_call_id=tool_call.id)
+                    result = ToolResult(
+                        error=f"Tool {func_name} not found", tool_call_id=tool_call.id
+                    )
                 else:
                     result = await invocation.execute()
                     result.tool_call_id = tool_call.id
@@ -357,7 +359,13 @@ class MinecraftSchematicAgent:
                 tool_response = ToolMessage(
                     role="tool",
                     tool_call_id=tool_call.id,
-                    content=json.dumps({k: v for k, v in result.to_dict().items() if k != "tool_call_id"}),
+                    content=json.dumps(
+                        {
+                            k: v
+                            for k, v in result.to_dict().items()
+                            if k != "tool_call_id"
+                        }
+                    ),
                     name=func_name,
                 ).model_dump()
                 serialized_responses.append(tool_response)

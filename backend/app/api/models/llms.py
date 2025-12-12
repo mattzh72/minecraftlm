@@ -6,7 +6,7 @@ AVAILABLE_MODELS = {
         "gemini/gemini-3-pro-preview",
     ],
     "openai": [
-        "gpt-5.1",
+        "gpt-5.2",
     ],
     "anthropic": [
         "claude-opus-4-5-20251101",

@@ -8,7 +8,6 @@ Requires the appropriate API key for the configured model (see app.config).
 import os
 
 import pytest
-
 from app.agent.harness import MinecraftSchematicAgent, TerminateReason
 from app.config import settings
 from app.services.session import SessionService
@@ -35,7 +34,9 @@ async def test_agent_e2e_simple_structure():
     if provider == "anthropic" and not has_key(
         "ANTHROPIC_API_KEY", settings.anthropic_api_key
     ):
-        pytest.skip("ANTHROPIC_API_KEY not set - skipping E2E test for Anthropic provider")
+        pytest.skip(
+            "ANTHROPIC_API_KEY not set - skipping E2E test for Anthropic provider"
+        )
 
     # Create session (uses real storage)
     session_id = SessionService.create_session()
@@ -43,6 +44,7 @@ async def test_agent_e2e_simple_structure():
 
     # Verify session files were created
     from app.services.session import STORAGE_DIR
+
     session_dir = STORAGE_DIR / session_id
     assert session_dir.exists(), f"Session directory not created: {session_dir}"
     assert (session_dir / "code.py").exists(), "code.py not created"
@@ -78,7 +80,9 @@ async def test_agent_e2e_simple_structure():
 
     completion_event = events[-1]
     assert completion_event.type == "complete"
-    assert completion_event.data["success"], f"Agent failed: {completion_event.data['message']}"
+    assert completion_event.data["success"], (
+        f"Agent failed: {completion_event.data['message']}"
+    )
     assert completion_event.data["reason"] == TerminateReason.GOAL
 
     # Verify tools were used

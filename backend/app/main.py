@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Startup
-    logger.info(f"LLM Model: {settings.llm_model} ({settings.get_provider()})")
     yield
     # Shutdown (nothing to clean up)
 
