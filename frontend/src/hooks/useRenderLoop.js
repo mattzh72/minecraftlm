@@ -7,7 +7,7 @@ import { Config } from '../config';
  * Hook to manage WebGL rendering loop
  * Recreates renderer when canvas size changes to ensure correct projection
  */
-export default function useRenderLoop(canvasRef, structureData, resources, camera) {
+export default function useRenderLoop(canvasRef, structureData, resources, camera, onStructureRendered) {
   const rendererRef = useRef(null);
   const animationFrameRef = useRef(null);
 
@@ -70,7 +70,13 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     renderer.setViewport(0, 0, canvas.width, canvas.height);
 
     // Render
-    animationFrameRef.current = requestAnimationFrame(render);
+    animationFrameRef.current = requestAnimationFrame(() => {
+      render();
+      // Call callback after initial render of new structure
+      if (onStructureRendered) {
+        onStructureRendered(canvas);
+      }
+    });
 
     // Cleanup
     return () => {
