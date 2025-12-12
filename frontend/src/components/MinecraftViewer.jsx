@@ -1,4 +1,4 @@
-import { useRef, useMemo, useCallback, useState, useLayoutEffect } from "react";
+import { useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import { useStore } from "../store";
 import useDeepslateResources from "../hooks/useDeepslateResources";
 import useCamera from "../hooks/useCamera";
@@ -17,6 +17,21 @@ export function MinecraftViewer() {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
 
+  // Upload thumbnail to backend
+  const uploadThumbnail = useCallback(async (canvas) => {
+    if (!activeSessionId || !canvas) return;
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      await fetch(`/api/sessions/${activeSessionId}/thumbnail`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+    } catch (err) {
+      console.error('Error uploading thumbnail:', err);
+    }
+  }, [activeSessionId]);
+
   // Load rendering resources
   const { resources, isLoading, error } = useDeepslateResources();
 
@@ -34,7 +49,8 @@ export function MinecraftViewer() {
     canvasRef,
     activeSession?.structure,
     resources,
-    camera
+    camera,
+    uploadThumbnail
   );
 
   // Store resize in ref to avoid dependency issues
