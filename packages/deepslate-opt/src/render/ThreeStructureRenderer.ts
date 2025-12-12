@@ -134,8 +134,8 @@ const DEFAULT_SUNLIGHT: Omit<SunlightSettings, 'direction'> & { direction: [numb
 	},
 	fog: {
 		color: [0.85, 0.6, 0.4],
-		density: 0.001,
-		heightFalloff: 0.005,
+		density: 0.0002,
+		heightFalloff: 0.001,
 	},
 	shadow: {
 		enabled: true,
@@ -147,7 +147,7 @@ const DEFAULT_SUNLIGHT: Omit<SunlightSettings, 'direction'> & { direction: [numb
 		frustumSize: 100,
 	},
 	postProcess: {
-		enabled: true,
+		enabled: false,
 		ao: {
 			enabled: true,
 			intensity: 0.5,
@@ -155,7 +155,7 @@ const DEFAULT_SUNLIGHT: Omit<SunlightSettings, 'direction'> & { direction: [numb
 			samples: 16,
 		},
 		bloom: {
-			enabled: true,
+			enabled: false,
 			threshold: 0.8,
 			intensity: 0.4,
 			radius: 0.6,
@@ -1661,14 +1661,14 @@ export class ThreeStructureRenderer {
 					vec4 sceneColor = texture2D(tScene, vUv);
 					vec4 bloomColor = texture2D(tBloom, vUv);
 
-					// Add bloom
-					vec3 color = sceneColor.rgb + bloomColor.rgb * bloomIntensity;
+					// Add bloom with soft knee to prevent harsh clipping
+					vec3 bloom = bloomColor.rgb * bloomIntensity;
+					vec3 color = sceneColor.rgb + bloom;
 
-					// Tone mapping (ACES approximation)
-					color = color * (2.51 * color + 0.03) / (color * (2.43 * color + 0.59) + 0.14);
-
-					// Gamma correction
-					color = pow(color, vec3(1.0 / 2.2));
+					// Soft highlight compression (only affects values > 1.0)
+					// This prevents harsh clipping while preserving SDR colors
+					vec3 overflow = max(color - 1.0, 0.0);
+					color = min(color, 1.0) + overflow / (1.0 + overflow);
 
 					gl_FragColor = vec4(color, sceneColor.a);
 				}
@@ -1704,6 +1704,13 @@ export class ThreeStructureRenderer {
 		}
 
 		const pp = this.sunlight.postProcess
+
+		// Check if any effects are actually enabled - if not, skip post-processing entirely
+		const hasEffects = pp.ao.enabled || pp.bloom.enabled || pp.godRays.enabled
+		if (!hasEffects) {
+			return false
+		}
+
 		const width = this.sceneTarget.width
 		const height = this.sceneTarget.height
 

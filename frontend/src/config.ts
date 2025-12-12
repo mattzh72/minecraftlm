@@ -77,10 +77,10 @@ export const Config = {
           enabled: true,
           threshold: 0.75,
           intensity: 0.5,
-          radius: 0.6,
+          radius: 0.2,
         },
         godRays: {
-          enabled: true,
+          enabled: false,
           intensity: 0.35,
           decay: 0.96,
           density: 0.7,
