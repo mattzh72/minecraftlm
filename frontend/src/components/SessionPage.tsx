@@ -116,10 +116,13 @@ export function SessionPage() {
         <ViewerModeToggle />
       </div>
 
-      {/* Floating Chat Panel - glass overlay, slightly narrower */}
+      {/* Floating Chat Panel - glass overlay, collapses vertically */}
       <div
-        className={`absolute top-4 right-4 bottom-4 z-10 ${!isResizing ? 'transition-all duration-300 ease-in-out' : ''}`}
-        style={{ width: chatExpanded ? chatWidth : 32 }}
+        className={`absolute top-4 right-4 z-10 ${!isResizing ? 'transition-all duration-300 ease-in-out' : ''}`}
+        style={{
+          width: chatWidth,
+          height: chatExpanded ? 'calc(100% - 32px)' : 48
+        }}
       >
         <ChatPanel
           expanded={chatExpanded}

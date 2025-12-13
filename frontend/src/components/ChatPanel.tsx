@@ -5,8 +5,7 @@ import {
   CircleCheck,
   Wrench,
   ChevronDown,
-  ChevronRight,
-  ChevronLeft,
+  ChevronUp,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { cn } from "@/lib/utils";
@@ -303,67 +302,57 @@ export function ChatPanel({ expanded, setExpanded, width, onWidthChange, onResiz
     }
   };
 
-  if (!expanded) {
-    return (
-      <div
-        className={cn(
-          GLASS_PANEL_CLASSES,
-          "group w-full h-full flex items-center justify-center",
-          "cursor-pointer hover:bg-black/40 transition-colors"
-        )}
-        onClick={() => setExpanded(true)}
-        aria-label="Expand chat"
-        role="button"
-      >
-        <ChevronLeft size={20} className="text-white/50 group-hover:text-white group-hover:scale-110 transition-all" />
-      </div>
-    );
-  }
-
   return (
-    <div className="relative h-full">
-      {/* Resize handle on left edge */}
-      <div
-        onMouseDown={handleResizeStart}
-        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 group"
-      >
-        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-white/0 group-hover:bg-white/30 transition-colors" />
-      </div>
-
-      {/* Circular collapse button on left edge */}
-      <button
-        onClick={() => setExpanded(false)}
-        className="group absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 border border-white/20 flex items-center justify-center transition-colors"
-        aria-label="Collapse chat"
-      >
-        <ChevronRight size={20} className="text-white/50 group-hover:text-white group-hover:scale-110 transition-all" />
-      </button>
-
-      {/* Main chat panel */}
-      <div className={cn(GLASS_PANEL_CLASSES, "flex flex-col h-full p-1.5")}>
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-white/10">
-          <h2 className="font-semibold text-sm text-white/90">Chat</h2>
+    <div className={cn(GLASS_PANEL_CLASSES, "flex flex-col h-full")}>
+      {/* Resize handle on left edge - only when expanded */}
+      {expanded && (
+        <div
+          onMouseDown={handleResizeStart}
+          className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 group"
+        >
+          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-white/0 group-hover:bg-white/30 transition-colors" />
         </div>
+      )}
 
-        {/* Messages */}
-        <div className="flex-1 min-h-0 overflow-clip">
-          <AgentScroller autoScrollDeps={[activeSession?.conversation]}>
-            <div className="px-4">
-              <MessageList />
-            </div>
-          </AgentScroller>
-        </div>
-
-        {/* Input */}
-        <div className="p-2 pt-0">
-          <PromptBox
-            onSubmit={handleSubmit}
-            disabled={!activeSession?.session_id || isAgentBusy}
-            placeholder="Design more..."
+      {/* Header with title and collapse button */}
+      <div className={cn(
+        "flex items-center justify-between px-4 shrink-0",
+        expanded ? "py-2 border-b border-white/10" : "py-2.5"
+      )}>
+        <h2 className="font-semibold text-sm text-white/90">Chat</h2>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/10 flex items-center justify-center transition-all hover:scale-105"
+          aria-label={expanded ? "Collapse chat" : "Expand chat"}
+        >
+          <ChevronUp
+            size={16}
+            className={cn(
+              "text-white/60 transition-transform duration-300",
+              !expanded && "rotate-180"
+            )}
           />
-        </div>
+        </button>
       </div>
+
+      {/* Body - Messages and Input */}
+      {expanded && (
+        <>
+          <div className="flex-1 min-h-0 overflow-clip">
+            <AgentScroller autoScrollDeps={[activeSession?.conversation]}>
+              <MessageList />
+            </AgentScroller>
+          </div>
+
+          <div className="p-2 pt-0">
+            <PromptBox
+              onSubmit={handleSubmit}
+              disabled={!activeSession?.session_id || isAgentBusy}
+              placeholder="Design more..."
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
