@@ -16,6 +16,7 @@ class StreamChunk:
     thought_signature: str | None = None  # Signature for thinking block (Anthropic)
     tool_calls_delta: list[dict] | None = None
     finish_reason: str | None = None
+    reasoning_items: list[dict] | None = None  # Encrypted reasoning for ZDR passback (OpenAI)
 
 
 class BaseLLMService(ABC):

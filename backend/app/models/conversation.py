@@ -38,6 +38,7 @@ class AssistantMessage(BaseModel):
     thought_summary: str | None = None
     thinking_signature: str | None = None  # Anthropic thinking block signature
     tool_calls: list[ToolCall] | None = None
+    reasoning_items: list[dict] | None = None  # Encrypted reasoning for ZDR passback (OpenAI)
 
 
 class ToolMessage(BaseModel):
