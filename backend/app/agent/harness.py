@@ -187,6 +187,7 @@ class MinecraftSchematicAgent:
             accumulated_thought = ""
             accumulated_thinking_signature = None
             accumulated_tool_calls = {}  # index -> tool call dict
+            accumulated_reasoning_items = None  # For OpenAI ZDR passback
 
             # Stream response chunks (rebuild system prompt to include latest code)
             async for chunk in self.llm.generate_with_tools_streaming(
@@ -262,6 +263,10 @@ class MinecraftSchematicAgent:
                         if tc_delta.get("id"):
                             accumulated_tool_calls[idx]["id"] = tc_delta["id"]
 
+                # Handle reasoning items (OpenAI ZDR passback)
+                if chunk.reasoning_items:
+                    accumulated_reasoning_items = chunk.reasoning_items
+
             # Build tool calls from accumulated data
             tool_calls_list: list[ToolCall] = []
             for tc_data in accumulated_tool_calls.values():
@@ -287,6 +292,7 @@ class MinecraftSchematicAgent:
                 thought_summary=accumulated_thought or None,
                 thinking_signature=accumulated_thinking_signature,
                 tool_calls=tool_calls_list if tool_calls_list else None,
+                reasoning_items=accumulated_reasoning_items,
             ).model_dump()
 
             # Save assistant message
