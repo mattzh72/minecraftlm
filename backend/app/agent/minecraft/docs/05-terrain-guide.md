@@ -327,6 +327,199 @@ terrain.flatten_for_structure(55, 11, width=18, depth=18)
 terrain.generate()
 ```
 
+## Valley and Depression Generation
+
+The terrain system creates natural valleys, gorges, and craters using organic shape generation. These features can be filled with water to create lakes and rivers.
+
+### Add a Valley
+
+Creates a broad valley with gentle slopes (inverse of mountains):
+
+```python
+terrain = create_terrain(128, 128, seed=42)
+
+# Add a natural valley
+terrain.add_valley(
+    center_x=64, center_z=64,
+    radius=30,           # Valley radius (use 25+ for broad valleys)
+    depth=15,            # Depth to carve (use 10-25)
+    seed=123,            # Different seeds create different shapes
+    fill_water=False,    # Optionally fill with water to create a lake
+)
+
+terrain.generate()
+```
+
+### Add a Gorge
+
+Creates a narrow, steep-sided canyon:
+
+```python
+terrain = create_terrain(128, 128, seed=42)
+
+# Add a dramatic canyon
+terrain.add_gorge(
+    start_x=10, start_z=64,
+    end_x=118, end_z=64,
+    width=10,            # Canyon width (use 8-15)
+    depth=25,            # Depth to carve (use 15-35 for dramatic gorges)
+    seed=456,            # Controls path curvature
+    fill_water=False,    # Can create a river canyon
+)
+
+terrain.generate()
+```
+
+### Add a Crater
+
+Creates a circular depression with optional raised rim:
+
+```python
+terrain = create_terrain(128, 128, seed=42)
+
+# Add an impact crater
+terrain.add_crater(
+    center_x=64, center_z=64,
+    radius=20,           # Crater radius
+    depth=15,            # Bowl depth
+    rim_height=5,        # Raised rim height (0 = no rim)
+    fill_water=True,     # Creates a crater lake
+    water_level=68,      # Optional: override water surface level (e.g., near the rim)
+)
+
+terrain.generate()
+```
+
+### Valley Parameters
+
+| Method | Parameter | Default | Description |
+|--------|-----------|---------|-------------|
+| `add_valley` | `radius` | - | Valley radius (use 25+) |
+| `add_valley` | `depth` | - | Depth to carve (10-25) |
+| `add_valley` | `falloff` | 1.8 | Slope steepness |
+| `add_valley` | `fill_water` | False | Fill with water |
+| `add_gorge` | `width` | - | Canyon width (8-15) |
+| `add_gorge` | `depth` | - | Depth to carve (15-35) |
+| `add_gorge` | `falloff` | 2.5 | Wall steepness (steeper than valleys) |
+| `add_crater` | `rim_height` | 0 | Raised rim height (3-8 for impact craters) |
+| `add_crater` | `fill_water` | False | Fill with water |
+| `add_crater` | `water_level` | None | Water surface level (when filling) |
+
+## Water Features
+
+The terrain system supports oceans, lakes, and rivers with proper underwater terrain (sand/gravel instead of grass/dirt).
+
+### Global Water Level (Oceans)
+
+Set a global water level for oceans and seas:
+
+```python
+# Create terrain with ocean level set
+terrain = create_terrain(
+    width=128,
+    depth=128,
+    base_height=64,
+    water_level=65,      # All terrain below 65 will be underwater
+    seed=42,
+)
+
+terrain.generate()
+
+# Creates underwater terrain with sand/gravel layers
+# Beach transitions at water edges
+```
+
+### Add a Lake
+
+Creates a valley filled with water:
+
+```python
+terrain = create_terrain(128, 128, seed=42)
+
+# Add a natural lake
+terrain.add_lake(
+    center_x=64, center_z=64,
+    radius=25,           # Lake radius
+    depth=10,            # Depth below terrain
+    seed=789,            # Lake shape variation
+)
+
+terrain.generate()
+```
+
+### Add a River
+
+Creates a terrain-following river between two points:
+
+Note: terrain features apply in the order you call them. For example, if you want a river to cut through a mountain, call `add_mountain(...)` first and `add_river(...)` after. If you add a mountain after a river, it can raise terrain back up and “erase” the river cut.
+
+```python
+terrain = create_terrain(128, 128, seed=42)
+
+# Add a winding river
+terrain.add_river(
+    start_x=10, start_z=10,
+    end_x=118, end_z=118,
+    width=6,             # River width (use 3-8 for streams, 10-20 for rivers)
+    depth=4,             # River depth (use 2-5 for shallow, 6-12 for deep)
+    seed=999,            # Path variation
+)
+
+terrain.generate()
+```
+
+### Water Block Types
+
+Water features automatically use appropriate blocks:
+- **Water**: `minecraft:water` fills from terrain to water level
+- **Underwater terrain**: Sand (3 blocks), gravel (2 blocks), stone (base)
+- **Beaches**: Sand layers at water edges (within 3 blocks of water, up to 2 blocks above water level)
+
+### Creating a Lake System
+
+```python
+terrain = create_terrain(128, 128, seed=42)
+
+# Main lake in valley
+terrain.add_lake(64, 64, radius=30, depth=12)
+
+# Smaller connected lake
+terrain.add_lake(90, 40, radius=15, depth=8)
+
+# River connecting to edge
+terrain.add_river(
+    start_x=90, start_z=50,
+    end_x=128, end_z=20,
+    width=5,
+    depth=3,
+)
+
+terrain.generate()
+```
+
+### Creating a Coastal Scene
+
+```python
+terrain = create_terrain(
+    width=128,
+    depth=128,
+    base_height=64,
+    height_range=20,
+    water_level=66,      # Ocean level
+    seed=42,
+)
+
+# Add a mountain near the coast
+terrain.add_mountain(90, 64, radius=25, height=35)
+
+# Flatten area for a beach resort
+terrain.flatten_for_structure(20, 50, width=20, depth=20)
+
+terrain.generate()
+
+# Now place your resort on the beach!
+```
+
 ## HeightMap Direct Access
 
 For advanced terrain manipulation (note: using `Terrain` methods is preferred as they handle block types automatically):
@@ -352,6 +545,11 @@ heightmap.carve_area(60, 60, 5, 5, amount=4)
 heightmap.add_mountain(64, 64, radius=35, height=50, seed=123)
 heightmap.add_ridge(10, 64, 118, 64, width=20, height=40, seed=456)
 heightmap.add_plateau(64, 64, radius=20, height=25)
+
+# Valleys (heightmap only - won't get water, use Terrain methods instead)
+heightmap.add_valley(64, 64, radius=30, depth=15, seed=789)
+heightmap.add_gorge(10, 64, 118, 64, width=10, depth=25, seed=321)
+heightmap.add_crater(64, 64, radius=20, depth=15, rim_height=5)
 ```
 
 ## Complete Example
