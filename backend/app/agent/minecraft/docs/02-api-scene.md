@@ -262,6 +262,8 @@ All methods that return `self` support fluent chaining (e.g., `block.at(1,2,3).f
 | `.facing(direction)` | self | Set facing property (north/south/east/west) |
 | `.set_properties(props)` | self | Replace all properties |
 | `.merge_properties(props)` | self | Merge with existing properties |
+| `.with_properties(props)` | self | Merge properties (alias for merge_properties) |
+| `.tap(fn)` | self | Execute side-effect function, return self |
 | `.clone()` | Block | Create a copy |
 | `.position.set(x, y, z)` | Vector3 | Set position directly |
 
@@ -272,6 +274,7 @@ All methods that return `self` support fluent chaining (e.g., `block.at(1,2,3).f
 | `.add(*objects)` | self | Add children to scene |
 | `.at(x, y, z)` | self | Set position |
 | `.move(dx, dy, dz)` | self | Translate by offset |
+| `.tap(fn)` | self | Execute side-effect function, return self |
 | `scene.to_structure(padding=0)` | dict | Export structure dictionary |
 
 ### Vector3
@@ -308,5 +311,22 @@ scene.add(
         .with_size(12, 5, 12)
         .at(2, 1, 2)
         .hollow()
+)
+
+# Using with_properties for block state
+scene.add(
+    Block("minecraft:iron_bars", catalog=catalog)
+        .with_properties({"east": "true", "west": "true", "north": "false", "south": "false"})
+        .with_size(4, 5, 1)
+        .at(10, 1, 5)
+)
+
+# Using tap for debugging or side effects
+blocks_added = []
+scene.add(
+    Block("minecraft:stone_bricks", catalog=catalog)
+        .with_size(8, 4, 1)
+        .at(0, 1, 0)
+        .tap(lambda b: blocks_added.append(b.block_id))
 )
 ```
