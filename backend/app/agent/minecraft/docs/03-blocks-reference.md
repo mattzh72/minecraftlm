@@ -227,17 +227,66 @@ trapdoor = Block(
 )
 ```
 
-## Fences and walls (`north/east/south/west` booleans)
+## Connecting blocks (`north/east/south/west` booleans)
 
-Fences and walls auto‑connect in Minecraft; in the blockstate they expose booleans per direction.
+Many blocks have directional connection properties that control how they render. **You must set these properties explicitly for correct rendering** - the renderer does not auto-connect based on neighbors.
+
+### Iron bars, glass panes, and similar
+
+These blocks **require** directional properties to render correctly:
+
+- Example ids:
+  - `minecraft:iron_bars`, `minecraft:glass_pane`
+  - `minecraft:black_stained_glass_pane`, `minecraft:white_stained_glass_pane`, …
+
+- Properties:
+  - `north`, `south`, `east`, `west`: `"true"` | `"false"`
+
+**Important:** Without these properties, connecting blocks may render as a small cross/post shape instead of extending to connect. Always specify which directions should connect:
+
+```python
+# A wall of iron bars (portcullis) - connects horizontally
+Block(
+    "minecraft:iron_bars",
+    catalog=catalog,
+    properties={"east": "true", "west": "true", "north": "false", "south": "false"},
+).with_size(4, 5, 1).at(10, 1, 5)
+
+# A glass pane window connecting north-south
+Block(
+    "minecraft:glass_pane",
+    catalog=catalog,
+    properties={"north": "true", "south": "true", "east": "false", "west": "false"},
+).with_size(1, 3, 5).at(5, 2, 0)
+```
+
+### Fences and walls
+
+Fences and walls also use directional connection properties:
 
 - Example ids:
   - `minecraft:oak_fence`, `minecraft:stone_brick_wall`, …
 
-- Properties (simplified):
-  - `north`, `south`, `east`, `west`: `"true" | "false"`
+- Properties:
+  - `north`, `south`, `east`, `west`: `"true"` | `"false"` (fences)
+  - `north`, `south`, `east`, `west`: `"low"` | `"tall"` (walls)
+  - `up`: `"true"` (walls - for the center post)
 
-For most schematic use cases, you can place fence blocks as simple cubes and let the model handle details. If you want precise control over individual post/connection elements, you can specify these properties explicitly, but that’s rarely necessary.
+```python
+# Fence section running east-west
+Block(
+    "minecraft:oak_fence",
+    catalog=catalog,
+    properties={"east": "true", "west": "true", "north": "false", "south": "false"},
+).with_size(5, 1, 1).at(0, 1, 0)
+
+# Stone wall with connections and center post
+Block(
+    "minecraft:stone_brick_wall",
+    catalog=catalog,
+    properties={"east": "low", "west": "low", "north": "low", "south": "low", "up": "true"},
+).at(5, 1, 5)
+```
 
 ## “Facing” from direction vectors
 
@@ -304,4 +353,6 @@ In summary:
 - For **slabs**, use `slab_properties`.
 - For **stairs**, use `stair_properties`/`make_stair` and be mindful of `facing`/`half`/`shape`.
 - For **doors/trapdoors**, set `facing`, `half`, `hinge` (doors), and `open`.
+- For **connecting blocks** (iron_bars, glass_pane, fences, walls), **always set directional properties** (`north`/`south`/`east`/`west`) explicitly - the renderer won't auto-connect.
+- See `04-block-list.md` for the complete list of blocks and their properties - pass them directly as `properties={"name": "value"}`.
 - When in doubt, inspect `BlockCatalog.assets["blockstates"]` and mirror the properties shown there.

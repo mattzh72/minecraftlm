@@ -2,6 +2,7 @@
 
 Use these guidelines to get clean, grounded builds and avoid common errors.
 
+- **Always set directional properties for connecting blocks** (iron_bars, glass_pane, fences, walls). The renderer does not auto-connect based on neighbors. Without properties like `{"east": "true", "west": "true", "north": "false", "south": "false"}`, these blocks will render as small posts instead of connected bars/panes.
 - Support stair roofs with backing `Block` volumes or slabs under each ring and at corners when the user wants everything connected and non‑floating.
 - Attach ornaments (lanterns, finials, horns) via face‑adjacent blocks, stairs, slabs, or fences; don’t rely on diagonal contact.
 - Set stair corner `shape` explicitly when you want turned corners; Minecraft won’t infer corner shapes from neighbors.
