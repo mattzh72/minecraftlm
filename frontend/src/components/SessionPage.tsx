@@ -85,13 +85,15 @@ export function SessionPage() {
                     ? "Rendering your structure..."
                     : "Initializing..."}
               </p>
-              <div className="glass-panel rounded-xl text-xs leading-relaxed p-4 text-white/70">
+              <div className="bg-white/10 rounded-xl text-xs leading-relaxed p-4 text-white/70">
                 <p className="font-medium text-white/80 mb-2">
                   Controls
                 </p>
-                <p>Mouse drag: Rotate view</p>
-                <p>Scroll: Zoom in/out</p>
-                <p>Shift/Space: Move up/down</p>
+                <div className="flex flex-col items gap-1 text-center">
+                  <p>Mouse drag: Rotate view</p>
+                  <p>Scroll: Zoom in/out</p>
+                  <p>Shift/Space: Move up/down</p>
+                </div>
               </div>
             </div>
           </div>
