@@ -599,3 +599,292 @@ class HeightMap:
                     self._heights[z, x] += int(height * factor)
 
         return self
+
+    def add_valley(
+        self,
+        center_x: int,
+        center_z: int,
+        radius: int,
+        depth: int,
+        falloff: float = 1.8,
+        seed: Optional[int] = None,
+    ) -> "HeightMap":
+        """Add an organic valley depression at the specified location.
+
+        Creates a natural-looking valley with irregular shape, varying
+        depths, and smooth transitions to surrounding terrain. Uses domain
+        warping for organic shapes (inverse of mountain generation).
+
+        Args:
+            center_x, center_z: Center position of the valley.
+            radius: Base radius of the valley. Use 25+ for broad valleys.
+            depth: Maximum depth to carve below current terrain. Use 10-25.
+            falloff: Controls slope steepness. 1.8 default for gentle slopes.
+            seed: Random seed for shape (uses position if None).
+
+        Returns:
+            Self for chaining.
+
+        Example:
+            heightmap.add_valley(64, 64, radius=30, depth=15)
+        """
+        from app.agent.minecraft.terrain.noise import PerlinNoise
+
+        noise_seed = seed if seed is not None else (center_x * 1000 + center_z)
+
+        # Multiple noise layers for organic shape
+        shape_noise = PerlinNoise(seed=noise_seed)        # Domain warping
+        detail_noise = PerlinNoise(seed=noise_seed + 100) # Floor detail
+        edge_noise = PerlinNoise(seed=noise_seed + 200)   # Edge variation
+
+        # Expand processing area to account for warping
+        warp_extent = int(radius * 0.35)
+        extended_radius = radius + warp_extent
+
+        for z in range(max(0, center_z - extended_radius), min(self.config.depth, center_z + extended_radius + 1)):
+            for x in range(max(0, center_x - extended_radius), min(self.config.width, center_x + extended_radius + 1)):
+
+                # Domain warping - distort coordinates for organic shape
+                warp_scale = radius * 0.4
+                warp_freq = 25.0
+                wx = x + shape_noise.noise2d(x / warp_freq, z / warp_freq) * warp_scale
+                wz = z + shape_noise.noise2d(x / warp_freq + 500, z / warp_freq + 500) * warp_scale
+
+                # Calculate distance using warped coordinates
+                dx = wx - center_x
+                dz = wz - center_z
+                distance = np.sqrt(dx * dx + dz * dz)
+
+                if distance <= radius:
+                    # Normalized distance: 0 at center, 1 at edge
+                    t = distance / radius
+
+                    # Base valley shape with smooth falloff (inverse of mountain)
+                    valley_factor = (1 - t ** falloff)
+
+                    # Add subtle floor variation
+                    detail_val = detail_noise.noise2d(x / 10.0, z / 10.0)
+                    valley_factor *= (1 + detail_val * 0.15)
+
+                    # Vary edge depth slightly
+                    edge_val = edge_noise.noise2d(x / 15.0, z / 15.0)
+                    if t > 0.6:  # Only affect edges
+                        valley_factor *= (1 + edge_val * 0.1 * (t - 0.6) / 0.4)
+
+                    # Ensure non-negative
+                    valley_factor = max(0, valley_factor)
+
+                    # Subtract height from terrain
+                    carved_depth = int(depth * valley_factor)
+                    if carved_depth > 0:
+                        self._heights[z, x] -= carved_depth
+
+        return self
+
+    def add_gorge(
+        self,
+        start_x: int,
+        start_z: int,
+        end_x: int,
+        end_z: int,
+        width: int,
+        depth: int,
+        falloff: float = 2.5,
+        seed: Optional[int] = None,
+    ) -> "HeightMap":
+        """Add a narrow gorge or canyon between two points.
+
+        Creates a steep-sided canyon with:
+        - Curved centerline for natural appearance
+        - Narrower width than valleys
+        - Steeper walls (higher falloff)
+        - Varying depth along length
+
+        Args:
+            start_x, start_z: Start point of the gorge.
+            end_x, end_z: End point of the gorge.
+            width: Base width of the gorge. Use 8-15 for dramatic canyons.
+            depth: Maximum depth to carve. Use 15-35 for impressive gorges.
+            falloff: Controls wall steepness. 2.5 default for steep canyon walls.
+            seed: Random seed for shape variation.
+
+        Returns:
+            Self for chaining.
+
+        Example:
+            heightmap.add_gorge(10, 64, 118, 64, width=10, depth=25)
+        """
+        from app.agent.minecraft.terrain.noise import PerlinNoise
+
+        noise_seed = seed if seed is not None else (start_x * 1000 + start_z)
+
+        # Multiple noise layers for organic shape
+        curve_noise = PerlinNoise(seed=noise_seed)         # Gorge line curvature
+        width_noise = PerlinNoise(seed=noise_seed + 100)   # Width variation
+        depth_noise = PerlinNoise(seed=noise_seed + 200)   # Depth variation
+        detail_noise = PerlinNoise(seed=noise_seed + 300)  # Floor detail
+
+        # Calculate gorge direction
+        gorge_dx = end_x - start_x
+        gorge_dz = end_z - start_z
+        gorge_length = np.sqrt(gorge_dx * gorge_dx + gorge_dz * gorge_dz)
+
+        if gorge_length == 0:
+            return self
+
+        # Normalized direction
+        dir_x = gorge_dx / gorge_length
+        dir_z = gorge_dz / gorge_length
+
+        # Perpendicular direction for curve offset
+        perp_x = -dir_z
+        perp_z = dir_x
+
+        # Expand bounding box
+        max_curve = width * 0.3  # Less curve than ridges for gorges
+        extended_width = int(width * 1.3 + max_curve)
+
+        min_x = max(0, min(start_x, end_x) - extended_width)
+        max_x = min(self.config.width, max(start_x, end_x) + extended_width + 1)
+        min_z = max(0, min(start_z, end_z) - extended_width)
+        max_z = min(self.config.depth, max(start_z, end_z) + extended_width + 1)
+
+        for z in range(min_z, max_z):
+            for x in range(min_x, max_x):
+                # Vector from start to current point
+                to_point_x = x - start_x
+                to_point_z = z - start_z
+
+                # Project onto gorge direction
+                along = to_point_x * dir_x + to_point_z * dir_z
+
+                # Clamp to gorge length
+                along_clamped = max(0, min(gorge_length, along))
+
+                # Calculate curved gorge centerline
+                curve_t = along_clamped / gorge_length
+                curve_offset = curve_noise.noise2d(curve_t * 3, 0) * max_curve
+
+                # Apply curve to closest point
+                closest_x = start_x + along_clamped * dir_x + curve_offset * perp_x
+                closest_z = start_z + along_clamped * dir_z + curve_offset * perp_z
+
+                # Distance from curved gorge line
+                dist_x = x - closest_x
+                dist_z = z - closest_z
+                distance = np.sqrt(dist_x * dist_x + dist_z * dist_z)
+
+                # Vary width along gorge (slight variation)
+                width_variation = width_noise.noise2d(curve_t * 4, 0) * 0.2
+                local_width = width * (1 + width_variation)
+
+                if distance <= local_width:
+                    # Calculate depth factor with steep falloff
+                    t = distance / local_width
+                    gorge_factor = (1 - t ** falloff)
+
+                    # Vary depth along gorge
+                    depth_variation = depth_noise.noise2d(curve_t * 5, 0)
+                    depth_mult = 1.0 + depth_variation * 0.25
+                    gorge_factor *= depth_mult
+
+                    # Taper at ends
+                    taper_dist = width * 0.6
+                    if along_clamped < taper_dist:
+                        gorge_factor *= (along_clamped / taper_dist) ** 0.5
+                    elif along_clamped > gorge_length - taper_dist:
+                        gorge_factor *= ((gorge_length - along_clamped) / taper_dist) ** 0.5
+
+                    # Add floor detail
+                    detail_val = detail_noise.noise2d(x / 6.0, z / 6.0)
+                    gorge_factor *= (1 + detail_val * 0.08)
+
+                    # Subtract height from terrain
+                    carved_depth = int(depth * max(0, gorge_factor))
+                    if carved_depth > 0:
+                        self._heights[z, x] -= carved_depth
+
+        return self
+
+    def add_crater(
+        self,
+        center_x: int,
+        center_z: int,
+        radius: int,
+        depth: int,
+        rim_height: int = 0,
+        falloff_inner: float = 1.5,
+        falloff_outer: float = 2.0,
+        seed: Optional[int] = None,
+    ) -> "HeightMap":
+        """Add a circular crater or depression with optional raised rim.
+
+        Creates a bowl-shaped depression with:
+        - Circular shape (less domain warping for cleaner craters)
+        - Optional raised rim around edge
+        - Smooth interior slopes
+        - Can simulate impact craters or sinkholes
+
+        Args:
+            center_x, center_z: Center position of the crater.
+            radius: Outer radius including rim. Use 15-30 for craters.
+            depth: Depth of the crater bowl. Use 8-20.
+            rim_height: Height of raised rim (0 = no rim). Use 3-8 for impact craters.
+            falloff_inner: Controls interior slope steepness.
+            falloff_outer: Controls exterior slope steepness (if rim exists).
+            seed: Random seed for subtle shape variation.
+
+        Returns:
+            Self for chaining.
+
+        Example:
+            heightmap.add_crater(64, 64, radius=20, depth=15, rim_height=5)
+        """
+        from app.agent.minecraft.terrain.noise import PerlinNoise
+
+        noise_seed = seed if seed is not None else (center_x * 1000 + center_z)
+
+        # Subtle noise for rim irregularity
+        rim_noise = PerlinNoise(seed=noise_seed)
+        floor_noise = PerlinNoise(seed=noise_seed + 100)
+
+        # Calculate rim zone
+        rim_width = max(3, radius // 4) if rim_height > 0 else 0
+        bowl_radius = radius - rim_width
+
+        for z in range(max(0, center_z - radius - 2), min(self.config.depth, center_z + radius + 3)):
+            for x in range(max(0, center_x - radius - 2), min(self.config.width, center_x + radius + 3)):
+                dx = x - center_x
+                dz = z - center_z
+                distance = np.sqrt(dx * dx + dz * dz)
+
+                # Add subtle irregularity to distance
+                angle = np.arctan2(dz, dx)
+                rim_variation = rim_noise.noise2d(angle * 2, 0) * (radius * 0.08)
+                effective_distance = distance + rim_variation
+
+                if effective_distance <= bowl_radius:
+                    # Inside the bowl - carve down
+                    t = effective_distance / bowl_radius
+                    bowl_factor = (1 - t ** falloff_inner)
+
+                    # Add floor detail
+                    floor_val = floor_noise.noise2d(x / 8.0, z / 8.0)
+                    bowl_factor *= (1 + floor_val * 0.1)
+
+                    carved_depth = int(depth * max(0, bowl_factor))
+                    if carved_depth > 0:
+                        self._heights[z, x] -= carved_depth
+
+                elif rim_height > 0 and effective_distance <= radius:
+                    # In the rim zone - raise up
+                    rim_t = (effective_distance - bowl_radius) / rim_width
+                    # Peak in middle of rim, tapering both sides
+                    rim_factor = 1 - abs(rim_t - 0.5) * 2
+                    rim_factor = max(0, rim_factor) ** falloff_outer
+
+                    raised_height = int(rim_height * rim_factor)
+                    if raised_height > 0:
+                        self._heights[z, x] += raised_height
+
+        return self
