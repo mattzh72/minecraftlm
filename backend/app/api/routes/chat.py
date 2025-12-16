@@ -7,13 +7,13 @@ import logging
 
 from app.agent.harness import MinecraftSchematicAgent
 from app.api.models import ChatRequest
+from app.api.models.chat import ChatResponse
 from app.services.event_buffer import (
     create_new_buffer,
     is_task_running,
     SessionEventBuffer,
 )
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -91,6 +91,4 @@ async def chat(request: ChatRequest):
     # Remove from set when done to allow cleanup
     task.add_done_callback(_background_tasks.discard)
 
-    return JSONResponse(
-        content={"status": "started", "session_id": request.session_id}
-    )
+    return ChatResponse(status="started", session_id=request.session_id)

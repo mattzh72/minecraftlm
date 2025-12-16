@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 from pydantic import BaseModel
 
 from app.agent.harness import ActivityEventType
@@ -12,6 +12,13 @@ class ChatRequest(BaseModel):
     session_id: str
     message: str
     model: str | None = None  # Optional - defaults to server config
+
+
+class ChatResponse(BaseModel):
+    """Response model for chat task start"""
+
+    status: Literal["started"]
+    session_id: str
 
 
 class SSEPayload(BaseModel):
