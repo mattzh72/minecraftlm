@@ -160,11 +160,11 @@ Use:
 
 ## Adding a New Eval
 
-1. Copy the template structure from an existing eval
+1. Copy [`evals/TEMPLATE.md`](evals/TEMPLATE.md)
 2. Write a clean prompt (no debug artifacts)
 3. Define concrete pass criteria (checkboxes)
 4. List anticipated failure modes
-5. Link to relevant harness fixes if known
+5. Save as `eval-XXX-short-name.md`
 6. Add to appropriate category section above
 
 ---
@@ -174,7 +174,8 @@ Use:
 ```
 evaluation/
 ├── README.md           # This file
-├── evals/              # Formalized evals
+├── evals/
+│   ├── TEMPLATE.md     # Copy this to create new evals
 │   ├── eval-001-*.md
 │   ├── eval-002-*.md
 │   └── ...

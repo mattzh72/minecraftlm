@@ -3,8 +3,6 @@
 **Category:** spatial-coherence
 **Difficulty:** medium
 
----
-
 ## Prompt
 
 **Turn 1:**
@@ -13,58 +11,29 @@
 **Turn 2:**
 > Add a garden. Build me a road. Build me a car in my driveway.
 
----
+## Tests
 
-## What This Tests
+Multi-turn spatial coherence. When adding elements to an existing scene, they must connect via continuous terrain—not float as separate islands.
 
-Tests whether the agent maintains spatial coherence when adding multiple elements to an existing structure. The additions must connect to the house via continuous terrain, not float as separate islands.
-
-**Why it's challenging:**
-- Multiple simultaneous additions (garden + road + car)
-- Must integrate with existing structure's position
-- Requires filling terrain between elements
-- Driveway must logically connect car → road → house
-
----
-
-## Expected Output
+## Pass Criteria
 
 - [ ] House with bed inside
-- [ ] Garden with white picket fence
-- [ ] Road
+- [ ] Garden near house
+- [ ] Road connected to property
 - [ ] Car in driveway
-- [ ] **All elements connected by continuous terrain (no floating islands)**
-- [ ] Driveway connecting car to road
+- [ ] **All elements on continuous terrain** (no floating islands)
+- [ ] Driveway connects car → road → house
 
----
+## Failure Modes
 
-## Common Mistakes
-
-| Mistake | Description |
-|---------|-------------|
-| Floating additions | Garden, road, and car placed as disconnected islands in void |
-| No shared ground | Each element has its own tiny ground patch instead of continuous terrain |
-| Missing driveway | Car placed but no driveway connecting to road |
-| No spatial relationship | Elements placed at random coordinates with no logical layout |
-
----
-
-## Fixes Applied
-
-| Fix | File | Status |
-|-----|------|--------|
-| Add "Spatial Coherence" section to system prompt | `system_prompt.txt` | pending |
-
----
+| Mode | Description |
+|------|-------------|
+| Floating additions | Garden, road, car placed as disconnected islands in void |
+| No shared ground | Each element on its own tiny ground patch |
+| No driveway | Car exists but doesn't connect to road |
 
 ## Results
 
-| Date | Model | Pass/Fail | Notes |
-|------|-------|-----------|-------|
+| Date | Model | Result | Notes |
+|------|-------|--------|-------|
 | 2025-12-15 | gemini-3-pro-preview | Fail | Additions floated as disconnected islands |
-
----
-
-## Session Reference
-
-**Session ID:** `c72dde7f-437e-4529-9b6b-4e55f0e285b1`

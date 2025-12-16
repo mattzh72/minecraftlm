@@ -3,74 +3,35 @@
 **Category:** real-world
 **Difficulty:** hard
 
----
-
 ## Prompt
 
-> "the golden gate bridge with the ocean"
+> The golden gate bridge with the ocean
 
----
+## Tests
 
-## What This Tests
+Famous landmark with terrain integration. Tests catenary cable math, water placement, and recognizable proportions.
 
-Tests the agent's ability to recreate a famous real-world landmark with proper aesthetics, terrain integration, and architectural accuracy.
+## Pass Criteria
 
-**Why it's challenging:**
-- Recognizable real-world structure with specific features
-- Suspension cables require catenary curve math
-- Terrain integration (water, land on both ends)
-- Architectural details (tower cross-bracing, road deck)
-- Proper proportions and iconic red color
-
----
-
-## Expected Output
-
-**Architecture:**
 - [ ] Two main towers with cross-bracing
 - [ ] Suspension cables with catenary curves
 - [ ] Road deck spanning between towers
-- [ ] Iconic red/orange color (red concrete, red wool, etc.)
-
-**Terrain:**
-- [ ] Water/ocean beneath the bridge
+- [ ] Iconic red/orange color
+- [ ] Water/ocean beneath bridge
 - [ ] Land/terrain on both ends
-- [ ] Bridge properly anchored to terrain
-
-**Aesthetics:**
 - [ ] Recognizable as Golden Gate Bridge
-- [ ] Proper proportions (towers taller than wide)
-- [ ] Visual detail (cable patterns, tower structure)
 
----
+## Failure Modes
 
-## Common Mistakes
-
-| Mistake | Description |
-|---------|-------------|
+| Mode | Description |
+|------|-------------|
 | No terrain | Bridge floating in void without water or land |
-| Straight cables | Suspension cables are diagonal lines instead of curves |
-| Missing cross-bracing | Towers are solid blocks instead of structural lattice |
-| Wrong color | Using gray/white instead of iconic red |
-
----
-
-## Fixes Applied
-
-| Fix | File | Status |
-|-----|------|--------|
-| None needed | - | - |
-
----
+| Straight cables | Suspension cables are diagonal lines, not curves |
+| Missing cross-bracing | Towers are solid blocks, not lattice |
+| Wrong color | Gray/white instead of red |
 
 ## Results
 
-| Date | Model | Pass/Fail | Notes |
-|------|-------|-----------|-------|
-| 2025-12-15 | gemini-3-pro-preview | Pass | Excellent build - catenary cables, cross-braced towers, water, terrain on both ends |
-
----
-
-## Session Reference
-
-**Session ID:** `3fce89b6-b402-4544-be0f-20900ac13849`
+| Date | Model | Result | Notes |
+|------|-------|--------|-------|
+| 2025-12-15 | gemini-3-pro-preview | Pass | Catenary cables, cross-braced towers, water, terrain both ends |

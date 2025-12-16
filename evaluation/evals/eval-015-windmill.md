@@ -3,76 +3,36 @@
 **Category:** real-world
 **Difficulty:** easy
 
----
-
 ## Prompt
 
 > Generate me a windmill.
 
----
+## Tests
 
-## What This Tests
+Baseline creativity. Windmills have distinctive features (blades, tower). Tests terrain context and design quality.
 
-A simpler eval testing baseline creativity. Windmills have distinctive features (rotating blades, tower structure) that should be present. Tests whether agent adds appropriate terrain context.
+## Pass Criteria
 
-**Why it's challenging:**
-- Blade design requires creativity (not just flat rectangles)
-- Tower structure variety (traditional Dutch vs modern wind turbine)
-- Terrain/context adds to realism
-- Proportions matter (blades vs tower size)
-
----
-
-## Expected Output
-
-**Structure:**
 - [ ] Tower/base structure
-- [ ] Rotating blade assembly at top
-- [ ] 3-4 blades (typical windmill)
-- [ ] Blades have reasonable shape (not single blocks)
-- [ ] Cap/nacelle where blades attach
-
-**Terrain:**
+- [ ] Blade assembly at top
+- [ ] 3-4 blades
+- [ ] Blades have shape (not single blocks)
 - [ ] Ground beneath windmill
-- [ ] Terrain extends beyond just the base
-- [ ] Optional: grass, path, fence, flowers
-- [ ] Optional: hills or flat farmland context
+- [ ] **Terrain extends beyond base**
+- [ ] Optional: windows, door, details
 
-**Creativity:**
-- [ ] Interesting design (Dutch traditional or modern turbine)
-- [ ] Details (windows, door, balcony for traditional)
-- [ ] Material variety
+## Failure Modes
 
----
-
-## Common Mistakes
-
-| Mistake | Description |
-|---------|-------------|
-| Lazy blades | Blades are single blocks or flat lines |
-| No terrain | Windmill floating or on tiny patch |
-| Missing blades | Tower only, no blade assembly |
-| Wrong proportions | Blades too small or tower too short |
-| No detail | Plain box tower with sticks for blades |
-
----
-
-## Fixes Applied
-
-| Fix | File | Status |
-|-----|------|--------|
-| Add "Design Quality Guidelines" | `06-implementation-guidelines.md` | pending |
-
----
+| Mode | Description |
+|------|-------------|
+| Lazy blades | Single blocks or flat lines |
+| No terrain | Floating or tiny patch |
+| Missing blades | Tower only |
+| Wrong proportions | Blades too small, tower too short |
+| No detail | Plain box with sticks |
 
 ## Results
 
-| Date | Model | Pass/Fail | Notes |
-|------|-------|-----------|-------|
+| Date | Model | Result | Notes |
+|------|-------|--------|-------|
 | | | | |
-
----
-
-## Session Reference
-
-**Session ID:** (to be filled after run)

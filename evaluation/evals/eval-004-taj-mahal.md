@@ -3,8 +3,6 @@
 **Category:** real-world
 **Difficulty:** hard
 
----
-
 ## Prompt
 
 **Turn 1:**
@@ -13,68 +11,37 @@
 **Turn 2:**
 > Add the gardens in front of the Taj Mahal.
 
----
+## Tests
 
-## What This Tests
+Iconic landmark with specific architecture. Tests dome geometry, symmetry, and multi-turn coherence (gardens must connect to structure).
 
-Tests the agent's ability to recreate an iconic real-world landmark with architectural accuracy. The Taj Mahal has specific features that must be present for it to be recognizable.
+## Pass Criteria
 
-**Why it's challenging:**
-- Specific architectural elements (4 minarets, central dome, arched entrances)
-- Symmetry requirements
-- Dome/curved geometry in voxels
-- Multi-turn: gardens must integrate with existing structure (spatial coherence)
-- Scale and proportions matter for realism
-
----
-
-## Expected Output
-
-**Architecture (Turn 1):**
-- [ ] Central dome (onion-shaped)
+**Turn 1:**
+- [ ] Central onion-shaped dome
 - [ ] 4 minarets at corners
 - [ ] Arched entrance portals
 - [ ] Raised platform/base
-- [ ] White material (quartz, white concrete)
+- [ ] White material
 - [ ] Symmetrical design
 
-**Gardens (Turn 2):**
+**Turn 2:**
 - [ ] Charbagh layout (4 quadrants)
-- [ ] Central water channel/reflecting pool
+- [ ] Central reflecting pool
 - [ ] Pathways
-- [ ] Vegetation (trees, grass)
-- [ ] Gardens connected to Taj Mahal platform (not floating)
+- [ ] **Gardens connected to platform** (not floating)
 
----
+## Failure Modes
 
-## Common Mistakes
-
-| Mistake | Description |
-|---------|-------------|
-| Missing minarets | Only builds central structure without the 4 corner towers |
-| Flat dome | Dome is a box or poorly approximated curve |
-| Floating gardens | Gardens placed as disconnected island from main structure |
-| Wrong proportions | Minarets too short, dome too small, etc. |
-| No water feature | Missing the iconic reflecting pool/channels |
-
----
-
-## Fixes Applied
-
-| Fix | File | Status |
-|-----|------|--------|
-| Add "Spatial Coherence" section | `system_prompt.txt` | pending |
-
----
+| Mode | Description |
+|------|-------------|
+| Missing minarets | Only central structure, no corner towers |
+| Flat dome | Box or poorly approximated curve |
+| Floating gardens | Gardens as disconnected island |
+| No water feature | Missing reflecting pool |
 
 ## Results
 
-| Date | Model | Pass/Fail | Notes |
-|------|-------|-----------|-------|
+| Date | Model | Result | Notes |
+|------|-------|--------|-------|
 | | | | |
-
----
-
-## Session Reference
-
-**Session ID:** (to be filled after run)
