@@ -440,11 +440,11 @@ class Terrain(Object3D):
 
                 if noise_val > 0.6:  # ~20% coverage for flowers
                     height = self.heightmap.get(x, z)
-                    flower = generate_flowers(x, height, z, catalog=self.catalog)
+                    flower = generate_flowers(x, height - 1, z, catalog=self.catalog)
                     self.children.append(flower)
                 elif noise_val > 0.3 and noise_val <= 0.4:  # ~10% for tall grass
                     height = self.heightmap.get(x, z)
-                    grass = generate_tall_grass(x, height, z, catalog=self.catalog)
+                    grass = generate_tall_grass(x, height - 1, z, catalog=self.catalog)
                     self.children.append(grass)
 
     def get_height_at(self, x: int, z: int) -> int:
