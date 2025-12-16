@@ -6,7 +6,7 @@ import { sessionDetailsResponseSchema } from "@/lib/schemas";
 
 export function useSession() {
   const setActiveSession = useStore((s) => s.setActiveSession);
-  const { handleSend } = useChat();
+  const { handleSend, checkAndResumeSession } = useChat();
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -45,7 +45,7 @@ export function useSession() {
         setIsLoading(false);
       }
     },
-    [setActiveSession]
+    [setActiveSession, handleSend]
   );
 
   const restoreSession = useCallback(
@@ -61,8 +61,11 @@ export function useSession() {
         structure: session.structure,
       });
       setIsLoading(false);
+
+      // Check if there's an active task and resume the stream
+      await checkAndResumeSession(sessionIdToRestore);
     },
-    [createSession]
+    [setActiveSession, checkAndResumeSession]
   );
   const clearActiveSession = useCallback(() => {
     setActiveSession(null);

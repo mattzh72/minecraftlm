@@ -417,6 +417,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "cachetools" },
     { name = "fastapi" },
     { name = "google-genai" },
     { name = "numpy" },
@@ -443,6 +444,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.75.0" },
+    { name = "cachetools", specifier = ">=6.2.2" },
     { name = "fastapi", specifier = ">=0.121.3" },
     { name = "google-genai", specifier = ">=1.54.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.1" },

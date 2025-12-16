@@ -3,62 +3,58 @@ Chat API endpoints
 """
 
 import logging
-from typing import AsyncIterator
 
 from app.agent.harness import MinecraftSchematicAgent
 from app.api.models import ChatRequest
-from app.api.models.chat import SSEPayload, sse_repr
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
+from app.services.event_buffer import (
+    create_new_buffer,
+    is_task_running,
+    SessionEventBuffer,
+)
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
+async def run_agent_task(
+    request: ChatRequest, buffer: SessionEventBuffer
+) -> None:
     """
-    Stream agent activity as Server-Sent Events.
-
-    Event types:
-    - turn_start: Agent turn beginning
-    - thought: Agent reasoning/text
-    - tool_call: Agent calling a tool
-    - tool_result: Tool execution result
-    - complete: Task finished (success or error)
+    Run the agent loop as a background task, writing events to the buffer.
     """
     try:
-        # Create agent executor with optional model override
         agent = MinecraftSchematicAgent(
             session_id=request.session_id, model=request.model
         )
 
-        # Run agent loop and stream events
         async for event in agent.run(request.message):
-            # Format as SSE
-            yield sse_repr.format(
-                payload=SSEPayload(type=event.type, data=event.data).model_dump_json()
-            )
+            buffer.append({"type": event.type, "data": event.data})
+
+        # Mark complete on success
+        buffer.mark_complete()
 
     except FileNotFoundError:
-        yield sse_repr.format(
-            payload=SSEPayload(
-                type="error",
-                data={"message": f"Session {request.session_id} not found"},
-            ).model_dump_json()
-        )
+        buffer.append({
+            "type": "error",
+            "data": {"message": f"Session {request.session_id} not found"},
+        })
+        buffer.mark_complete(error=f"Session {request.session_id} not found")
+
     except Exception as e:
         logger.exception(
-            "Error while streaming chat for session %s", request.session_id
+            "Error while running agent for session %s", request.session_id
         )
-        yield sse_repr.format(
-            payload=SSEPayload(
-                type="error", data={"message": f"Error: {str(e)}"}
-            ).model_dump_json()
-        )
+        buffer.append({
+            "type": "error",
+            "data": {"message": f"Error: {str(e)}"},
+        })
+        buffer.mark_complete(error=str(e))
 
 
 @router.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     """
     Send a message and run the agentic loop.
 
@@ -69,15 +65,24 @@ async def chat(request: ChatRequest):
     4. Continue fixing if validation fails
     5. Stop when validation passes
 
-    Streams activity events (thoughts, tool calls, results) back as SSE.
-    Frontend can read the final code from storage/sessions/{session_id}/code.py
+    The agent runs as a background task. Use GET /sessions/{session_id}/stream
+    to subscribe to the event stream.
+
+    Returns 409 if a task is already running for this session.
     """
-    return StreamingResponse(
-        chat_stream(request),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
-        },
+    # Check if task already running
+    if is_task_running(request.session_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Task already running for this session"
+        )
+
+    # Create fresh buffer for new task
+    buffer = create_new_buffer(request.session_id)
+
+    # Start agent in background
+    background_tasks.add_task(run_agent_task, request, buffer)
+
+    return JSONResponse(
+        content={"status": "started", "session_id": request.session_id}
     )

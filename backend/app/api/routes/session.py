@@ -7,9 +7,11 @@ import json
 from pathlib import Path
 
 from app.api.models import SessionResponse
+from app.api.models.chat import sse_repr
+from app.services.event_buffer import get_buffer, get_or_create_buffer
 from app.services.session import SessionService
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 router = APIRouter()
 
@@ -213,3 +215,63 @@ async def upload_thumbnail(session_id: str, request: Request):
         raise HTTPException(
             status_code=500, detail=f"Error saving thumbnail: {str(e)}"
         )
+
+
+@router.get("/sessions/{session_id}/status")
+async def get_session_status(session_id: str):
+    """
+    Check if session has an active task running.
+
+    Returns:
+    - status: "idle" | "running" | "completed" | "error"
+    - has_events: whether there are events in the buffer
+    - event_count: number of events in the buffer
+    - error: error message if status is "error"
+    """
+    buffer = get_buffer(session_id)
+
+    if buffer is None:
+        return JSONResponse(content={
+            "status": "idle",
+            "has_events": False,
+            "event_count": 0,
+        })
+
+    status = "running"
+    if buffer.is_complete:
+        status = "error" if buffer.error else "completed"
+
+    return JSONResponse(content={
+        "status": status,
+        "has_events": len(buffer.events) > 0,
+        "event_count": len(buffer.events),
+        "error": buffer.error,
+    })
+
+
+@router.get("/sessions/{session_id}/stream")
+async def stream_session_events(session_id: str):
+    """
+    SSE endpoint to subscribe to session events.
+
+    Streams all past events first, then streams new events in real-time
+    until the task completes. Automatically cleans up on disconnect.
+    """
+    buffer = get_or_create_buffer(session_id)
+
+    async def event_generator():
+        async for event in buffer.subscribe():
+            # Skip internal events
+            if event.get("type", "").startswith("_"):
+                continue
+            yield sse_repr.format(payload=json.dumps(event))
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
