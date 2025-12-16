@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { useSession } from "@/hooks/useSession";
-import ThumbnailViewer from "./ThumbnailViewer";
-import { SuggestionButtons } from "./SuggestionButton.tsx";
-import { PromptBox } from "./PromptBox";
-import { cn } from "@/lib/utils";
 import { listSessionsResponseSchema, storeSessionSchema } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { PromptBox } from "./PromptBox";
+import { SuggestionButtons } from "./SuggestionButton.tsx";
+import ThumbnailViewer from "./ThumbnailViewer";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
@@ -132,7 +132,13 @@ export function ProjectsPage() {
             </h2>
 
             <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-5">
-              {Object.values(sessions).map((session) => (
+              {Object.values(sessions)
+                .sort((a, b) => {
+                  const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                  const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                  return dateB - dateA; // Most recent first
+                })
+                .map((session) => (
                 <div
                   key={session.session_id}
                   onClick={() => handleSelectSession(session.session_id)}

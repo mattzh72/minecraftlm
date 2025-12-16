@@ -1,7 +1,7 @@
-import { Eye, Footprints } from "lucide-react";
-import { ToggleGroup, Toggle } from "@/components/ui/toggle-group";
-import { useStore } from "@/store";
-import type { ViewerMode } from "@/store";
+import { Toggle, ToggleGroup } from '@/components/ui/toggle-group';
+import type { ViewerMode } from '@/store';
+import { useStore } from '@/store';
+import { Eye, Footprints } from 'lucide-react';
 
 export function ViewerModeToggle() {
   const viewerMode = useStore((s) => s.viewerMode);
@@ -20,14 +20,14 @@ export function ViewerModeToggle() {
       <Toggle
         value="orbit"
         aria-label="Orbit Mode"
-        className="text-white/70 hover:text-white hover:bg-white/10 data-pressed:bg-white/20 data-pressed:text-white border-0"
+        className="text-white/70 hover:text-white hover:bg-white/10 data-pressed:bg-white/20 data-pressed:text-white border-0 rounded-md"
       >
         <Eye className="size-4" />
       </Toggle>
       <Toggle
         value="playable"
         aria-label="Playable Mode"
-        className="text-white/70 hover:text-white hover:bg-white/10 data-pressed:bg-white/20 data-pressed:text-white border-0"
+        className="text-white/70 hover:text-white hover:bg-white/10 data-pressed:bg-white/20 data-pressed:text-white border-0 rounded-md"
       >
         <Footprints className="size-4" />
       </Toggle>
