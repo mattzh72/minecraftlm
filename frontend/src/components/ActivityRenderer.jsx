@@ -56,8 +56,11 @@ export function ThoughtDisplay({ content, isStreaming }) {
       </CollapsibleTrigger>
       <CollapsiblePanel>
         <div className="pl-4 border-l-2 border-white/20 py-2">
-          <div className="max-w-none max-h-64 overflow-y-auto text-white/60 text-xs">
-            <Streamdown mode={isStreaming ? "streaming" : "static"}>
+          <div className="max-w-none max-h-64 overflow-y-auto text-white/60 text-xs custom-scrollbar">
+            <Streamdown mode={isStreaming ? "streaming" : "static"} components={{
+              p: ({ children }) => <p className="mb-2">{children}</p>,
+              code: ({ children }) => <code className="bg-white/10 px-1 rounded-md text-xs">{children}</code>
+            }}>
               {content}
             </Streamdown>
           </div>
