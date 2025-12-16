@@ -390,6 +390,8 @@ terrain.add_crater(
 terrain.generate()
 ```
 
+Note: When you provide `water_level`, the SDK clamps it to the lowest rim height in the rim band to avoid overflow down the crater walls.
+
 ### Valley Parameters
 
 | Method | Parameter | Default | Description |

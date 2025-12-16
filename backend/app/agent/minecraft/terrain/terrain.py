@@ -1255,7 +1255,27 @@ class Terrain(Object3D):
         # Fill with water if requested
         if fill_water:
             water_surface = water_level if water_level is not None else (base_height - depth // 2)
-            bowl_radius = radius - (max(3, radius // 4) if rim_height > 0 else 0)
+            rim_width = max(3, radius // 4) if rim_height > 0 else 0
+            bowl_radius = radius - rim_width
+
+            # Clamp to the lowest rim height to prevent overflow
+            if rim_width > 0:
+                rim_inner = radius - rim_width
+                min_rim_height: Optional[int] = None
+                for z in range(max(0, center_z - radius - 2), min(self.config.depth, center_z + radius + 3)):
+                    for x in range(max(0, center_x - radius - 2), min(self.config.width, center_x + radius + 3)):
+                        dx = x - center_x
+                        dz = z - center_z
+                        distance = np.sqrt(dx * dx + dz * dz)
+                        # Only sample the rim band (avoid interior bowl heights)
+                        if rim_inner <= distance <= radius:
+                            h = self.heightmap.get(x, z)
+                            if min_rim_height is None or h < min_rim_height:
+                                min_rim_height = h
+
+                if min_rim_height is not None:
+                    water_surface = min(water_surface, min_rim_height - 1)
+
             self._lakes.append(LakeInfo(
                 center_x=center_x,
                 center_z=center_z,
