@@ -2,6 +2,7 @@
 Chat API endpoints
 """
 
+import asyncio
 import logging
 
 from app.agent.harness import MinecraftSchematicAgent
@@ -11,11 +12,15 @@ from app.services.event_buffer import (
     is_task_running,
     SessionEventBuffer,
 )
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Store strong references to background tasks to prevent garbage collection
+# See: https://docs.python.org/3/library/asyncio-task.html#creating-tasks
+_background_tasks: set[asyncio.Task] = set()
 
 
 async def run_agent_task(
@@ -54,7 +59,7 @@ async def run_agent_task(
 
 
 @router.post("/chat")
-async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
+async def chat(request: ChatRequest):
     """
     Send a message and run the agentic loop.
 
@@ -80,8 +85,11 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     # Create fresh buffer for new task
     buffer = create_new_buffer(request.session_id)
 
-    # Start agent in background
-    background_tasks.add_task(run_agent_task, request, buffer)
+    # Create task and store strong reference to prevent GC
+    task = asyncio.create_task(run_agent_task(request, buffer))
+    _background_tasks.add(task)
+    # Remove from set when done to allow cleanup
+    task.add_done_callback(_background_tasks.discard)
 
     return JSONResponse(
         content={"status": "started", "session_id": request.session_id}
