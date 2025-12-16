@@ -19,12 +19,12 @@ class SessionEventBuffer:
         self.is_complete: bool = False
         self.error: str | None = None
         self._subscribers: list[asyncio.Queue[dict[str, Any]]] = []
-        self._lock = asyncio.Lock()
 
     def append(self, event: dict[str, Any]) -> None:
         """Add event and notify all subscribers."""
         self.events.append(event)
-        for queue in self._subscribers:
+        # Copy list to avoid issues if subscriber list changes during iteration
+        for queue in list(self._subscribers):
             try:
                 queue.put_nowait(event)
             except asyncio.QueueFull:
@@ -35,7 +35,7 @@ class SessionEventBuffer:
         self.is_complete = True
         self.error = error
         # Wake up all subscribers by putting a sentinel
-        for queue in self._subscribers:
+        for queue in list(self._subscribers):
             try:
                 queue.put_nowait({"type": "_complete_sentinel"})
             except asyncio.QueueFull:
@@ -48,13 +48,11 @@ class SessionEventBuffer:
         On disconnect (generator close), subscriber is automatically cleaned up.
         """
         queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-
-        async with self._lock:
-            self._subscribers.append(queue)
+        self._subscribers.append(queue)
 
         try:
             # Replay all existing events
-            for event in self.events:
+            for event in list(self.events):  # Copy to avoid mutation during iteration
                 yield event
 
             # If already complete, we're done
@@ -77,10 +75,11 @@ class SessionEventBuffer:
                     return
 
         finally:
-            # Cleanup on disconnect
-            async with self._lock:
-                if queue in self._subscribers:
-                    self._subscribers.remove(queue)
+            # Cleanup on disconnect - no lock needed, just remove from list
+            try:
+                self._subscribers.remove(queue)
+            except ValueError:
+                pass  # Already removed
 
 
 # Global buffer store with 30 minute TTL

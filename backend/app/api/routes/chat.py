@@ -40,22 +40,33 @@ async def run_agent_task(
         # Mark complete on success
         buffer.mark_complete()
 
-    except FileNotFoundError:
+    except FileNotFoundError as e:
+        error_msg = f"Session {request.session_id} not found"
+        logger.error("Session not found: %s", request.session_id)
         buffer.append({
             "type": "error",
-            "data": {"message": f"Session {request.session_id} not found"},
+            "data": {"message": error_msg},
         })
-        buffer.mark_complete(error=f"Session {request.session_id} not found")
+        buffer.append({
+            "type": "complete",
+            "data": {"success": False, "reason": error_msg},
+        })
+        buffer.mark_complete(error=error_msg)
 
     except Exception as e:
+        error_msg = str(e)
         logger.exception(
             "Error while running agent for session %s", request.session_id
         )
         buffer.append({
             "type": "error",
-            "data": {"message": f"Error: {str(e)}"},
+            "data": {"message": f"Error: {error_msg}"},
         })
-        buffer.mark_complete(error=str(e))
+        buffer.append({
+            "type": "complete",
+            "data": {"success": False, "reason": error_msg},
+        })
+        buffer.mark_complete(error=error_msg)
 
 
 @router.post("/chat")
