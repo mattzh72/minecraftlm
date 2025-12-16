@@ -1,9 +1,9 @@
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useStore } from "@/store";
+import { ArrowUp } from "lucide-react";
 import { forwardRef } from "react";
 import TextareaAutosize from "react-textarea-autosize";
-import { ArrowUp } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { useStore } from "@/store";
 import { ModelSelector } from "./ModelSelector.tsx";
 
 type PromptBoxProps = {
@@ -89,7 +89,7 @@ export const PromptBox = forwardRef<HTMLTextAreaElement, PromptBoxProps>(
             variant === "hero"
               ? "text-foreground/90 placeholder:text-muted-foreground/60"
               : "text-white/90 placeholder:text-white/40",
-            "text-base leading-relaxed",
+            "text-sm leading-relaxed",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "font-text"
           )}

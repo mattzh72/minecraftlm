@@ -1,10 +1,11 @@
+import { Button } from "@/components/ui/button";
+import { useSession } from "@/hooks/useSession";
+import { useStore } from "@/store";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { BlockAnimation } from "./BlockAnimation";
 import { ChatPanel } from "./ChatPanel";
-import { useSession } from "@/hooks/useSession";
 import { MinecraftViewer } from "./MinecraftViewer";
-import { Button } from "@/components/ui/button";
-import { useStore } from "@/store";
 import { TimeOfDayToggle } from "./TimeOfDayToggle";
 import { ViewerModeToggle } from "./ViewerModeToggle";
 /**
@@ -71,6 +72,9 @@ export function SessionPage() {
         ) : (
           <div className="flex items-center justify-center h-full text-center text-white/70 p-6 bg-gradient-to-b from-zinc-700 to-zinc-900">
             <div className="max-w-xs">
+              <div className="flex justify-center mb-4">
+                <BlockAnimation size={32} className="text-white/90" />
+              </div>
               <h2 className="text-xl font-semibold text-white/90 mb-3">
                 MinecraftLM
               </h2>
@@ -78,16 +82,18 @@ export function SessionPage() {
                 {isLoading
                   ? "Loading session..."
                   : activeSessionId
-                    ? "Start chatting to design your Minecraft structure!"
+                    ? "Rendering your structure..."
                     : "Initializing..."}
               </p>
-              <div className="glass-panel rounded-xl text-xs leading-relaxed p-4 text-white/70">
+              <div className="bg-white/10 rounded-xl text-xs leading-relaxed p-4 text-white/70">
                 <p className="font-medium text-white/80 mb-2">
                   Controls
                 </p>
-                <p>Mouse drag: Rotate view</p>
-                <p>Scroll: Zoom in/out</p>
-                <p>Shift/Space: Move up/down</p>
+                <div className="flex flex-col items gap-1 text-center">
+                  <p>Mouse drag: Rotate view</p>
+                  <p>Scroll: Zoom in/out</p>
+                  <p>Shift/Space: Move up/down</p>
+                </div>
               </div>
             </div>
           </div>
