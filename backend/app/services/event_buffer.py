@@ -1,85 +1,79 @@
 """
 Session event buffer for SSE stream resumption.
 
-Implements a pub-sub pattern where the agent writes events to a buffer,
-and SSE streams subscribe/unsubscribe independently.
+Simple polling-based approach: agent writes pre-serialized SSE strings to a list,
+SSE streams poll the list for new events.
 """
 
 import asyncio
-from typing import Any, AsyncIterator
+from typing import AsyncIterator
 
 from cachetools import TTLCache
 
+# SSE format string
+SSE_FORMAT = "data: {payload}\n\n"
+SSE_KEEPALIVE = ": keepalive\n\n"
+
 
 class SessionEventBuffer:
-    """Buffer for storing and streaming session events."""
+    """Buffer for storing and streaming pre-serialized SSE events."""
 
     def __init__(self):
-        self.events: list[dict[str, Any]] = []
+        self.events: list[str] = []  # Pre-serialized SSE strings
         self.is_complete: bool = False
         self.error: str | None = None
-        self._subscribers: list[asyncio.Queue[dict[str, Any]]] = []
 
-    def append(self, event: dict[str, Any]) -> None:
-        """Add event and notify all subscribers."""
-        self.events.append(event)
-        # Copy list to avoid issues if subscriber list changes during iteration
-        for queue in list(self._subscribers):
-            try:
-                queue.put_nowait(event)
-            except asyncio.QueueFull:
-                pass  # Skip if queue is full (shouldn't happen with unbounded queues)
+    def append(self, sse_string: str) -> None:
+        """Add a pre-serialized SSE string to the buffer."""
+        self.events.append(sse_string)
 
     def mark_complete(self, error: str | None = None) -> None:
         """Mark the buffer as complete (agent finished)."""
         self.is_complete = True
         self.error = error
-        # Wake up all subscribers by putting a sentinel
-        for queue in list(self._subscribers):
-            try:
-                queue.put_nowait({"type": "_complete_sentinel"})
-            except asyncio.QueueFull:
-                pass
 
-    async def subscribe(self) -> AsyncIterator[dict[str, Any]]:
+    async def subscribe(self, since: int = 0, timeout: float = 300.0) -> AsyncIterator[str]:
         """
-        Yield past events, then stream new ones until complete.
+        Yield SSE strings from the buffer, polling for new ones until complete.
 
-        On disconnect (generator close), subscriber is automatically cleaned up.
+        Args:
+            since: Start from this event index (skip first N events)
+            timeout: Max seconds to wait for new events (default 5 minutes)
         """
-        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-        self._subscribers.append(queue)
+        last_index = since
+        keepalive_counter = 0
+        idle_counter = 0
+        max_idle_iterations = int(timeout / 0.1)  # Convert timeout to iterations
 
-        try:
-            # Replay all existing events
-            for event in list(self.events):  # Copy to avoid mutation during iteration
-                yield event
+        while True:
+            # Yield any new events
+            had_events = False
+            while last_index < len(self.events):
+                yield self.events[last_index]
+                last_index += 1
+                keepalive_counter = 0
+                idle_counter = 0
+                had_events = True
 
-            # If already complete, we're done
+            # Done?
             if self.is_complete:
                 return
 
-            # Stream new events
-            while True:
-                try:
-                    event = await asyncio.wait_for(queue.get(), timeout=30)
-                    # Check for sentinel
-                    if event.get("type") == "_complete_sentinel":
-                        return
-                    yield event
-                except asyncio.TimeoutError:
-                    # Send a keep-alive comment (client ignores these)
-                    yield {"type": "_keepalive"}
-                except asyncio.CancelledError:
-                    # Client disconnected
+            # Wait before checking again
+            await asyncio.sleep(0.1)
+
+            # Track idle time (no new events)
+            if not had_events:
+                idle_counter += 1
+                # Timeout if no events for too long
+                if idle_counter >= max_idle_iterations:
                     return
 
-        finally:
-            # Cleanup on disconnect - no lock needed, just remove from list
-            try:
-                self._subscribers.remove(queue)
-            except ValueError:
-                pass  # Already removed
+            # Send keepalive every ~30 seconds (300 * 0.1s)
+            keepalive_counter += 1
+            if keepalive_counter >= 300:
+                yield SSE_KEEPALIVE
+                keepalive_counter = 0
 
 
 # Global buffer store with 30 minute TTL

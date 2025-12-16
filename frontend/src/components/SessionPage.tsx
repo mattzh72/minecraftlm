@@ -30,20 +30,12 @@ export function SessionPage() {
   const [chatWidth, setChatWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
 
-  // restore session from URL param on mount
+  // Restore session from URL param on mount or when URL changes
   useEffect(() => {
-    if (urlSessionId) {
+    if (urlSessionId && urlSessionId !== activeSessionId) {
       restoreSession(urlSessionId);
     }
-  }, []);
-
-  // Restore session from URL param on mount
-  useEffect(() => {
-    console.log(`useEffect`, { activeSessionId });
-    if (urlSessionId) {
-      restoreSession(urlSessionId);
-    }
-  }, [urlSessionId, restoreSession]);
+  }, [urlSessionId, activeSessionId, restoreSession]);
 
   const handleBackToProjects = () => {
     clearActiveSession();

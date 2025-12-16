@@ -1,8 +1,9 @@
 from typing import Any, Literal
-from pydantic import BaseModel
 
 from app.agent.harness import ActivityEventType
+from pydantic import BaseModel
 
+PayloadEventType = Literal["success", "failure"]
 sse_repr = "data: {payload}\n\n"
 
 
@@ -24,5 +25,5 @@ class ChatResponse(BaseModel):
 class SSEPayload(BaseModel):
     """Payload for SSE"""
 
-    type: ActivityEventType
+    type: ActivityEventType | PayloadEventType
     data: Any

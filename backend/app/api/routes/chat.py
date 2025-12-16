@@ -5,13 +5,13 @@ Chat API endpoints
 import asyncio
 import logging
 
-from app.agent.harness import MinecraftSchematicAgent
+from app.agent.harness import ActivityEventType, MinecraftSchematicAgent
 from app.api.models import ChatRequest
-from app.api.models.chat import ChatResponse
+from app.api.models.chat import ChatResponse, PayloadEventType, SSEPayload, sse_repr
 from app.services.event_buffer import (
+    SessionEventBuffer,
     create_new_buffer,
     is_task_running,
-    SessionEventBuffer,
 )
 from fastapi import APIRouter, HTTPException
 
@@ -23,11 +23,16 @@ logger = logging.getLogger(__name__)
 _background_tasks: set[asyncio.Task] = set()
 
 
-async def run_agent_task(
-    request: ChatRequest, buffer: SessionEventBuffer
-) -> None:
+def _make_sse(event_type: ActivityEventType | PayloadEventType, data: dict) -> str:
+    """Create a pre-serialized SSE string."""
+    return sse_repr.format(
+        payload=SSEPayload(type=event_type, data=data).model_dump_json()
+    )
+
+
+async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> None:
     """
-    Run the agent loop as a background task, writing events to the buffer.
+    Run the agent loop as a background task, writing pre-serialized SSE events to the buffer.
     """
     try:
         agent = MinecraftSchematicAgent(
@@ -35,37 +40,23 @@ async def run_agent_task(
         )
 
         async for event in agent.run(request.message):
-            buffer.append({"type": event.type, "data": event.data})
+            buffer.append(_make_sse(event.type, event.data))
 
         # Mark complete on success
         buffer.mark_complete()
 
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         error_msg = f"Session {request.session_id} not found"
         logger.error("Session not found: %s", request.session_id)
-        buffer.append({
-            "type": "error",
-            "data": {"message": error_msg},
-        })
-        buffer.append({
-            "type": "complete",
-            "data": {"success": False, "reason": error_msg},
-        })
+        buffer.append(_make_sse("error", {"message": error_msg}))
+        buffer.append(_make_sse("complete", {"success": False, "reason": error_msg}))
         buffer.mark_complete(error=error_msg)
 
     except Exception as e:
         error_msg = str(e)
-        logger.exception(
-            "Error while running agent for session %s", request.session_id
-        )
-        buffer.append({
-            "type": "error",
-            "data": {"message": f"Error: {error_msg}"},
-        })
-        buffer.append({
-            "type": "complete",
-            "data": {"success": False, "reason": error_msg},
-        })
+        logger.exception("Error while running agent for session %s", request.session_id)
+        buffer.append(_make_sse("error", {"message": f"Error: {error_msg}"}))
+        buffer.append(_make_sse("complete", {"success": False, "reason": error_msg}))
         buffer.mark_complete(error=error_msg)
 
 
@@ -89,8 +80,7 @@ async def chat(request: ChatRequest):
     # Check if task already running
     if is_task_running(request.session_id):
         raise HTTPException(
-            status_code=409,
-            detail="Task already running for this session"
+            status_code=409, detail="Task already running for this session"
         )
 
     # Create fresh buffer for new task

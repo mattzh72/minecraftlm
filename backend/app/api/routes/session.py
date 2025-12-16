@@ -2,13 +2,16 @@
 Session API endpoints
 """
 
+import asyncio
 import base64
 import json
 from pathlib import Path
 
+import aiofiles
+import aiofiles.os
+
 from app.api.models import SessionResponse
-from app.api.models.chat import sse_repr
-from app.services.event_buffer import get_buffer, get_or_create_buffer
+from app.services.event_buffer import get_buffer
 from app.services.session import SessionService
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -23,56 +26,75 @@ LOCAL_STORAGE_FOLDER = (
 )
 
 
+async def _path_exists(path: Path) -> bool:
+    """Check if path exists without blocking the event loop."""
+    return await aiofiles.os.path.exists(path)
+
+
+async def _path_is_dir(path: Path) -> bool:
+    """Check if path is a directory without blocking the event loop."""
+    return await aiofiles.os.path.isdir(path)
+
+
+async def _read_json_file(path: Path) -> dict | list | None:
+    """Read and parse a JSON file asynchronously."""
+    if not await _path_exists(path):
+        return None
+    try:
+        async with aiofiles.open(path, "r") as f:
+            content = await f.read()
+            return json.loads(content)
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
+async def _get_session_info(session_dir: Path) -> dict | None:
+    """Get info for a single session directory (runs file checks concurrently)."""
+    if not await _path_is_dir(session_dir):
+        return None
+
+    session_id = session_dir.name
+
+    # Run file existence checks and JSON reads concurrently
+    has_structure, has_thumbnail, conversation, metadata = await asyncio.gather(
+        _path_exists(session_dir / CODE_FNAME),
+        _path_exists(session_dir / THUMBNAIL_FNAME),
+        _read_json_file(session_dir / "conversation.json"),
+        _read_json_file(session_dir / "metadata.json"),
+    )
+
+    message_count = len(conversation) if conversation else 0
+    created_at = metadata.get("created_at") if metadata else None
+    updated_at = metadata.get("updated_at") if metadata else None
+
+    return {
+        "session_id": session_id,
+        "has_structure": has_structure,
+        "has_thumbnail": has_thumbnail,
+        "message_count": message_count,
+        "created_at": created_at,
+        "updated_at": updated_at,
+    }
+
+
 @router.get("/sessions")
 async def list_sessions():
     """
     List all available sessions with metadata.
     """
-    sessions = []
-    if LOCAL_STORAGE_FOLDER.exists():
-        for session_dir in LOCAL_STORAGE_FOLDER.iterdir():
-            if session_dir.is_dir():
-                session_id = session_dir.name
-                # Get basic info
-                has_structure = (session_dir / CODE_FNAME).exists()
-                has_thumbnail = (session_dir / THUMBNAIL_FNAME).exists()
-                conversation_path = session_dir / "conversation.json"
-                message_count = 0
-                if conversation_path.exists():
-                    try:
-                        with open(conversation_path, "r") as f:
-                            conv = json.load(f)
-                            message_count = len(conv)
-                    except (json.JSONDecodeError, IOError):
-                        pass
+    if not await _path_exists(LOCAL_STORAGE_FOLDER):
+        return JSONResponse(content={"sessions": []})
 
-                # Load metadata for timestamps
-                metadata_path = session_dir / "metadata.json"
-                created_at = None
-                updated_at = None
-                if metadata_path.exists():
-                    try:
-                        with open(metadata_path, "r") as f:
-                            metadata = json.load(f)
-                            created_at = metadata.get("created_at")
-                            updated_at = metadata.get("updated_at")
-                    except (json.JSONDecodeError, IOError):
-                        pass
+    # Get list of directories (this is the one sync call we can't easily avoid,
+    # but it's fast for small numbers of directories)
+    session_dirs = list(LOCAL_STORAGE_FOLDER.iterdir())
 
-                sessions.append(
-                    {
-                        "session_id": session_id,
-                        "has_structure": has_structure,
-                        "has_thumbnail": has_thumbnail,
-                        "message_count": message_count,
-                        "created_at": created_at,
-                        "updated_at": updated_at,
-                    }
-                )
+    # Process all sessions concurrently
+    results = await asyncio.gather(*[_get_session_info(d) for d in session_dirs])
+    sessions = [s for s in results if s is not None]
 
     # Sort by updated_at (most recent first)
     sessions.sort(key=lambda s: s.get("updated_at") or "", reverse=True)
-
     return JSONResponse(content={"sessions": sessions})
 
 
@@ -93,25 +115,12 @@ async def get_session(session_id: str):
     Used to restore sessions on page reload.
     """
     session_dir = Path(LOCAL_STORAGE_FOLDER) / session_id
-    if not session_dir.exists():
+    if not await _path_exists(session_dir):
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
     try:
-        # Load conversation
-        conversation_path = session_dir / "conversation.json"
-        conversation = []
-        if conversation_path.exists():
-            with open(conversation_path, "r") as f:
-                conversation = json.load(f)
-
-        # Load structure if exists
-        structure_path = session_dir / CODE_FNAME
-        structure = None
-        if structure_path.exists():
-            with open(structure_path, "r") as f:
-                structure = json.load(f)
-
-        # Load model from metadata
+        conversation = await _read_json_file(session_dir / "conversation.json") or []
+        structure = await _read_json_file(session_dir / CODE_FNAME)
         model = SessionService.get_model(session_id)
 
         return JSONResponse(
@@ -147,15 +156,20 @@ async def get_structure(session_id: str):
     Returns the code.json file which contains the structure data.
     """
     code_path = Path(LOCAL_STORAGE_FOLDER) / session_id / CODE_FNAME
-    if not code_path.exists():
+    if not await _path_exists(code_path):
         raise HTTPException(
             status_code=404, detail=f"Structure not found for session {session_id}"
         )
 
     try:
-        with open(code_path, "r") as f:
-            structure_data = json.load(f)
+        structure_data = await _read_json_file(code_path)
+        if structure_data is None:
+            raise HTTPException(
+                status_code=500, detail="Failed to parse structure JSON"
+            )
         return JSONResponse(content=structure_data)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error reading structure: {str(e)}"
@@ -169,7 +183,7 @@ async def get_thumbnail(session_id: str):
     Returns the thumbnail.png file if it exists.
     """
     thumbnail_path = Path(LOCAL_STORAGE_FOLDER) / session_id / THUMBNAIL_FNAME
-    if not thumbnail_path.exists():
+    if not await _path_exists(thumbnail_path):
         raise HTTPException(
             status_code=404, detail=f"Thumbnail not found for session {session_id}"
         )
@@ -188,7 +202,7 @@ async def upload_thumbnail(session_id: str, request: Request):
     Accepts base64-encoded PNG image data.
     """
     session_dir = Path(LOCAL_STORAGE_FOLDER) / session_id
-    if not session_dir.exists():
+    if not await _path_exists(session_dir):
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
     try:
@@ -202,69 +216,73 @@ async def upload_thumbnail(session_id: str, request: Request):
             # Extract base64 portion after the comma
             image_data = image_data.split(",", 1)[1]
 
-        # Decode base64 and save
+        # Decode base64 and save asynchronously
         image_bytes = base64.b64decode(image_data)
         thumbnail_path = session_dir / THUMBNAIL_FNAME
-        with open(thumbnail_path, "wb") as f:
-            f.write(image_bytes)
+        async with aiofiles.open(thumbnail_path, "wb") as f:
+            await f.write(image_bytes)
 
         return JSONResponse(content={"message": "Thumbnail saved successfully"})
     except base64.binascii.Error:
         raise HTTPException(status_code=400, detail="Invalid base64 image data")
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error saving thumbnail: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error saving thumbnail: {str(e)}")
 
 
 @router.get("/sessions/{session_id}/status")
 async def get_session_status(session_id: str):
     """
-    Check if session has an active task running.
+    Get current task status and all buffered events.
 
     Returns:
     - status: "idle" | "running" | "completed" | "error"
-    - has_events: whether there are events in the buffer
+    - events: list of pre-serialized SSE strings
     - event_count: number of events in the buffer
     - error: error message if status is "error"
+
+    Client should:
+    1. Process all events in the response
+    2. If status == "running", subscribe to /stream?since=event_count for new events
     """
     buffer = get_buffer(session_id)
 
     if buffer is None:
-        return JSONResponse(content={
-            "status": "idle",
-            "has_events": False,
-            "event_count": 0,
-        })
+        return JSONResponse(content={"status": "idle", "events": [], "event_count": 0})
 
     status = "running"
     if buffer.is_complete:
         status = "error" if buffer.error else "completed"
 
-    return JSONResponse(content={
-        "status": status,
-        "has_events": len(buffer.events) > 0,
-        "event_count": len(buffer.events),
-        "error": buffer.error,
-    })
+    return JSONResponse(
+        content={
+            "status": status,
+            "events": buffer.events,  # Pre-serialized SSE strings
+            "event_count": len(buffer.events),
+            "error": buffer.error,
+        }
+    )
 
 
 @router.get("/sessions/{session_id}/stream")
-async def stream_session_events(session_id: str):
+async def stream_session_events(session_id: str, since: int = 0):
     """
     SSE endpoint to subscribe to session events.
 
-    Streams all past events first, then streams new events in real-time
-    until the task completes. Automatically cleans up on disconnect.
+    Args:
+        since: Skip first N events (use event_count from /status endpoint)
+
+    Streams events starting from index `since` until task completes.
+    Returns 404 if no active buffer exists.
     """
-    buffer = get_or_create_buffer(session_id)
+    buffer = get_buffer(session_id)
+
+    # No buffer = no active task, don't create one and poll forever
+    if buffer is None:
+        raise HTTPException(status_code=404, detail="No active task for this session")
 
     async def event_generator():
-        async for event in buffer.subscribe():
-            # Skip internal events
-            if event.get("type", "").startswith("_"):
-                continue
-            yield sse_repr.format(payload=json.dumps(event))
+        async for sse_string in buffer.subscribe(since=since):
+            yield sse_string
 
     return StreamingResponse(
         event_generator(),
