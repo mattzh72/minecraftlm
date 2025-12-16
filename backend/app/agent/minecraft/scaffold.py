@@ -51,7 +51,7 @@ def build_structure() -> dict:
     # scene.add(
     #     Block("minecraft:grass_block", catalog=catalog)
     #         .with_size(16, 1, 16)
-    #         .set_properties({"snowy": "false"})
+    #         .with_properties({"snowy": "false"})
     # )
     #
     # scene.add(
@@ -73,10 +73,21 @@ def build_structure() -> dict:
     #         .at(5, 1, 0)
     # )
     #
-    # # Traditional style (also works):
-    # wall = Block("minecraft:oak_planks", size=(12, 4, 1), catalog=catalog)
-    # wall.position.set(2, 1, 2)
-    # scene.add(wall)
+    # # Connecting blocks (iron_bars, glass_pane, fences) need directional properties:
+    # scene.add(
+    #     Block("minecraft:iron_bars", catalog=catalog)
+    #         .with_properties({"east": "true", "west": "true", "north": "false", "south": "false"})
+    #         .with_size(4, 5, 1)
+    #         .at(10, 1, 5)
+    # )
+    #
+    # # Use .tap() for debugging or side effects in a chain:
+    # scene.add(
+    #     Block("minecraft:stone", catalog=catalog)
+    #         .with_size(5, 1, 5)
+    #         .tap(lambda b: print(f"Placing {b.block_id}"))
+    #         .at(0, 0, 0)
+    # )
 
     structure = scene.to_structure(padding=0)
     return structure

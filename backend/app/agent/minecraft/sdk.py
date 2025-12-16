@@ -31,7 +31,7 @@ The exported structure dictionary has the form::
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from app.agent.minecraft.assets import LegacyAssets, _normalize_block_id
 
@@ -223,6 +223,11 @@ class Object3D:
         self.position.translate(dx, dy, dz)
         return self
 
+    def tap(self, fn: Callable[["Object3D"], None]) -> "Object3D":
+        """Execute a side-effect function and return self for chaining."""
+        fn(self)
+        return self
+
     def _flatten_blocks(
         self,
         parent_offset: Optional[Vector3] = None,
@@ -321,6 +326,15 @@ class Block(Object3D):
         """Set facing direction (north/south/east/west). Returns self for chaining."""
         self.merge_properties({"facing": direction})
         return self
+
+    def tap(self, fn: Callable[["Block"], None]) -> "Block":
+        """Execute a side-effect function and return self for chaining."""
+        fn(self)
+        return self
+
+    def with_properties(self, properties: Dict[str, str]) -> "Block":
+        """Merge properties and return self for chaining. Alias for merge_properties."""
+        return self.merge_properties(properties)
 
 
 class Scene(Object3D):
