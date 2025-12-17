@@ -37,6 +37,9 @@ export type StoreStateBase = {
   agentState: AgentState;
   activeAssistantMessageIndex: number | null;
 
+  // stream management (shared across all useChat instances)
+  streamAbortController: AbortController | null;
+
   // model state
   models: Model[];
   selectedModelId: string | null;
@@ -88,6 +91,10 @@ export type StoreActions = {
   setViewerMode: (mode: ViewerMode) => void;
 
   addThoughtSummary: (sessionId: string, thoughtSummary: string) => void;
+
+  // stream management actions
+  setStreamAbortController: (controller: AbortController | null) => void;
+  abortCurrentStream: () => void;
 };
 
 const defaultSession: StoreSession = {
@@ -160,7 +167,21 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   agentState: "idle",
   activeAssistantMessageIndex: null,
+  streamAbortController: null,
   setAgentState: (state) => set({ agentState: state }),
+
+  setStreamAbortController: (controller) => set({ streamAbortController: controller }),
+  abortCurrentStream: () => {
+    const controller = get().streamAbortController;
+    console.log(`[abortCurrentStream] controller exists: ${!!controller}`);
+    if (controller) {
+      controller.abort();
+      set({ streamAbortController: null });
+      console.log(`[abortCurrentStream] Aborted and cleared controller`);
+    } else {
+      console.log(`[abortCurrentStream] No controller to abort`);
+    }
+  },
 
   addToolCall: (sessionId: string, toolCall: ToolCall) => {
     const session = get().sessions[sessionId];
@@ -169,26 +190,33 @@ export const useStore = create<StoreState>()((set, get) => ({
       return;
     }
 
-    const conversation = session.conversation || [];
     const newConversation = [...(session.conversation || [])];
+    console.log(`[addToolCall] Adding tool call ${toolCall.function.name}, conversation length: ${newConversation.length}`);
 
-    const assistantMessages = conversation.filter(
-      (msg) => msg.role === "assistant"
-    );
-    const latestAssistantMessage =
-      assistantMessages[assistantMessages.length - 1];
+    // Find the index of the last assistant message
+    let assistantIdx = -1;
+    for (let i = newConversation.length - 1; i >= 0; i--) {
+      if (newConversation[i]?.role === "assistant") {
+        assistantIdx = i;
+        break;
+      }
+    }
 
-    const latestAssistantMessageToolCalls =
-      latestAssistantMessage?.role === "assistant"
-        ? latestAssistantMessage.tool_calls || []
-        : [];
+    if (assistantIdx === -1) {
+      console.warn(`[addToolCall] No assistant message found to attach tool call`);
+      return;
+    }
 
-    const newToolCalls = [...latestAssistantMessageToolCalls, toolCall];
-    const newAssistantMessage = {
+    const latestAssistantMessage = newConversation[assistantIdx];
+    const existingToolCalls = latestAssistantMessage.tool_calls || [];
+    const newToolCalls = [...existingToolCalls, toolCall];
+    console.log(`[addToolCall] Attaching to assistant message at index ${assistantIdx}, total tool calls: ${newToolCalls.length}`);
+
+    newConversation[assistantIdx] = {
       ...latestAssistantMessage,
       tool_calls: newToolCalls,
     };
-    newConversation[newConversation.length - 1] = newAssistantMessage;
+
     set({
       sessions: {
         ...get().sessions,

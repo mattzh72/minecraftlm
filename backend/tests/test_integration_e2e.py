@@ -63,11 +63,18 @@ async def test_agent_e2e_simple_structure():
     # Track events
     events = []
     tool_calls = []
+    # Build conversation with user message (as chat.py would do)
+    conversation = [{"role": "user", "content": user_message}]
 
     # Run agent
-    async for event in agent.run(user_message):
+    async for event in agent.run(conversation):
+        # Skip internal events (handled by chat.py in production)
+        if event.type == "full_message":
+            print(f"[Internal] Event: {event.type} (skipped)")
+            continue
+
         events.append(event)
-        print(f"Event: {event.type} - {event.data}")
+        print(f"Event: {event.type}")
 
         if event.type == "tool_call":
             tool_calls.append(event.data["name"])

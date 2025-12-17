@@ -1,6 +1,6 @@
 import { useStore } from "../store";
 import { sseEvent } from "@/lib/schemas/sse-events";
-import { useRef, useCallback } from "react";
+import { useCallback } from "react";
 
 export function useChat() {
   const addStructureData = useStore((s) => s.addStructureData);
@@ -13,8 +13,9 @@ export function useChat() {
   const addToolResult = useStore((s) => s.addToolResult);
   const requestThumbnailCapture = useStore((s) => s.requestThumbnailCapture);
 
-  // Track abort controllers for cleanup
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Stream management - shared across all useChat instances via store
+  const setStreamAbortController = useStore((s) => s.setStreamAbortController);
+  const abortCurrentStream = useStore((s) => s.abortCurrentStream);
 
   /**
    * Process a single SSE event and update store state.
@@ -138,29 +139,30 @@ export function useChat() {
     async (sessionId: string, isResume: boolean = false, since: number = 0) => {
       console.log(`[subscribeToStream] Starting subscription`, { sessionId, isResume, since });
 
-      // Cancel any existing subscription
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      // Cancel any existing subscription (shared across all useChat instances)
+      abortCurrentStream();
 
       const abortController = new AbortController();
-      abortControllerRef.current = abortController;
-
+      setStreamAbortController(abortController);
 
       try {
         const url = since > 0
           ? `/api/sessions/${sessionId}/stream?since=${since}`
           : `/api/sessions/${sessionId}/stream`;
 
+        console.log(`[subscribeToStream] Fetching ${url}`);
         const response = await fetch(url, {
           signal: abortController.signal,
         });
+
+        console.log(`[subscribeToStream] Response status: ${response.status}, ok: ${response.ok}, hasBody: ${!!response.body}`);
 
         if (!response.ok || !response.body) {
           throw new Error(`Stream request failed: ${response.status}`);
         }
 
         const reader = response.body.getReader();
+        console.log(`[subscribeToStream] Got reader, starting to read...`);
         const decoder = new TextDecoder();
         let lineBuffer = "";
         let eventLines: string[] = [];
@@ -168,13 +170,22 @@ export function useChat() {
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            console.log(`[subscribeToStream] Reader done, stream ended`);
+            break;
+          }
 
           lineBuffer += decoder.decode(value, { stream: true });
           const lines = lineBuffer.split(/\r?\n/);
           lineBuffer = lines.pop() || "";
 
           for (const line of lines) {
+            // Early exit if aborted during processing
+            if (abortController.signal.aborted) {
+              console.log(`[subscribeToStream] Abort detected during line processing`);
+              return;
+            }
+
             if (line === "") {
               if (eventLines.length === 0) continue;
               const dataStr = eventLines.join("\n");
@@ -183,7 +194,6 @@ export function useChat() {
               try {
                 const rawData = JSON.parse(dataStr);
                 const event = sseEvent.parse(rawData);
-                console.log(`[subscribeToStream] Received event:`, event.type, event.data);
                 const shouldContinue = await processEvent(
                   event,
                   sessionId,
@@ -203,14 +213,21 @@ export function useChat() {
         }
       } catch (err: any) {
         if (err.name === "AbortError") {
-          // Intentionally aborted, ignore
+          console.log(`[subscribeToStream] Aborted (intentional)`);
           return;
         }
-        console.error("Stream error:", err);
+        console.error("[subscribeToStream] Stream error:", err);
         setAgentState("error");
+      } finally {
+        // Only clear if this is still our controller
+        // (another stream might have started and set a new controller)
+        const currentController = useStore.getState().streamAbortController;
+        if (currentController === abortController) {
+          setStreamAbortController(null);
+        }
       }
     },
-    [processEvent, setAgentState]
+    [processEvent, setAgentState, abortCurrentStream, setStreamAbortController]
   );
 
   /**
@@ -254,78 +271,27 @@ export function useChat() {
   );
 
   /**
-   * Process buffered events from the status response.
-   * Returns true if stream is complete, false if still running.
-   */
-  const processBufferedEvents = useCallback(
-    async (sessionId: string, events: string[]): Promise<boolean> => {
-      const sawCompleteTaskCallRef = { current: false };
-
-      for (const eventStr of events) {
-        try {
-          // Events are pre-serialized SSE strings like "data: {...}\n\n"
-          // Extract the JSON from the SSE format
-          const match = eventStr.match(/^data:\s*(.+)$/m);
-          if (!match) continue;
-
-          const rawData = JSON.parse(match[1]);
-          const event = sseEvent.parse(rawData);
-          const shouldContinue = await processEvent(event, sessionId, sawCompleteTaskCallRef);
-
-          if (!shouldContinue) {
-            return true; // Stream complete
-          }
-        } catch (err) {
-          console.error("[processBufferedEvents] Error parsing event:", err, eventStr);
-        }
-      }
-
-      return false; // Not complete yet
-    },
-    [processEvent]
-  );
-
-  /**
-   * Check session status and resume stream if task is running.
+   * Resume stream if task is running.
    *
-   * IMPORTANT: The conversation is already loaded from the backend via restoreSession.
-   * We should NOT replay buffered events as that would duplicate messages.
-   * We only need to subscribe to the live stream if the task is still running.
+   * Called after restoreSession with the task status from the unified session response.
+   * No separate API call needed - status info comes from GET /sessions/{id}.
+   *
+   * Buffer is cleared after each disk save, so on resume we replay ALL buffered events
+   * (since=0) to rebuild the in-progress message. The frontend already knows how to
+   * process these events, so we just stream them rather than trying to reconstruct.
    */
-  const checkAndResumeSession = useCallback(
-    async (sessionId: string) => {
-      console.log(`[checkAndResumeSession] Checking status for session ${sessionId}`);
-      try {
-        const response = await fetch(`/api/sessions/${sessionId}/status`);
-        if (!response.ok) return;
+  const resumeStreamIfRunning = useCallback(
+    async (sessionId: string, taskStatus: string) => {
+      console.log(`[resumeStreamIfRunning] taskStatus=${taskStatus}`);
 
-        // Check if session is still active after async fetch completes
-        const currentActive = useStore.getState().activeSessionId;
-        if (currentActive !== sessionId) {
-          console.log(`[checkAndResumeSession] Session changed, aborting (current: ${currentActive})`);
-          return;
-        }
-
-        const status = await response.json();
-        console.log(`[checkAndResumeSession] Status response:`, {
-          status: status.status,
-          eventCount: status.event_count,
-          error: status.error,
-        });
-
-        if (status.status === "running") {
-          // Task is still running - subscribe to stream for new events
-          // Start from current event count to avoid replaying already-persisted events
-          console.log(`[checkAndResumeSession] Subscribing to stream with since=${status.event_count}`);
-          setAgentState("thinking");
-          await subscribeToStream(sessionId, true, status.event_count);
-        } else {
-          console.log(`[checkAndResumeSession] Task not running (${status.status}), no stream needed`);
-        }
-        // If status is "completed", "error", or "idle" - conversation is already loaded
-        // from the backend, nothing to do here
-      } catch (err) {
-        console.error("Error checking session status:", err);
+      if (taskStatus === "running") {
+        // Task is still running - subscribe to stream to replay ALL buffered events
+        // Buffer only contains events since last disk save, so since=0 is correct
+        console.log(`[resumeStreamIfRunning] Subscribing to stream with since=0`);
+        setAgentState("thinking");
+        await subscribeToStream(sessionId, true, 0);
+      } else {
+        console.log(`[resumeStreamIfRunning] Task not running (${taskStatus}), no stream needed`);
       }
     },
     [subscribeToStream, setAgentState]
@@ -335,16 +301,14 @@ export function useChat() {
    * Cancel any active stream subscription.
    */
   const cancelStream = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-  }, []);
+    console.log("[cancelStream] Cancelling stream");
+    abortCurrentStream();
+  }, [abortCurrentStream]);
 
   return {
     handleSend,
     subscribeToStream,
-    checkAndResumeSession,
+    resumeStreamIfRunning,
     cancelStream,
   };
 }

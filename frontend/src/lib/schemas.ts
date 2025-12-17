@@ -96,11 +96,14 @@ export const uiMessageSchema = z.discriminatedUnion("type", [
 export const uiConversationSchema = z.array(uiMessageSchema);
 
 const structureDataSchema = z.record(z.string(), z.unknown()).nullish().default(null);
+const taskStatusSchema = z.enum(["idle", "running", "completed", "error"]);
 export const sessionDetailsResponseSchema = z.object({
   session_id: z.string(),
   conversation: rawConversationSchema,
   structure: structureDataSchema,
+  has_thumbnail: z.boolean().optional().default(false),
   model: z.string().nullish(),
+  task_status: taskStatusSchema.default("idle"),
 });
 
 export const storeSessionSchema = sessionLiteSchema.extend({

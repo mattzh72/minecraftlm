@@ -6,15 +6,16 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import AsyncIterator, Literal
+from typing import AsyncIterator
 
 from app.agent.llms import (
     AnthropicService,
     BaseLLMService,
     GeminiService,
     OpenAIService,
+    StreamChunk,
 )
 from app.agent.llms.base import ThinkingLevel
 from app.agent.tools.base import ToolResult
@@ -27,26 +28,26 @@ from app.models import (
     ToolCall,
     ToolCallFunction,
     ToolMessage,
-    UserMessage,
 )
-from app.services.event_buffer import get_buffer
-from app.services.session import SessionService
-
-# Event types emitted by the agent
-ActivityEventType = Literal[
-    "thought",
-    "text_delta",
-    "tool_call",
-    "tool_result",
-    "complete",
-    "turn_start",
-    "error",
-]
 
 logger = logging.getLogger(__name__)
 
 
-class TerminateReason(str, Enum):
+# Event types emitted by the agent
+# Frontend events: sent to UI
+# Internal events: handled by chat.py but not sent to frontend
+class ActivityEventType(StrEnum):
+    THOUGHT = "thought"
+    TEXT_DELTA = "text_delta"
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
+    COMPLETE = "complete"
+    TURN_START = "turn_start"
+    ERROR = "error"
+    FULL_MESSAGE = "full_message"  # Complete message(s) to persist - chat.py saves and clears buffer
+
+
+class TerminateReason(StrEnum):
     """Reasons for agent termination"""
 
     GOAL = "GOAL"  # Successfully completed
@@ -116,8 +117,6 @@ class MinecraftSchematicAgent:
         # Initialize LLM service with thinking level
         self.llm = self._providers[provider](self.model, self.thinking_level)
 
-        self.session_service = SessionService()
-
         # Initialize tools
         tools = [ReadCodeTool(), EditCodeTool()]
         self.tool_registry = ToolRegistry(tools)
@@ -146,40 +145,26 @@ class MinecraftSchematicAgent:
 
         return template
 
-    async def run(self, user_message: str) -> AsyncIterator[ActivityEvent]:
+    async def run(self, conversation: list[dict]) -> AsyncIterator[ActivityEvent]:
         """
         Run the agent loop.
 
         Args:
-            user_message: Initial user message
+            conversation: Full conversation history including the new user message
 
         Yields:
-            ActivityEvent for streaming to UI
+            ActivityEvent for streaming to UI and internal events for persistence
         """
         turn_count = 0
 
-        # Lock the model to this session on first use
-        await self.session_service.set_model(self.session_id, self.model)
-
-        # Load conversation history
-        conversation = await self.session_service.load_conversation(self.session_id)
-
-        # Add user message
-        conversation.append(UserMessage(role="user", content=user_message).model_dump())
-        await self.session_service.save_conversation(self.session_id, conversation)
-        # Clear buffer after disk save to prevent duplication on refresh
-        buffer = get_buffer(self.session_id)
-        if buffer:
-            buffer.clear()
-
-        # Conversation is already in OpenAI format
+        # Working copy for LLM context
         messages = list(conversation)
 
         # Main loop
         while True:
             if turn_count >= self.max_turns:
                 yield ActivityEvent(
-                    type="complete",
+                    type=ActivityEventType.COMPLETE,
                     data={
                         "success": False,
                         "reason": TerminateReason.MAX_TURNS,
@@ -191,8 +176,12 @@ class MinecraftSchematicAgent:
             turn_count += 1
 
             # Call model with tools (streaming)
-            logger.info(f"yielding event type=turn_start, turn={turn_count}")
-            yield ActivityEvent(type="turn_start", data={"turn": turn_count})
+            logger.info(
+                f"yielding event type={ActivityEventType.TURN_START}, turn={turn_count}"
+            )
+            yield ActivityEvent(
+                type=ActivityEventType.TURN_START, data={"turn": turn_count}
+            )
 
             # Accumulators for streaming response
             accumulated_text = ""
@@ -207,13 +196,16 @@ class MinecraftSchematicAgent:
                 messages,
                 self.tool_registry.get_tool_schemas(),
             ):
+                chunk: StreamChunk
                 logger.info(f"handling chunk, chunk={chunk}")
 
                 # Stream thought summaries separately when available (Gemini/Anthropic)
                 thought_delta = getattr(chunk, "thought_delta", None)
                 if thought_delta:
                     accumulated_thought += thought_delta
-                    yield ActivityEvent(type="thought", data={"delta": thought_delta})
+                    yield ActivityEvent(
+                        type=ActivityEventType.THOUGHT, data={"delta": thought_delta}
+                    )
 
                 # Capture thinking signature (Anthropic)
                 thought_signature = getattr(chunk, "thought_signature", None)
@@ -227,13 +219,14 @@ class MinecraftSchematicAgent:
                         f"yielding event type=text_delta, delta={chunk.text_delta}"
                     )
                     yield ActivityEvent(
-                        type="text_delta", data={"delta": chunk.text_delta}
+                        type=ActivityEventType.TEXT_DELTA,
+                        data={"delta": chunk.text_delta},
                     )
 
                 # Handle tool calls delta
                 if chunk.tool_calls_delta:
                     logger.info(
-                        f"yielding event type=tool_calls_delta, delta={chunk.tool_calls_delta}"
+                        f"handling tool_calls_delta, delta={chunk.tool_calls_delta}"
                     )
                     for tc_delta in chunk.tool_calls_delta:
                         idx = tc_delta.get("index", 0)
@@ -309,11 +302,9 @@ class MinecraftSchematicAgent:
 
             # Save assistant message
             conversation.append(assistant_message)
-            await self.session_service.save_conversation(self.session_id, conversation)
-            # Clear buffer after disk save to prevent duplication on refresh
-            buffer = get_buffer(self.session_id)
-            if buffer:
-                buffer.clear()
+            yield ActivityEvent(
+                type=ActivityEventType.FULL_MESSAGE, data={"conversation": conversation}
+            )
             messages.append(assistant_message)
 
             # No function calls - agent responded with content only
@@ -322,7 +313,7 @@ class MinecraftSchematicAgent:
                 # a conversational response and end the loop successfully
                 if accumulated_text.strip():
                     yield ActivityEvent(
-                        type="complete",
+                        type=ActivityEventType.COMPLETE,
                         data={
                             "success": True,
                             "reason": TerminateReason.GOAL,
@@ -333,7 +324,7 @@ class MinecraftSchematicAgent:
                 else:
                     # No content and no tool calls - protocol violation
                     yield ActivityEvent(
-                        type="complete",
+                        type=ActivityEventType.COMPLETE,
                         data={
                             "success": False,
                             "reason": TerminateReason.NO_COMPLETE_TASK,
@@ -350,7 +341,7 @@ class MinecraftSchematicAgent:
                 func_args = json.loads(tool_call.function.arguments or "{}")
 
                 yield ActivityEvent(
-                    type="tool_call",
+                    type=ActivityEventType.TOOL_CALL,
                     data={"id": tool_call.id, "name": func_name, "args": func_args},
                 )
 
@@ -370,7 +361,9 @@ class MinecraftSchematicAgent:
                     result = await invocation.execute()
                     result.tool_call_id = tool_call.id
 
-                yield ActivityEvent(type="tool_result", data=result.to_dict())
+                yield ActivityEvent(
+                    type=ActivityEventType.TOOL_RESULT, data=result.to_dict()
+                )
 
                 # Build tool response (without tool_call_id in content, it's in the message itself)
                 tool_response = ToolMessage(
@@ -390,9 +383,8 @@ class MinecraftSchematicAgent:
             if serialized_responses:
                 # Save tool responses
                 conversation.extend(serialized_responses)
-                await self.session_service.save_conversation(self.session_id, conversation)
-                # Clear buffer after disk save to prevent duplication on refresh
-                buffer = get_buffer(self.session_id)
-                if buffer:
-                    buffer.clear()
+                yield ActivityEvent(
+                    type=ActivityEventType.FULL_MESSAGE,
+                    data={"conversation": conversation},
+                )
                 messages.extend(serialized_responses)

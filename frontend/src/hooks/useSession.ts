@@ -7,7 +7,7 @@ import { sessionDetailsResponseSchema } from "@/lib/schemas";
 export function useSession() {
   const setActiveSession = useStore((s) => s.setActiveSession);
   const setSelectedModelId = useStore((s) => s.setSelectedModelId);
-  const { handleSend, checkAndResumeSession, cancelStream } = useChat();
+  const { handleSend, resumeStreamIfRunning } = useChat();
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -66,28 +66,31 @@ export function useSession() {
           session_id: session.session_id,
           conversation: session.conversation,
           structure: session.structure,
+          has_thumbnail: session.has_thumbnail,
         });
         // Restore the model that was used for this session
         if (session.model) {
           setSelectedModelId(session.model);
         }
 
-        // Check if there's an active task and resume the stream
-        await checkAndResumeSession(sessionIdToRestore);
+        // Resume stream if task is running (using status from the same response)
+        // Frontend will subscribe with since=0 to replay all buffered events
+        await resumeStreamIfRunning(session.session_id, session.task_status);
       } catch (error) {
         console.error("Error restoring session:", error);
       } finally {
         setIsLoading(false);
       }
     },
-    [setActiveSession, setSelectedModelId, checkAndResumeSession]
+    [setActiveSession, setSelectedModelId, resumeStreamIfRunning]
   );
 
   const clearActiveSession = useCallback(() => {
     // Cancel any active SSE stream before clearing the session
-    cancelStream();
+    // Call store action directly to avoid dependency on cancelStream which changes reference
+    useStore.getState().abortCurrentStream();
     setActiveSession(null);
-  }, [setActiveSession, cancelStream]);
+  }, [setActiveSession]);
 
   return {
     isLoading,

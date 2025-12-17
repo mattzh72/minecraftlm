@@ -7,11 +7,7 @@ import base64
 from pathlib import Path
 
 from app.api.models import SessionResponse
-from app.services.event_buffer import (
-    get_buffer,
-    is_task_running,
-    reconstruct_conversation_from_buffer,
-)
+from app.services.event_buffer import get_buffer
 from app.services.file_ops import get_file_service
 from app.services.session import SessionService
 from fastapi import APIRouter, HTTPException, Request
@@ -60,11 +56,19 @@ async def create_session():
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str):
     """
-    Get session data including conversation history and structure (if exists).
+    Get session data including conversation history, structure, and task status.
     Used to restore sessions on page reload.
 
-    If a task is currently running, merges disk (completed turns) with
-    in-progress assistant message reconstructed from the buffer.
+    Returns:
+    - session_id: The session ID
+    - conversation: Persisted conversation history (complete messages only)
+    - structure: The structure data (if exists)
+    - has_thumbnail: Whether a cached thumbnail exists
+    - model: The model used for this session
+    - task_status: "idle" | "running" | "completed" | "error"
+
+    If task_status == "running", frontend should subscribe to /stream?since=0
+    to replay all buffered events and build the in-progress message.
     """
     fs = get_file_service()
     session_dir = Path(LOCAL_STORAGE_FOLDER) / session_id
@@ -76,13 +80,16 @@ async def get_session(session_id: str):
     except FileNotFoundError:
         conversation = []
 
-    # If task is running, reconstruct current turn from buffer and append
-    if is_task_running(session_id):
-        buffer = get_buffer(session_id)
-        if buffer:
-            current_turn = reconstruct_conversation_from_buffer(buffer)
-            if current_turn:
-                conversation.append(current_turn)
+    # Determine task status from buffer
+    buffer = get_buffer(session_id)
+    if buffer is None:
+        task_status = "idle"
+    elif buffer.is_complete:
+        task_status = "error" if buffer.error else "completed"
+    elif buffer.is_started:
+        task_status = "running"
+    else:
+        task_status = "idle"
 
     try:
         structure_path = session_dir / CODE_FNAME
@@ -93,6 +100,10 @@ async def get_session(session_id: str):
     except Exception:
         structure = None
 
+    # Check if thumbnail exists
+    thumbnail_path = session_dir / THUMBNAIL_FNAME
+    has_thumbnail = await fs.exists(thumbnail_path)
+
     model = await SessionService.get_model(session_id)
 
     return JSONResponse(
@@ -100,7 +111,9 @@ async def get_session(session_id: str):
             "session_id": session_id,
             "conversation": conversation,
             "structure": structure,
+            "has_thumbnail": has_thumbnail,
             "model": model,
+            "task_status": task_status,
         }
     )
 
@@ -195,47 +208,13 @@ async def upload_thumbnail(session_id: str, request: Request):
         raise HTTPException(status_code=500, detail=f"Error saving thumbnail: {str(e)}")
 
 
-@router.get("/sessions/{session_id}/status")
-async def get_session_status(session_id: str):
-    """
-    Get current task status and all buffered events.
-
-    Returns:
-    - status: "idle" | "running" | "completed" | "error"
-    - events: list of pre-serialized SSE strings
-    - event_count: number of events in the buffer
-    - error: error message if status is "error"
-
-    Client should:
-    1. Process all events in the response
-    2. If status == "running", subscribe to /stream?since=event_count for new events
-    """
-    buffer = get_buffer(session_id)
-
-    if buffer is None:
-        return JSONResponse(content={"status": "idle", "events": [], "event_count": 0})
-
-    status = "running"
-    if buffer.is_complete:
-        status = "error" if buffer.error else "completed"
-
-    return JSONResponse(
-        content={
-            "status": status,
-            "events": buffer.events,  # Pre-serialized SSE strings
-            "event_count": len(buffer.events),
-            "error": buffer.error,
-        }
-    )
-
-
 @router.get("/sessions/{session_id}/stream")
 async def stream_session_events(session_id: str, since: int = 0):
     """
     SSE endpoint to subscribe to session events.
 
     Args:
-        since: Skip first N events (use event_count from /status endpoint)
+        since: Skip first N events (use event_count from GET /sessions/{id})
 
     Streams events starting from index `since` until task completes.
     Returns 404 if no active buffer exists.

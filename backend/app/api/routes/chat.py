@@ -13,10 +13,14 @@ from app.services.event_buffer import (
     create_new_buffer,
     is_task_running,
 )
+from app.services.session import SessionService
 from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Internal event types that should not be sent to frontend
+INTERNAL_EVENTS = {"full_message"}
 
 # Store strong references to background tasks to prevent garbage collection
 # See: https://docs.python.org/3/library/asyncio-task.html#creating-tasks
@@ -33,16 +37,38 @@ def _make_sse(event_type: ActivityEventType | PayloadEventType, data: dict) -> s
 async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> None:
     """
     Run the agent loop as a background task, writing pre-serialized SSE events to the buffer.
+
+    Handles:
+    - Loading conversation from disk before starting agent
+    - Setting model on session
+    - Processing full_message events (save to disk, clear buffer)
+    - Forwarding frontend events to buffer
     """
     try:
+        # Load conversation from disk and add user message
+        conversation = await SessionService.load_conversation(request.session_id)
+        conversation.append({"role": "user", "content": request.message})
+        # Persist user message immediately
+        await SessionService.save_conversation(request.session_id, conversation)
+        # Lock model to session
+        await SessionService.set_model(request.session_id, request.model)
+
         agent = MinecraftSchematicAgent(
             session_id=request.session_id,
             model=request.model,
             thinking_level=request.thinking_level,
         )
 
-        async for event in agent.run(request.message):
-            buffer.append(_make_sse(event.type, event.data))
+        async for event in agent.run(conversation):
+            if event.type == "full_message":
+                # Handle internal save event
+                conv_data = event.data.get("conversation", [])
+                await SessionService.save_conversation(request.session_id, conv_data)
+                # Clear buffer after save - buffer only holds unsaved events
+                buffer.clear()
+            elif event.type not in INTERNAL_EVENTS:
+                # Forward to frontend via buffer
+                buffer.append(_make_sse(event.type, event.data))
 
         # Mark complete on success
         buffer.mark_complete()

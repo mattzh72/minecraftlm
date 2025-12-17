@@ -6,8 +6,6 @@ SSE streams poll the list for new events.
 """
 
 import asyncio
-import json
-import re
 import threading
 from typing import AsyncIterator
 
@@ -24,6 +22,7 @@ class SessionEventBuffer:
     def __init__(self):
         self.events: list[str] = []  # Pre-serialized SSE strings
         self.is_complete: bool = False
+        self.is_started: bool = False  # Set to True when task starts
         self.error: str | None = None
         self._lock = threading.Lock()
 
@@ -33,7 +32,7 @@ class SessionEventBuffer:
             self.events.append(sse_string)
 
     def clear(self) -> None:
-        """Clear all events from the buffer."""
+        """Clear all events from the buffer after they've been saved to disk."""
         with self._lock:
             self.events.clear()
 
@@ -42,7 +41,9 @@ class SessionEventBuffer:
         self.is_complete = True
         self.error = error
 
-    async def subscribe(self, since: int = 0, timeout: float = 300.0) -> AsyncIterator[str]:
+    async def subscribe(
+        self, since: int = 0, timeout: float = 300.0
+    ) -> AsyncIterator[str]:
         """
         Yield SSE strings from the buffer, polling for new ones until complete.
 
@@ -104,8 +105,10 @@ def get_or_create_buffer(session_id: str) -> SessionEventBuffer:
 
 def create_new_buffer(session_id: str) -> SessionEventBuffer:
     """Create a fresh buffer for a session, replacing any existing one."""
-    _buffers[session_id] = SessionEventBuffer()
-    return _buffers[session_id]
+    buffer = SessionEventBuffer()
+    buffer.is_started = True
+    _buffers[session_id] = buffer
+    return buffer
 
 
 def is_task_running(session_id: str) -> bool:
@@ -113,59 +116,5 @@ def is_task_running(session_id: str) -> bool:
     buffer = _buffers.get(session_id)
     if buffer is None:
         return False
-    return not buffer.is_complete and len(buffer.events) > 0
-
-
-def reconstruct_conversation_from_buffer(buffer: SessionEventBuffer) -> dict | None:
-    """
-    Parse SSE events and reconstruct the in-progress assistant message.
-
-    Returns an assistant message dict if there's content, None otherwise.
-    """
-    thought_summary = ""
-    content = ""
-    tool_calls = []
-
-    # Regex to extract JSON from SSE format: "data: {...}\n\n"
-    data_pattern = re.compile(r"^data:\s*(.+)$", re.MULTILINE)
-
-    with buffer._lock:
-        for event_str in buffer.events:
-            # Parse SSE format
-            match = data_pattern.search(event_str)
-            if not match:
-                continue
-
-            try:
-                event = json.loads(match.group(1))
-            except json.JSONDecodeError:
-                continue
-
-            event_type = event.get("type")
-            event_data = event.get("data", {})
-
-            if event_type == "thought":
-                thought_summary += event_data.get("delta", "")
-            elif event_type == "text_delta":
-                content += event_data.get("delta", "")
-            elif event_type == "tool_call":
-                # Format tool call to match conversation schema
-                tool_calls.append({
-                    "id": event_data.get("id"),
-                    "type": "function",
-                    "function": {
-                        "name": event_data.get("name", ""),
-                        "arguments": json.dumps(event_data.get("args", {})),
-                    },
-                })
-            # turn_start just indicates new message, no data to extract
-
-    # Only return if we have any content
-    if thought_summary or content or tool_calls:
-        return {
-            "role": "assistant",
-            "content": content,
-            "thought_summary": thought_summary if thought_summary else None,
-            "tool_calls": tool_calls if tool_calls else None,
-        }
-    return None
+    # Use is_started flag instead of events length since buffer gets cleared after disk saves
+    return buffer.is_started and not buffer.is_complete
