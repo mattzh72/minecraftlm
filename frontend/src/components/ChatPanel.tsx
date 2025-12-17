@@ -262,7 +262,7 @@ type ChatPanelProps = {
   onResizeEnd?: () => void;
 };
 
-const MIN_WIDTH = 280;
+const MIN_WIDTH = 320;
 const MAX_WIDTH = 600;
 
 const GLASS_PANEL_CLASSES = cn(

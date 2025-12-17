@@ -210,6 +210,4 @@ async def upload_thumbnail(session_id: str, request: Request):
     except base64.binascii.Error:
         raise HTTPException(status_code=400, detail="Invalid base64 image data")
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error saving thumbnail: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error saving thumbnail: {str(e)}")

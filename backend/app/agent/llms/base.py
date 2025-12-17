@@ -4,7 +4,9 @@ Base class for LLM services with streaming support.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import AsyncIterator
+from typing import AsyncIterator, Literal
+
+ThinkingLevel = Literal["low", "med", "high"]
 
 
 @dataclass
@@ -16,14 +18,17 @@ class StreamChunk:
     thought_signature: str | None = None  # Signature for thinking block (Anthropic)
     tool_calls_delta: list[dict] | None = None
     finish_reason: str | None = None
-    reasoning_items: list[dict] | None = None  # Encrypted reasoning for ZDR passback (OpenAI)
+    reasoning_items: list[dict] | None = (
+        None  # Encrypted reasoning for ZDR passback (OpenAI)
+    )
 
 
 class BaseLLMService(ABC):
     """Abstract base class for LLM services."""
 
-    def __init__(self, model_id: str):
+    def __init__(self, model_id: str, thinking_level: ThinkingLevel = "med"):
         self.model_id = model_id
+        self.thinking_level = thinking_level
 
     @abstractmethod
     async def generate_with_tools_streaming(

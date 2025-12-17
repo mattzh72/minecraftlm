@@ -13,9 +13,10 @@ export function useChat() {
   const requestThumbnailCapture = useStore((s) => s.requestThumbnailCapture);
 
   const handleSend = async (userMessage: string, sessionId: string) => {
-    // Read selectedModelId at call time to avoid stale closure issues
+    // Read selectedModelId and thinkingLevel at call time to avoid stale closure issues
     const selectedModelId = useStore.getState().selectedModelId;
-    console.log(`handleSend`, { userMessage, sessionId, selectedModelId });
+    const selectedThinkingLevel = useStore.getState().selectedThinkingLevel;
+    console.log(`handleSend`, { userMessage, sessionId, selectedModelId, selectedThinkingLevel });
     if (!userMessage.trim() || !sessionId) return;
 
     addUserMessage(sessionId, userMessage);
@@ -23,6 +24,7 @@ export function useChat() {
       sessionId,
       userMessage,
       selectedModelId,
+      selectedThinkingLevel,
     });
 
     try {
@@ -33,6 +35,7 @@ export function useChat() {
           session_id: sessionId,
           message: userMessage,
           model: selectedModelId,
+          thinking_level: selectedThinkingLevel,
         }),
       });
 
