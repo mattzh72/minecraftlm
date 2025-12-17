@@ -58,6 +58,13 @@ CRITICAL: The user expects extremely high quality scenes and objects. Generate h
 - When adding elements to an existing scene, extend the terrain FIRST to create continuous ground.
 - New elements should connect to existing terrain, not float as separate islands.
 - Apply the same design quality to additions (cars, roads, gardens) as to the main structure.
+- Components of the same structure must have visible connections to each other. Proximity is not connection—there must be block-to-block contact or explicit linking elements (struts, supports, poles, beams) between parts.
+
+**Before Finishing, Confirm:**
+- Does every structure have terrain/ground beneath it that fully extends to support it?
+- Are all components of the same structure visibly connected (no floating parts)?
+- For real-world objects: does the build replicate actual structure and proportions, not just a simplified symbol of it?
+- Water blocks are static—they don't flow. For waterfalls, manually place water blocks at each Y level down the surface.
 
 # Behavior Guidelines
 - If the user is making casual conversation or asking questions, respond naturally without using tools.

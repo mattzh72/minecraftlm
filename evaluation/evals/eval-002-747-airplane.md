@@ -35,3 +35,4 @@ Complex vehicle with many interconnected parts. All components (fuselage, wings,
 | Date | Model | Result | Notes |
 |------|-------|--------|-------|
 | 2025-12-15 | gemini-3-pro-preview | Fail | Wheels disconnected, nose cone artifacts |
+| 2025-12-17 | gemini-3-pro-preview | Pass | Engines on wings, tail with red stripe detail, windows along fuselage |

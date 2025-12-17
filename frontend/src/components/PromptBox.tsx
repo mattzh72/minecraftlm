@@ -81,7 +81,6 @@ export const PromptBox = forwardRef<HTMLTextAreaElement, PromptBoxProps>(
           onChange={(e) => setDraftMessage(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          disabled={disabled}
           minRows={1}
           maxRows={5}
           className={cn(
@@ -90,7 +89,6 @@ export const PromptBox = forwardRef<HTMLTextAreaElement, PromptBoxProps>(
               ? "text-foreground/90 placeholder:text-muted-foreground/80"
               : "text-white/90 placeholder:text-white/40",
             "text-sm leading-relaxed",
-            "disabled:opacity-50 disabled:cursor-not-allowed",
             "font-text"
           )}
         />

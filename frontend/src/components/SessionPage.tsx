@@ -99,7 +99,7 @@ export function SessionPage() {
           variant="outline"
           size="sm"
           onClick={handleBackToProjects}
-          className="bg-black/40 border-white/15 text-white/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] backdrop-blur-xl hover:bg-black/50 hover:text-white"
+          className="bg-black/40 border-white/15 text-white/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] backdrop-blur-xl hover:bg-black/50 hover:text-white py-1 px-2"
         >
           ← Projects
         </Button>

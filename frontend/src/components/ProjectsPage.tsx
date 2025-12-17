@@ -5,6 +5,7 @@ import { useStore } from "@/store";
 import { useEffect, useState } from "react";
 import { FiTrash2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
+import { BlockAnimation } from "./BlockAnimation";
 import { PromptBox } from "./PromptBox";
 import { SuggestionButtons } from "./SuggestionButton.tsx";
 import ThumbnailViewer from "./ThumbnailViewer";
@@ -187,9 +188,7 @@ export function ProjectsPage() {
                         structureData={session.structure}
                       />
                     ) : (
-                      <div className="text-white/30 text-4xl">
-                        📦
-                      </div>
+                      <BlockAnimation size={32} className="text-white/30" />
                     )}
                   </div>
 
