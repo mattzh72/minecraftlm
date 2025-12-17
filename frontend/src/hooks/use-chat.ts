@@ -2,6 +2,24 @@ import { useStore } from "../store";
 import { sseEvent } from "@/lib/schemas/sse-events";
 import { useCallback } from "react";
 
+/**
+ * Helper to fetch structure data for a session.
+ * Centralized to avoid duplication.
+ */
+async function fetchStructure(sessionId: string): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await fetch(`/api/sessions/${sessionId}/structure`);
+    if (res.ok) {
+      return await res.json();
+    } else if (res.status !== 404) {
+      console.error("Error fetching structure:", res.statusText);
+    }
+  } catch (err) {
+    console.error("Error fetching structure:", err);
+  }
+  return null;
+}
+
 export function useChat() {
   const addStructureData = useStore((s) => s.addStructureData);
   const addUserMessage = useStore((s) => s.addUserMessage);
@@ -31,7 +49,6 @@ export function useChat() {
       // This prevents stale events from updating state after session switch
       const currentActiveSession = useStore.getState().activeSessionId;
       if (currentActiveSession !== sessionId) {
-        console.warn(`[processEvent] Ignoring event for stale session ${sessionId}, active is ${currentActiveSession}`);
         return false; // Stop processing this stream
       }
 
@@ -72,16 +89,9 @@ export function useChat() {
 
           // Check if this tool result includes a structure update
           if (event.data.compilation?.structure_updated) {
-            try {
-              const structureRes = await fetch(
-                `/api/sessions/${sessionId}/structure`
-              );
-              if (structureRes.ok) {
-                const structureData = await structureRes.json();
-                addStructureData(sessionId, structureData);
-              }
-            } catch (err) {
-              console.error("Error fetching intermediate structure:", err);
+            const structureData = await fetchStructure(sessionId);
+            if (structureData) {
+              addStructureData(sessionId, structureData);
             }
           }
           return true;
@@ -96,21 +106,11 @@ export function useChat() {
           if (event.data.success) {
             setAgentState("idle");
             if (sawCompleteTaskCallRef.current) {
-              try {
-                const structureRes = await fetch(
-                  `/api/sessions/${sessionId}/structure`
-                );
-                if (structureRes.ok) {
-                  const structureData = await structureRes.json();
-                  addStructureData(sessionId, structureData);
-                } else if (structureRes.status !== 404) {
-                  console.error("Error fetching structure:", structureRes.statusText);
-                }
-              } catch (err) {
-                console.error("Error fetching structure:", err);
-              } finally {
-                requestThumbnailCapture(sessionId);
+              const structureData = await fetchStructure(sessionId);
+              if (structureData) {
+                addStructureData(sessionId, structureData);
               }
+              requestThumbnailCapture(sessionId);
             }
           } else {
             console.error("Chat error:", event.data.error);
@@ -136,9 +136,7 @@ export function useChat() {
    * Handles parsing and processing events until completion.
    */
   const subscribeToStream = useCallback(
-    async (sessionId: string, isResume: boolean = false, since: number = 0) => {
-      console.log(`[subscribeToStream] Starting subscription`, { sessionId, isResume, since });
-
+    async (sessionId: string, since: number = 0) => {
       // Cancel any existing subscription (shared across all useChat instances)
       abortCurrentStream();
 
@@ -150,19 +148,15 @@ export function useChat() {
           ? `/api/sessions/${sessionId}/stream?since=${since}`
           : `/api/sessions/${sessionId}/stream`;
 
-        console.log(`[subscribeToStream] Fetching ${url}`);
         const response = await fetch(url, {
           signal: abortController.signal,
         });
-
-        console.log(`[subscribeToStream] Response status: ${response.status}, ok: ${response.ok}, hasBody: ${!!response.body}`);
 
         if (!response.ok || !response.body) {
           throw new Error(`Stream request failed: ${response.status}`);
         }
 
         const reader = response.body.getReader();
-        console.log(`[subscribeToStream] Got reader, starting to read...`);
         const decoder = new TextDecoder();
         let lineBuffer = "";
         let eventLines: string[] = [];
@@ -170,10 +164,7 @@ export function useChat() {
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) {
-            console.log(`[subscribeToStream] Reader done, stream ended`);
-            break;
-          }
+          if (done) break;
 
           lineBuffer += decoder.decode(value, { stream: true });
           const lines = lineBuffer.split(/\r?\n/);
@@ -182,7 +173,6 @@ export function useChat() {
           for (const line of lines) {
             // Early exit if aborted during processing
             if (abortController.signal.aborted) {
-              console.log(`[subscribeToStream] Abort detected during line processing`);
               return;
             }
 
@@ -200,7 +190,6 @@ export function useChat() {
                   sawCompleteTaskCallRef
                 );
                 if (!shouldContinue) {
-                  console.log(`[subscribeToStream] Stream complete`);
                   return; // Stream complete
                 }
               } catch (parseErr) {
@@ -211,9 +200,8 @@ export function useChat() {
             }
           }
         }
-      } catch (err: any) {
-        if (err.name === "AbortError") {
-          console.log(`[subscribeToStream] Aborted (intentional)`);
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === "AbortError") {
           return;
         }
         console.error("[subscribeToStream] Stream error:", err);
@@ -262,7 +250,7 @@ export function useChat() {
 
         // Subscribe to the event stream
         await subscribeToStream(sessionId);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Chat error:", err);
         setAgentState("error");
       }
@@ -282,16 +270,11 @@ export function useChat() {
    */
   const resumeStreamIfRunning = useCallback(
     async (sessionId: string, taskStatus: string) => {
-      console.log(`[resumeStreamIfRunning] taskStatus=${taskStatus}`);
-
       if (taskStatus === "running") {
         // Task is still running - subscribe to stream to replay ALL buffered events
         // Buffer only contains events since last disk save, so since=0 is correct
-        console.log(`[resumeStreamIfRunning] Subscribing to stream with since=0`);
         setAgentState("thinking");
-        await subscribeToStream(sessionId, true, 0);
-      } else {
-        console.log(`[resumeStreamIfRunning] Task not running (${taskStatus}), no stream needed`);
+        await subscribeToStream(sessionId, 0);
       }
     },
     [subscribeToStream, setAgentState]
@@ -301,7 +284,6 @@ export function useChat() {
    * Cancel any active stream subscription.
    */
   const cancelStream = useCallback(() => {
-    console.log("[cancelStream] Cancelling stream");
     abortCurrentStream();
   }, [abortCurrentStream]);
 

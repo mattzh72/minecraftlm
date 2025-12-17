@@ -58,7 +58,6 @@ export type StoreActions = {
     id: string | null,
     newSessionData?: Partial<StoreSession>
   ) => void;
-  clearActiveSession: () => void;
 
   // agent actions
   setAgentState: (state: AgentState) => void;
@@ -134,10 +133,7 @@ export const useStore = create<StoreState>()((set, get) => ({
   setTimeOfDay: (time) => set({ timeOfDay: time }),
   viewerMode: "orbit",
   setViewerMode: (mode) => set({ viewerMode: mode }),
-  activeSession: () => {
-    const activeSessionId = get().activeSessionId;
-    return activeSessionId ? get().sessions[activeSessionId] : null;
-  },
+
   setActiveSession: (id, newSessionData?: Partial<StoreSession>) => {
     if (!id) {
       set({ activeSessionId: null });
@@ -159,11 +155,8 @@ export const useStore = create<StoreState>()((set, get) => ({
       },
     });
   },
-  clearActiveSession: () => set({ activeSessionId: null }),
 
   error: null,
-  setError: (error: string | null) => set({ error }),
-  clearError: () => set({ error: null }),
 
   agentState: "idle",
   activeAssistantMessageIndex: null,
@@ -173,25 +166,17 @@ export const useStore = create<StoreState>()((set, get) => ({
   setStreamAbortController: (controller) => set({ streamAbortController: controller }),
   abortCurrentStream: () => {
     const controller = get().streamAbortController;
-    console.log(`[abortCurrentStream] controller exists: ${!!controller}`);
     if (controller) {
       controller.abort();
       set({ streamAbortController: null });
-      console.log(`[abortCurrentStream] Aborted and cleared controller`);
-    } else {
-      console.log(`[abortCurrentStream] No controller to abort`);
     }
   },
 
   addToolCall: (sessionId: string, toolCall: ToolCall) => {
     const session = get().sessions[sessionId];
-    if (!session) {
-      console.warn(`[addToolCall] Session ${sessionId} not found`);
-      return;
-    }
+    if (!session) return;
 
     const newConversation = [...(session.conversation || [])];
-    console.log(`[addToolCall] Adding tool call ${toolCall.function.name}, conversation length: ${newConversation.length}`);
 
     // Find the index of the last assistant message
     let assistantIdx = -1;
@@ -202,15 +187,11 @@ export const useStore = create<StoreState>()((set, get) => ({
       }
     }
 
-    if (assistantIdx === -1) {
-      console.warn(`[addToolCall] No assistant message found to attach tool call`);
-      return;
-    }
+    if (assistantIdx === -1) return;
 
     const latestAssistantMessage = newConversation[assistantIdx];
     const existingToolCalls = latestAssistantMessage.tool_calls || [];
     const newToolCalls = [...existingToolCalls, toolCall];
-    console.log(`[addToolCall] Attaching to assistant message at index ${assistantIdx}, total tool calls: ${newToolCalls.length}`);
 
     newConversation[assistantIdx] = {
       ...latestAssistantMessage,
@@ -227,10 +208,7 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   addToolResult: (sessionId: string, toolCallId: string, result: string, hasError: boolean) => {
     const session = get().sessions[sessionId];
-    if (!session) {
-      console.warn(`[addToolResult] Session ${sessionId} not found`);
-      return;
-    }
+    if (!session) return;
 
     const newConversation = [...(session.conversation || [])];
 
@@ -262,10 +240,7 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   addThoughtSummary: (sessionId: string, thoughtSummary: string) => {
     const session = get().sessions[sessionId];
-    if (!session) {
-      console.warn(`[addThoughtSummary] Session ${sessionId} not found`);
-      return;
-    }
+    if (!session) return;
 
     const newConversation = [...(session.conversation || [])];
 
@@ -300,12 +275,11 @@ export const useStore = create<StoreState>()((set, get) => ({
       },
     });
   },
+
   addAssistantMessage: (sessionId: string, message: string) => {
     const session = get().sessions[sessionId];
-    if (!session) {
-      console.warn(`[addAssistantMessage] Session ${sessionId} not found`);
-      return;
-    }
+    if (!session) return;
+
     const newConversation = [...(session.conversation || [])];
     newConversation.push({
       role: "assistant",
@@ -320,12 +294,11 @@ export const useStore = create<StoreState>()((set, get) => ({
       },
     });
   },
+
   addStreamDelta: (sessionId: string, delta: string) => {
     const session = get().sessions[sessionId];
-    if (!session) {
-      console.warn(`[addStreamDelta] Session ${sessionId} not found`);
-      return;
-    }
+    if (!session) return;
+
     const latestAssistantMessage =
       session.conversation?.[session.conversation.length - 1];
 
@@ -333,11 +306,6 @@ export const useStore = create<StoreState>()((set, get) => ({
       !latestAssistantMessage ||
       latestAssistantMessage.role !== "assistant"
     ) {
-      console.warn(`[addStreamDelta] No assistant message to append to`, {
-        sessionId,
-        lastRole: latestAssistantMessage?.role,
-        conversationLength: session.conversation?.length,
-      });
       return;
     }
 
@@ -353,10 +321,12 @@ export const useStore = create<StoreState>()((set, get) => ({
       },
     }));
   },
+
   setActiveAssistantMessageIndex: (index) =>
     set({ activeAssistantMessageIndex: index }),
   clearActiveAssistantMessageIndex: () =>
     set({ activeAssistantMessageIndex: null }),
+
   addUserMessage: (sessionId: string, message: string) => {
     const session = get().sessions[sessionId];
     if (!session) return;
@@ -372,17 +342,13 @@ export const useStore = create<StoreState>()((set, get) => ({
       },
     });
   },
+
   models: [],
   selectedModelId: null,
   selectedThinkingLevel: "med",
-  selectedModel: () => {
-    const selectedModelId = get().selectedModelId;
-    return get().models.find((m) => m.id === selectedModelId) || null;
-  },
   setSelectedModelId: (id: string | null) => set({ selectedModelId: id }),
   setModels: (models: Model[]) => set({ models }),
   setSelectedThinkingLevel: (level) => set({ selectedThinkingLevel: level }),
-  clearSelectedModelId: () => set({ selectedModelId: null }),
 
   addSession: (session: StoreSession) => {
     set({ sessions: { ...get().sessions, [session.session_id]: session } });
@@ -405,6 +371,7 @@ export const useStore = create<StoreState>()((set, get) => ({
     };
     set({ sessions: { ...get().sessions, [sessionId]: newSession } });
   },
+
   addSessions: (sessions: StoreSession[]) => {
     set({
       sessions: {

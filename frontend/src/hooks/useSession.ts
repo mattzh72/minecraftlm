@@ -45,22 +45,12 @@ export function useSession() {
   const restoreSession = useCallback(
     async (sessionIdToRestore: string) => {
       setIsLoading(true);
-      console.log(`[restoreSession] Starting restore for session ${sessionIdToRestore}`);
       try {
         const response = await fetch(`/api/sessions/${sessionIdToRestore}`);
         if (!response.ok) {
           throw new Error(`Failed to restore session: ${response.status}`);
         }
         const data = await response.json();
-        console.log(`[restoreSession] GET /sessions/${sessionIdToRestore} response:`, {
-          conversationLength: data.conversation?.length,
-          conversation: data.conversation?.map((m: any) => ({
-            role: m.role,
-            contentLength: m.content?.length,
-            thoughtLength: m.thought_summary?.length,
-            toolCallsCount: m.tool_calls?.length,
-          })),
-        });
         const session = sessionDetailsResponseSchema.parse(data);
         setActiveSession(session.session_id, {
           session_id: session.session_id,
