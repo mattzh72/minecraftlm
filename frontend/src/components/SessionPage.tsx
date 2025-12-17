@@ -30,13 +30,6 @@ export function SessionPage() {
   const [chatWidth, setChatWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
 
-  // restore session from URL param on mount
-  useEffect(() => {
-    if (urlSessionId) {
-      restoreSession(urlSessionId);
-    }
-  }, []);
-
   // Restore session from URL param on mount
   useEffect(() => {
     console.log(`useEffect`, { activeSessionId });

@@ -221,14 +221,15 @@ function MessageList() {
         const isLastAssistant =
           msg.type === "assistant" && idx === messages.length - 1;
         const isStreaming = isLoading && isLastAssistant;
+        const messageKey = `${msg.type}-${idx}`;
 
         if (msg.type === "user") {
-          return <UserMessage key={idx} content={msg.content} />;
+          return <UserMessage key={messageKey} content={msg.content} />;
         }
         if (msg.type === "assistant") {
           return (
             <AssistantMessage
-              key={idx}
+              key={messageKey}
               log={isStreaming}
               content={msg.content}
               thought_summary={msg.thought_summary || ""}

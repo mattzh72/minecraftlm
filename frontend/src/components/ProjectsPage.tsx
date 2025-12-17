@@ -21,7 +21,10 @@ export function ProjectsPage() {
   // Fetch all sessions on mount
   useEffect(() => {
     fetch("/api/sessions")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         const result = listSessionsResponseSchema.parse(data);
         const sessions = result.sessions;

@@ -52,20 +52,28 @@ export function useSession() {
   const restoreSession = useCallback(
     async (sessionIdToRestore: string) => {
       setIsLoading(true);
-      const response = await fetch(`/api/sessions/${sessionIdToRestore}`);
-      const data = await response.json();
-      const session = sessionDetailsResponseSchema.parse(data);
-      console.log(`restoring session`, { session });
-      setActiveSession(session.session_id, {
-        session_id: session.session_id,
-        conversation: session.conversation,
-        structure: session.structure,
-      });
-      // Restore the model that was used for this session
-      if (session.model) {
-        setSelectedModelId(session.model);
+      try {
+        const response = await fetch(`/api/sessions/${sessionIdToRestore}`);
+        if (!response.ok) {
+          throw new Error(`Failed to restore session: ${response.status}`);
+        }
+        const data = await response.json();
+        const session = sessionDetailsResponseSchema.parse(data);
+        console.log(`restoring session`, { session });
+        setActiveSession(session.session_id, {
+          session_id: session.session_id,
+          conversation: session.conversation,
+          structure: session.structure,
+        });
+        // Restore the model that was used for this session
+        if (session.model) {
+          setSelectedModelId(session.model);
+        }
+      } catch (error) {
+        console.error("Error restoring session:", error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     },
     [setActiveSession, setSelectedModelId]
   );
