@@ -46,3 +46,4 @@ Geometric reasoning AND default design quality. Should feel grand and architectu
 | Date | Model | Result | Notes |
 |------|-------|--------|-------|
 | 2025-12-15 | gemini-3-pro-preview | Fail | Geometry correct but: minimal, no platforms, no lighting, single material, floating |
+| 2025-12-17 | gemini-3-pro-preview | Partial | Spiral geometry, central column, material variety (chiseled copper), decorative posts, base platform. Missing: lighting, defined landings |
