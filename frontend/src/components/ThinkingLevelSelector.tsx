@@ -21,8 +21,10 @@ export function ThinkingLevelSelector({ variant = 'default' }: ThinkingLevelSele
   return (
     <div
       className={cn(
-        'flex items-center gap-0.5 rounded-lg p-0.5 shrink-0',
-        isLight ? 'bg-white/20 border border-black/10' : 'bg-black/70 border border-white/15',
+        'relative flex items-center gap-0.5 rounded-lg p-0.5 shrink-0 shadow-xs before:pointer-events-none before:absolute before:inset-0 before:rounded-lg',
+        isLight
+          ? 'bg-white/20 border border-black/10 before:shadow-[0_1px_--theme(--color-black/4%)]'
+          : 'bg-black/70 border border-white/15 before:shadow-[0_-1px_--theme(--color-white/8%)]',
       )}
     >
       {LEVELS.map((l) => (
