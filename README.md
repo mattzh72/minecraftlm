@@ -1,5 +1,7 @@
 <div align="center">
+  
 # MinecraftLM
+
 </div>
 
 https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
@@ -10,6 +12,7 @@ https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/mattzh72/minecraft-schematic-gen?style=flat&logo=github)](https://github.com/mattzh72/minecraft-schematic-gen)
 </div>
+
 ## Examples
 
 <table>
