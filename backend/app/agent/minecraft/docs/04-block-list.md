@@ -2,6 +2,41 @@
 
 This list enumerates every known block ID and the discrete property values that appear in its blockstate definitions. It's important to specify the correct properties when instantiating blocks.
 
+## How to Use This List
+
+Each entry shows a block ID followed by its properties and allowed values. Pass these properties directly as a dictionary to the `Block` constructor:
+
+```python
+# Format: property_name [allowed_values]
+# Example entry: minecraft:iron_bars: east [false, true]; north [false, true]; south [false, true]; west [false, true]
+
+# To use: pass properties as {"property_name": "value"} - all values are strings!
+Block(
+    "minecraft:iron_bars",
+    catalog=catalog,
+    properties={"east": "true", "west": "true", "north": "false", "south": "false"},
+)
+```
+
+**Key points:**
+- Property values are **always strings** (e.g., `"true"` not `True`, `"1"` not `1`)
+- Blocks marked "no properties (single state)" don't need a `properties` argument
+- Connecting blocks (iron_bars, glass_pane, fences, walls, vines) accept `"true"` **and** `"false"` for directions; the table may only list `"true"` because that’s how the assets encode connections. Omit or set `"false"` to leave a side unconnected.
+- Slabs **require** a `type` property (`"bottom"`, `"top"`, or `"double"`); set it explicitly to avoid missing-property errors.
+- Provide properties directly; consult this list for names/values (e.g., stairs need `facing`/`half`/`shape`, logs need `axis`).
+
+### Common Patterns
+
+| Pattern | Example Blocks | Properties |
+|---------|---------------|------------|
+| Directional connections | iron_bars, glass_pane, fences, vines | `east/north/south/west`: `"true"` or `"false"` |
+| Facing | furnace, chest, stairs | `facing`: `"north"`, `"south"`, `"east"`, `"west"` |
+| Axis (logs, pillars) | oak_log, chain, bone_block | `axis`: `"x"`, `"y"`, `"z"` |
+| Slab type | stone_slab, oak_slab | `type`: `"bottom"`, `"top"`, `"double"` |
+| Lit state | torch, furnace, candle | `lit`: `"true"` or `"false"` |
+
+---
+
 - `minecraft:acacia_button`: face [ceiling, floor, wall]; facing [east, north, south, west]; powered [false, true]
 - `minecraft:acacia_door`: facing [east, north, south, west]; half [lower, upper]; hinge [left, right]; open [false, true]
 - `minecraft:acacia_fence`: east [true]; north [true]; south [true]; west [true]

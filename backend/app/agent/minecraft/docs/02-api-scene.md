@@ -82,7 +82,7 @@ block = Block(
     "minecraft:stone",
     size=(2, 1, 2),      # width, height, depth in blocks
     fill=True,           # solid cuboid
-    properties={},       # blockstate props (optional)
+    properties={},       # blockstate props (optional but required for some ids)
     catalog=catalog,     # BlockCatalog instance
 )
 
@@ -108,9 +108,8 @@ block.position = Vector3(4, 1, 4)
     - `True` – solid cuboid: every block within the volume is placed.
     - `False` – hollow shell: only faces are placed (like a hollow box).
 
-- Methods:
-  - `setProperties(props: Record<string, string>)` – replace properties.
-  - `mergeProperties(extra: Record<string, string>)` – shallow merge.
+**Important:** required blockstate properties must be passed in the constructor.
+This SDK validates required properties immediately when you construct `Block`.
 
 Example: a 10‑wide, 3‑high wall of `stone_bricks`:
 
@@ -123,6 +122,15 @@ wall = Block(
 )
 wall.position = Vector3(3, 1, 5)
 scene.add(wall)
+
+# Example stair with explicit properties
+stair = Block(
+    "minecraft:stone_brick_stairs",
+    catalog=catalog,
+    properties={"facing": "south", "half": "bottom", "shape": "straight"},
+)
+stair.position = Vector3(7, 1, 4)
+scene.add(stair)
 ```
 
 ## `Scene`
@@ -230,7 +238,7 @@ scene.add(glass)
 stair = Block(
     "minecraft:oak_stairs",
     catalog=catalog,
-    properties=stair_properties(facing="south"),
+    properties={"facing": "south", "half": "bottom", "shape": "straight"},
 )
 stair.position = Vector3(8, 1, 1)
 scene.add(stair)
@@ -248,7 +256,7 @@ For block‑specific configuration (stairs, slabs, logs, doors, etc.) see `03-bl
 
 ## Quick Method Reference
 
-All methods that return `self` support fluent chaining (e.g., `block.at(1,2,3).facing("north")`).
+All methods that return `self` support fluent chaining (e.g., `block.with_size(3, 2, 3).at(1, 2, 1)`).
 
 ### Block
 
@@ -259,9 +267,7 @@ All methods that return `self` support fluent chaining (e.g., `block.at(1,2,3).f
 | `.with_size(w, h, d)` | self | Set size |
 | `.filled(bool)` | self | Set fill mode |
 | `.hollow()` | self | Make hollow (outline only) |
-| `.facing(direction)` | self | Set facing property (north/south/east/west) |
-| `.set_properties(props)` | self | Replace all properties |
-| `.merge_properties(props)` | self | Merge with existing properties |
+| `.tap(fn)` | self | Execute side-effect function, return self |
 | `.clone()` | Block | Create a copy |
 | `.position.set(x, y, z)` | Vector3 | Set position directly |
 
@@ -272,6 +278,7 @@ All methods that return `self` support fluent chaining (e.g., `block.at(1,2,3).f
 | `.add(*objects)` | self | Add children to scene |
 | `.at(x, y, z)` | self | Set position |
 | `.move(dx, dy, dz)` | self | Translate by offset |
+| `.tap(fn)` | self | Execute side-effect function, return self |
 | `scene.to_structure(padding=0)` | dict | Export structure dictionary |
 
 ### Vector3
@@ -298,7 +305,7 @@ scene.add(
 # Stair with facing
 scene.add(
     Block("minecraft:oak_stairs", catalog=catalog,
-          properties=stair_properties(facing="south"))
+          properties={"facing": "south", "half": "bottom", "shape": "straight"})
         .at(5, 1, 0)
 )
 
@@ -308,5 +315,25 @@ scene.add(
         .with_size(12, 5, 12)
         .at(2, 1, 2)
         .hollow()
+)
+
+# Block state via constructor properties
+scene.add(
+    Block(
+        "minecraft:iron_bars",
+        catalog=catalog,
+        properties={"east": "true", "west": "true", "north": "false", "south": "false"},
+    )
+        .with_size(4, 5, 1)
+        .at(10, 1, 5)
+)
+
+# Using tap for debugging or side effects
+blocks_added = []
+scene.add(
+    Block("minecraft:stone_bricks", catalog=catalog)
+        .with_size(8, 4, 1)
+        .at(0, 1, 0)
+        .tap(lambda b: blocks_added.append(b.block_id))
 )
 ```

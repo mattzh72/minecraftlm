@@ -9,7 +9,6 @@ from pathlib import Path
 
 import aiofiles
 import aiofiles.os
-
 from app.api.models import SessionResponse
 from app.services.event_buffer import get_buffer
 from app.services.session import SessionService

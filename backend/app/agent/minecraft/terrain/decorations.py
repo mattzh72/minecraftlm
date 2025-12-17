@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from app.agent.minecraft.sdk import Block, BlockCatalog, Object3D, axis_properties
+from app.agent.minecraft.sdk import Block, BlockCatalog, Object3D
 
 
 def generate_oak_tree(
@@ -61,7 +61,7 @@ def generate_oak_tree(
     trunk = Block(
         "minecraft:oak_log",
         size=(1, trunk_height, 1),
-        properties=axis_properties("y"),
+        properties={"axis": "y"},
         catalog=catalog,
     )
     trunk.position.set(0, 0, 0)

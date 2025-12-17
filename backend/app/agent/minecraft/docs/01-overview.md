@@ -45,8 +45,6 @@ Every script using this SDK should roughly follow this pattern:
    - `Block`
    - `Vector3`
    - `BlockCatalog`
-   - Orientation helpers: `stair_properties`, `axis_properties`,
-     `slab_properties`, `make_stair`, `facing_from_vector`
 
 2. **Create a catalog and scene**
 
@@ -81,7 +79,11 @@ Every script using this SDK should roughly follow this pattern:
    stair = Block(
        "minecraft:stone_brick_stairs",
        catalog=catalog,
-       properties=stair_properties(facing="south"),
+       properties={
+           "facing": "south",
+           "half": "bottom",
+           "shape": "straight",
+       },
    )
    stair.position.set(7, 1, 4)
    scene.add(stair)
@@ -116,12 +118,7 @@ Every script using this SDK should roughly follow this pattern:
     `Block` on construction (including required properties).
   - Creating a `Block` with an unknown id raises an error, which helps catch
     typos early.
-
-- **Orientation helpers**  
-  - Many blocks are not simple cubes (stairs, slabs, logs, doors).
-  - Helpers such as `stair_properties`, `axis_properties`, `slab_properties`,
-    and `make_stair` map high‑level intent (e.g. “stair facing south,
-    upside‑down”) to the correct blockstate properties.
+  - You provide blockstate properties directly as dictionaries (e.g., slabs need `{"type": "bottom"|"top"|"double"}`, stairs need `{"facing": "...", "half": "...", "shape": "..."}`, logs need `{"axis": "x"|"y"|"z"}`).
 
 ## Coordinate system & units
 

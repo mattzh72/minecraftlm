@@ -201,8 +201,10 @@ export function useChat() {
    */
   const handleSend = useCallback(
     async (userMessage: string, sessionId: string) => {
+      // Read selectedModelId and thinkingLevel at call time to avoid stale closure issues
       const selectedModelId = useStore.getState().selectedModelId;
-      console.log(`handleSend`, { userMessage, sessionId, selectedModelId });
+      const selectedThinkingLevel = useStore.getState().selectedThinkingLevel;
+      console.log(`handleSend`, { userMessage, sessionId, selectedModelId, selectedThinkingLevel });
       if (!userMessage.trim() || !sessionId) return;
 
       addUserMessage(sessionId, userMessage);
@@ -216,6 +218,7 @@ export function useChat() {
             session_id: sessionId,
             message: userMessage,
             model: selectedModelId,
+            thinking_level: selectedThinkingLevel,
           }),
         });
 

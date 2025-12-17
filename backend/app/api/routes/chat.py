@@ -36,7 +36,9 @@ async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> No
     """
     try:
         agent = MinecraftSchematicAgent(
-            session_id=request.session_id, model=request.model
+            session_id=request.session_id,
+            model=request.model,
+            thinking_level=request.thinking_level,
         )
 
         async for event in agent.run(request.message):

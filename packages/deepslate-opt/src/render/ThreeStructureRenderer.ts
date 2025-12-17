@@ -871,10 +871,12 @@ export class ThreeStructureRenderer {
 						float attenuation = max(0.0, 1.0 - dist / emissiveRange);
 						attenuation = attenuation * attenuation; // Quadratic falloff for softer edges
 
-						// Simple diffuse contribution
-						float ndl = max(dot(normal, lightDir), 0.0);
-						// Add some ambient to simulate light bouncing around corners
-						float wrappedNdl = ndl * 0.6 + 0.4;
+						// Diffuse contribution (prevent backface "bleed-through" on opaque blocks)
+						float dotNL = dot(normal, lightDir);
+						float ndl = max(dotNL, 0.0);
+						// Add some ambient to simulate light bouncing around corners, but only on the lit side
+						float facing = smoothstep(0.0, 0.1, dotNL);
+						float wrappedNdl = (ndl * 0.6 + 0.4) * facing;
 
 						// Apply tint and global intensity
 						vec3 tintedColor = lightColor * emissiveTint;

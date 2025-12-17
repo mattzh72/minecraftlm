@@ -123,6 +123,16 @@ def _build_block_state_schema(
         block_id: {name: tuple(values) for name, values in props.items()}
         for block_id, props in all_properties.items()
     }
+
+    # Broaden adjacency/boolean properties to accept both true/false.
+    # Blockstate "when" clauses often only mention the connected case ("true"),
+    # but agents should be able to specify explicit false for fence/pane posts.
+    directional_flags = {"north", "south", "east", "west", "up", "down"}
+    for props in block_properties.values():
+        for name, values in list(props.items()):
+            if name in directional_flags or values in (("true",), ("false",)):
+                props[name] = tuple(sorted(set(values) | {"true", "false"}))
+
     required_properties: Dict[str, Tuple[str, ...]] = {
         block_id: tuple(sorted(flags.keys())) for block_id, flags in required_flags.items()
     }

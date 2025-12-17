@@ -30,6 +30,13 @@ stairs = Block("minecraft:oak_stairs", catalog=catalog)         # ok
 bad = Block("minecraft:oook_stairs", catalog=catalog)           # raises ValueError
 ```
 
+### Validation rules to remember
+
+- Property values are **strings**, e.g. `"true"`, `"bottom"`, `"south"`.
+- If a block has required properties (e.g. slabs with `type`, stairs with `facing`/`half`), omitting them raises a `ValueError` during compilation.
+- Required properties must be provided in the `Block(..., properties={...})` constructor; this SDK validates at construction time.
+- For “connecting” blocks (fences, panes, bars, walls) the catalog accepts both `"true"` and `"false"` for directional flags; the block list may only show `"true"` because that’s what appears in the assets, but you can explicitly set `"false"` or omit a direction to leave a post unconnected.
+
 ## Full blocks (simple cubes)
 
 Many blocks are simple cubes that look the same from all directions (planks, stone, dirt, glass, etc.). These usually have **no orientation properties** and you can use them with default properties:
@@ -73,19 +80,19 @@ Many blocks that represent columns use an `axis` property:
 - Relevant properties:
   - `axis`: `"x" | "y" | "z"`
 
-Use the helper:
+Set axis directly:
 
 ```python
 vertical_log = Block(
     "minecraft:oak_log",
     catalog=catalog,
-    properties=axis_properties("y"),  # default
+    properties={"axis": "y"},  # default
 )
 
 horizontal_log = Block(
     "minecraft:oak_log",
     catalog=catalog,
-    properties=axis_properties("x"),
+    properties={"axis": "x"},
 )
 ```
 
@@ -100,27 +107,29 @@ Slabs occupy half a block vertically, or a full block when doubled.
 - Properties:
   - `type`: `"bottom" | "top" | "double"`
 
-Use the helper:
+Set `type` explicitly:
 
 ```python
 bottom_slab = Block(
     "minecraft:stone_slab",
     catalog=catalog,
-    properties=slab_properties(),  # bottom
+    properties={"type": "bottom"},
 )
 
 top_slab = Block(
     "minecraft:stone_slab",
     catalog=catalog,
-    properties=slab_properties(top=True),
+    properties={"type": "top"},
 )
 
 double_slab = Block(
     "minecraft:stone_slab",
     catalog=catalog,
-    properties=slab_properties(double=True),
+    properties={"type": "double"},
 )
 ```
+
+If you omit `type` on any slab (quartz slabs, copper slabs, etc.), the SDK will raise `ValueError: ... missing required properties: type`. Always set `{"type": "bottom"|"top"|"double"}`.
 
 ## Stairs (`facing`, `half`, `shape`)
 
@@ -134,32 +143,20 @@ Stairs are among the most configuration‑heavy blocks:
   - `half`: `"top" | "bottom"` (upside‑down stairs live on the “top” half)
   - `shape`: `"straight" | "inner_left" | "inner_right" | "outer_left" | "outer_right"`
 
-Use provided helpers:
+Provide all stair properties explicitly:
 
 ```python
 # Explicit use via properties
 south_stair = Block(
     "minecraft:oak_stairs",
     catalog=catalog,
-    properties=stair_properties(facing="south"),
+    properties={"facing": "south", "half": "bottom", "shape": "straight"},
 )
 
 upside_down_corner = Block(
     "minecraft:stone_brick_stairs",
     catalog=catalog,
-    properties=stair_properties(
-        facing="east",
-        upside_down=True,
-        shape="inner_left",
-    ),
-)
-
-# Convenience factory
-quick_stair = make_stair(
-    "minecraft:oak_stairs",
-    direction="west",
-    upside_down=False,
-    catalog=catalog,
+    properties={"facing": "east", "half": "top", "shape": "inner_left"},
 )
 ```
 
@@ -167,6 +164,22 @@ When in doubt:
 
 - Use `shape: "straight"` for linear stairs.
 - Use inner/outer shapes when building corners; you can experiment visually in the viewer.
+
+## Connecting blocks (fences, panes, bars, walls)
+
+These blocks expose directional properties that control which sides connect. Even if the block list shows only `"true"` for a direction, the SDK accepts both `"true"` and `"false"`. Defaults are effectively `"false"` (a standalone post). Set flags to `"true"` for each side you want connected:
+
+```python
+# Single post
+Block("minecraft:oak_fence", catalog=catalog)  # no properties = all false
+
+# Bar spanning east-west
+Block(
+    "minecraft:iron_bars",
+    catalog=catalog,
+    properties={"east": "true", "west": "true", "north": "false", "south": "false"},
+)
+```
 
 ## Doors (`facing`, `half`, `hinge`, `open`)
 
@@ -227,36 +240,66 @@ trapdoor = Block(
 )
 ```
 
-## Fences and walls (`north/east/south/west` booleans)
+## Connecting blocks (`north/east/south/west` booleans)
 
-Fences and walls auto‑connect in Minecraft; in the blockstate they expose booleans per direction.
+Many blocks have directional connection properties that control how they render. **You must set these properties explicitly for correct rendering** - the renderer does not auto-connect based on neighbors.
+
+### Iron bars, glass panes, and similar
+
+These blocks **require** directional properties to render correctly:
+
+- Example ids:
+  - `minecraft:iron_bars`, `minecraft:glass_pane`
+  - `minecraft:black_stained_glass_pane`, `minecraft:white_stained_glass_pane`, …
+
+- Properties:
+  - `north`, `south`, `east`, `west`: `"true"` | `"false"`
+
+**Important:** Without these properties, connecting blocks may render as a small cross/post shape instead of extending to connect. Always specify which directions should connect:
+
+```python
+# A wall of iron bars (portcullis) - connects horizontally
+Block(
+    "minecraft:iron_bars",
+    catalog=catalog,
+    properties={"east": "true", "west": "true", "north": "false", "south": "false"},
+).with_size(4, 5, 1).at(10, 1, 5)
+
+# A glass pane window connecting north-south
+Block(
+    "minecraft:glass_pane",
+    catalog=catalog,
+    properties={"north": "true", "south": "true", "east": "false", "west": "false"},
+).with_size(1, 3, 5).at(5, 2, 0)
+```
+
+### Fences and walls
+
+Fences and walls also use directional connection properties:
 
 - Example ids:
   - `minecraft:oak_fence`, `minecraft:stone_brick_wall`, …
 
-- Properties (simplified):
-  - `north`, `south`, `east`, `west`: `"true" | "false"`
-
-For most schematic use cases, you can place fence blocks as simple cubes and let the model handle details. If you want precise control over individual post/connection elements, you can specify these properties explicitly, but that’s rarely necessary.
-
-## “Facing” from direction vectors
-
-Sometimes you want a block to face “toward” something (e.g. stair facing toward a door). Use the helper:
+- Properties:
+  - `north`, `south`, `east`, `west`: `"true"` | `"false"` (fences)
+  - `north`, `south`, `east`, `west`: `"low"` | `"tall"` (walls)
+  - `up`: `"true"` (walls - for the center post)
 
 ```python
-facing = facing_from_vector(1, 0)  # positive X -> "east"
-
-stair = Block(
-    "minecraft:oak_stairs",
+# Fence section running east-west
+Block(
+    "minecraft:oak_fence",
     catalog=catalog,
-    properties=stair_properties(facing=facing),
-)
+    properties={"east": "true", "west": "true", "north": "false", "south": "false"},
+).with_size(5, 1, 1).at(0, 1, 0)
+
+# Stone wall with connections and center post
+Block(
+    "minecraft:stone_brick_wall",
+    catalog=catalog,
+    properties={"east": "low", "west": "low", "north": "low", "south": "low", "up": "true"},
+).at(5, 1, 5)
 ```
-
-The helper:
-
-- Ignores `y`.
-- Chooses the dominant axis: if `|x| >= |z|`, uses `east`/`west`, otherwise `south`/`north`.
 
 ## How to discover additional properties
 
@@ -300,8 +343,10 @@ This pattern is generic and works for any block present in
 In summary:
 
 - Use **simple blocks** (stone, planks, glass) with no properties or minimal ones.
-- For **logs**, use `axis_properties`.
-- For **slabs**, use `slab_properties`.
-- For **stairs**, use `stair_properties`/`make_stair` and be mindful of `facing`/`half`/`shape`.
+- For **logs**, set `axis`.
+- For **slabs**, set `type`.
+- For **stairs**, set `facing`/`half`/`shape`.
 - For **doors/trapdoors**, set `facing`, `half`, `hinge` (doors), and `open`.
+- For **connecting blocks** (iron_bars, glass_pane, fences, walls), **always set directional properties** (`north`/`south`/`east`/`west`) explicitly - the renderer won't auto-connect.
+- See `04-block-list.md` for the complete list of blocks and their properties - pass them directly as `properties={"name": "value"}`.
 - When in doubt, inspect `BlockCatalog.assets["blockstates"]` and mirror the properties shown there.
