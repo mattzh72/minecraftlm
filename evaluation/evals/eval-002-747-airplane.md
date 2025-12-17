@@ -5,7 +5,7 @@
 
 ## Prompt
 
-> Design the most detailed 747 airplane you possibly can. Make it HIGH FIDELITY. I'm expecting over 50+ components that comprise of this airplane spanning over 1000 blocks. Make sure everything connects, and the plane looks like a plane.
+> Build me a 747 airplane.
 
 ## Tests
 
