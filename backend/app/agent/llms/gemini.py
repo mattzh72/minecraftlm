@@ -44,10 +44,7 @@ class GeminiService(BaseLLMService):
 
     def _is_gemini_3_or_later(self) -> bool:
         """Check if the model is Gemini 3 or later (supports thinkingLevel)."""
-        # Gemini 3 models have "3" in their name (e.g., gemini-3-pro-preview)
-        # Gemini 2.5 models have "2.5" in their name (e.g., gemini-2.5-flash)
         model_lower = self.model_id.lower()
-        # Check for Gemini 3+ models
         return "gemini-3" in model_lower or "gemini3" in model_lower
 
     def _convert_tools(self, tools: list[dict]) -> list[FunctionDeclaration]:

@@ -42,8 +42,14 @@ class ReadCodeTool(BaseDeclarativeTool):
         schema = make_tool_schema(
             name="read_code",
             description=(
-                "Read the current Python SDK script for this session. "
-                "Use this before editing to inspect the full code if needed."
+                "Read the current Python SDK code.\n\n"
+                "Returns the full Python code as a string with line numbers prefixed to each line. "
+                "The code uses the minecraft_sdk module to define 3D structures.\n\n"
+                "Use this when you need to:\n"
+                "- See the current state of the code before editing\n"
+                "- Find the exact string to use in edit_code's old_string parameter\n"
+                "- Check variable names, imports, or code structure\n\n"
+                "Returns: The complete Python code with line numbers (e.g., '  1: from minecraft_sdk import ...')."
             ),
         )
         super().__init__("read_code", schema)
