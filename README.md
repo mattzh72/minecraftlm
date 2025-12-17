@@ -2,22 +2,14 @@
 
 # MinecraftLM
 
-**Describe it. AI builds it. In Minecraft. Turn natural language into Minecraft structures. Powered by Claude, GPT, and Gemini.**
+https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
+
+<div align="center">
+<h3>An AI Builder for Minecraft • Create anything • World interactions</h3>
+</div>
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/mattzh72/minecraft-schematic-gen?style=flat&logo=github)](https://github.com/mattzh72/minecraft-schematic-gen)
-
-</div>
-
----
-
-<!--
-## Demo
-
-![Demo](assets/demo.gif)
-
-TODO: Add a GIF showing: user types prompt → agent thinks → 3D structure appears
--->
 
 ## Examples
 
