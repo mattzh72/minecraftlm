@@ -41,8 +41,12 @@ async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> No
     Handles:
     - Loading conversation from disk before starting agent
     - Setting model on session
-    - Processing full_message events (save to disk, clear buffer)
+    - Processing full_message events (save to disk)
     - Forwarding frontend events to buffer
+
+    The buffer accumulates ALL events for the task lifetime. On resume,
+    frontend replays the entire stream from since=0 to rebuild in-progress state.
+    Disk has complete messages, buffer has all streaming deltas.
     """
     try:
         # Load conversation from disk and add user message
@@ -61,11 +65,10 @@ async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> No
 
         async for event in agent.run(conversation):
             if event.type == "full_message":
-                # Handle internal save event
+                # Save complete messages to disk for persistence
                 conv_data = event.data.get("conversation", [])
                 await SessionService.save_conversation(request.session_id, conv_data)
-                # Clear buffer after save - buffer only holds unsaved events
-                buffer.clear()
+                # Don't clear buffer - keep all events for potential resume/replay
             elif event.type not in INTERNAL_EVENTS:
                 # Forward to frontend via buffer
                 buffer.append(_make_sse(event.type, event.data))
