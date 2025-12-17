@@ -159,14 +159,14 @@ class MinecraftSchematicAgent:
         turn_count = 0
 
         # Lock the model to this session on first use
-        self.session_service.set_model(self.session_id, self.model)
+        await self.session_service.set_model(self.session_id, self.model)
 
         # Load conversation history
-        conversation = self.session_service.load_conversation(self.session_id)
+        conversation = await self.session_service.load_conversation(self.session_id)
 
         # Add user message
         conversation.append(UserMessage(role="user", content=user_message).model_dump())
-        self.session_service.save_conversation(self.session_id, conversation)
+        await self.session_service.save_conversation(self.session_id, conversation)
 
         # Conversation is already in OpenAI format
         messages = list(conversation)
@@ -305,7 +305,7 @@ class MinecraftSchematicAgent:
 
             # Save assistant message
             conversation.append(assistant_message)
-            self.session_service.save_conversation(self.session_id, conversation)
+            await self.session_service.save_conversation(self.session_id, conversation)
             messages.append(assistant_message)
 
             # No function calls - agent responded with content only
@@ -387,7 +387,7 @@ class MinecraftSchematicAgent:
             if serialized_responses:
                 # Save tool responses
                 conversation.extend(serialized_responses)
-                self.session_service.save_conversation(self.session_id, conversation)
+                await self.session_service.save_conversation(self.session_id, conversation)
                 messages.extend(serialized_responses)
 
             # If task completed successfully, stop

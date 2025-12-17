@@ -24,7 +24,7 @@ class CompleteTaskInvocation(BaseToolInvocation[CompleteTaskParams, str]):
     async def execute(self) -> ToolResult:
         try:
             # Load current code
-            code = SessionService.load_code(self.params.session_id)
+            code = await SessionService.load_code(self.params.session_id)
 
             # Check if code exists
             if not code or code.strip() == "# Generated SDK code will appear here":
@@ -44,7 +44,7 @@ class CompleteTaskInvocation(BaseToolInvocation[CompleteTaskParams, str]):
                 return ToolResult(error=error_msg)
 
             # Code is valid! Save the structure JSON for the frontend
-            SessionService.save_structure(
+            await SessionService.save_structure(
                 self.params.session_id, validation_result.structure
             )
 

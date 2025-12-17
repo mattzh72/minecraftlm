@@ -27,7 +27,7 @@ class ReadCodeInvocation(BaseToolInvocation[ReadCodeParams, str]):
 
     async def execute(self) -> ToolResult:
         try:
-            code = SessionService.load_code(self.params.session_id)
+            code = await SessionService.load_code(self.params.session_id)
             return ToolResult(output=code)
         except FileNotFoundError:
             return ToolResult(error=f"Session {self.params.session_id} not found")

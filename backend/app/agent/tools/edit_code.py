@@ -34,7 +34,7 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
     async def execute(self) -> ToolResult:
         try:
             # Load current code
-            code = SessionService.load_code(self.params.session_id)
+            code = await SessionService.load_code(self.params.session_id)
 
             # Check if old_string exists in code
             if self.params.old_string not in code:
@@ -55,10 +55,10 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
             new_code = code.replace(self.params.old_string, self.params.new_string)
 
             # Save updated code
-            SessionService.save_code(self.params.session_id, new_code)
+            await SessionService.save_code(self.params.session_id, new_code)
 
             # Auto-compile and validate for immediate feedback
-            compilation = self._compile_and_validate(new_code)
+            compilation = await self._compile_and_validate(new_code)
 
             return ToolResult(output="Code edited successfully", compilation=compilation)
 
@@ -67,7 +67,7 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
         except Exception as e:
             return ToolResult(error=f"Error editing code: {str(e)}")
 
-    def _compile_and_validate(self, code: str) -> dict:
+    async def _compile_and_validate(self, code: str) -> dict:
         """
         Compile and validate the code, returning compilation status.
         If valid, saves the structure for immediate UI rendering.
@@ -76,7 +76,7 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
 
         if validation.is_valid:
             # Save structure for UI to render immediately
-            SessionService.save_structure(self.params.session_id, validation.structure)
+            await SessionService.save_structure(self.params.session_id, validation.structure)
 
             # Calculate bounding box to help agent track spatial extent
             blocks = validation.structure.get("blocks", [])
