@@ -8,7 +8,7 @@ exports a structure dictionary via the top-level `structure` variable.
 import json
 from pathlib import Path
 
-from app.agent.minecraft import Scene, Block, BlockCatalog, axis_properties
+from app.agent.minecraft import Scene, Block, BlockCatalog
 
 
 def build_structure() -> dict:
@@ -24,7 +24,7 @@ def build_structure() -> dict:
     trunk = Block(
         "minecraft:oak_log",
         size=(1, trunk_height, 1),
-        properties=axis_properties("y"),
+        properties={"axis": "y"},
         catalog=catalog,
     )
     trunk.position.set(base_x, base_y, base_z)

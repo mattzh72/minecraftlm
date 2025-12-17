@@ -18,11 +18,6 @@ from app.agent.minecraft import (
     Object3D,
     Vector3,
     BlockCatalog,
-    stair_properties,
-    axis_properties,
-    slab_properties,
-    make_stair,
-    facing_from_vector,
 )
 from app.agent.minecraft.terrain import (
     create_terrain,
@@ -49,9 +44,8 @@ def build_structure() -> dict:
     #
     # # Fluent style (recommended):
     # scene.add(
-    #     Block("minecraft:grass_block", catalog=catalog)
+    #     Block("minecraft:grass_block", catalog=catalog, properties={"snowy": "false"})
     #         .with_size(16, 1, 16)
-    #         .with_properties({"snowy": "false"})
     # )
     #
     # scene.add(
@@ -67,16 +61,26 @@ def build_structure() -> dict:
     #         .hollow()
     # )
     #
+    # # Slabs require a "type" property.
+    # scene.add(
+    #     Block("minecraft:quartz_slab", catalog=catalog, properties={"type": "bottom"})
+    #         .with_size(6, 1, 6)
+    #         .at(4, 5, 4)
+    # )
+    #
     # scene.add(
     #     Block("minecraft:oak_stairs", catalog=catalog,
-    #           properties=stair_properties(facing="south"))
+    #           properties={"facing": "south", "half": "bottom", "shape": "straight"})
     #         .at(5, 1, 0)
     # )
     #
-    # # Connecting blocks (iron_bars, glass_pane, fences) need directional properties:
+    # # Connecting blocks (iron_bars, glass_pane, fences) use directional properties:
     # scene.add(
-    #     Block("minecraft:iron_bars", catalog=catalog)
-    #         .with_properties({"east": "true", "west": "true", "north": "false", "south": "false"})
+    #     Block(
+    #         "minecraft:iron_bars",
+    #         catalog=catalog,
+    #         properties={"east": "true", "west": "true", "north": "false", "south": "false"},
+    #     )
     #         .with_size(4, 5, 1)
     #         .at(10, 1, 5)
     # )

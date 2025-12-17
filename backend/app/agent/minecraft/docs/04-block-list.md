@@ -21,8 +21,9 @@ Block(
 **Key points:**
 - Property values are **always strings** (e.g., `"true"` not `True`, `"1"` not `1`)
 - Blocks marked "no properties (single state)" don't need a `properties` argument
-- For connecting blocks (iron_bars, glass_panes, fences, vines), set directional properties explicitly for correct rendering
-- Use helper functions (`stair_properties`, `slab_properties`, `axis_properties`) for common block types when available
+- Connecting blocks (iron_bars, glass_pane, fences, walls, vines) accept `"true"` **and** `"false"` for directions; the table may only list `"true"` because that’s how the assets encode connections. Omit or set `"false"` to leave a side unconnected.
+- Slabs **require** a `type` property (`"bottom"`, `"top"`, or `"double"`); set it explicitly to avoid missing-property errors.
+- Provide properties directly; consult this list for names/values (e.g., stairs need `facing`/`half`/`shape`, logs need `axis`).
 
 ### Common Patterns
 
