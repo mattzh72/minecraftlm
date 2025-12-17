@@ -19,9 +19,6 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Internal event types that should not be sent to frontend
-INTERNAL_EVENTS = {"full_message"}
-
 # Store strong references to background tasks to prevent garbage collection
 # See: https://docs.python.org/3/library/asyncio-task.html#creating-tasks
 _background_tasks: set[asyncio.Task] = set()
@@ -36,18 +33,12 @@ def _make_sse(event_type: ActivityEventType | PayloadEventType, data: dict) -> s
 
 async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> None:
     """
-    Run the agent loop as a background task, writing pre-serialized SSE events to the buffer.
+    Run the agent loop as a background task, writing SSE events to the buffer.
 
-    Handles:
-    - Loading conversation from disk before starting agent
-    - Setting model on session
-    - Capturing full_message events (save to disk ONLY at task completion)
-    - Forwarding frontend events to buffer
-
-    The buffer accumulates ALL events for the task lifetime. Disk write happens
-    only once at the end, making buffer and disk mutually exclusive.
+    All events are forwarded to the buffer. The complete event includes the final
+    conversation which we save to disk at the end.
     """
-    final_conversation = None  # Track last full conversation for disk save at end
+    final_conversation = None
 
     try:
         # Load conversation from disk and add user message
@@ -65,16 +56,18 @@ async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> No
         )
 
         async for event in agent.run(conversation):
-            if event.type == "full_message":
-                # Capture conversation but don't write to disk yet
-                final_conversation = event.data.get("conversation", [])
-            elif event.type not in INTERNAL_EVENTS:
-                # Forward to frontend via buffer
-                buffer.append(_make_sse(event.type, event.data))
+            # Forward all events to frontend
+            buffer.append(_make_sse(event.type, event.data))
 
-        # Write to disk only at the end (single write)
+            # Capture conversation from complete event for disk save
+            if event.type == "complete":
+                final_conversation = event.data.get("conversation")
+
+        # Write final conversation to disk
         if final_conversation:
-            await SessionService.save_conversation(request.session_id, final_conversation)
+            await SessionService.save_conversation(
+                request.session_id, final_conversation
+            )
         buffer.mark_complete()
 
     except FileNotFoundError:
@@ -90,9 +83,14 @@ async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> No
         # Still try to save whatever conversation we have on error
         if final_conversation:
             try:
-                await SessionService.save_conversation(request.session_id, final_conversation)
+                await SessionService.save_conversation(
+                    request.session_id, final_conversation
+                )
             except Exception:
-                logger.exception("Failed to save conversation on error for session %s", request.session_id)
+                logger.exception(
+                    "Failed to save conversation on error for session %s",
+                    request.session_id,
+                )
         buffer.mark_complete(error=error_msg)
 
 

@@ -44,7 +44,6 @@ class ActivityEventType(StrEnum):
     COMPLETE = "complete"
     TURN_START = "turn_start"
     ERROR = "error"
-    FULL_MESSAGE = "full_message"  # Complete message(s) to persist - chat.py saves and clears buffer
 
 
 class TerminateReason(StrEnum):
@@ -54,15 +53,6 @@ class TerminateReason(StrEnum):
     MAX_TURNS = "MAX_TURNS"  # Hit max turns limit
     ERROR = "ERROR"  # Unexpected error
     NO_COMPLETE_TASK = "NO_COMPLETE_TASK"  # Protocol violation
-
-
-@dataclass
-class AgentOutput:
-    """Output from agent execution"""
-
-    success: bool
-    terminate_reason: TerminateReason
-    message: str
 
 
 @dataclass
@@ -76,11 +66,8 @@ class ActivityEvent:
 class MinecraftSchematicAgent:
     """Executes the main agentic loop"""
 
-    # Available providers based on configured API keys
-    _providers: dict[str, type[BaseLLMService]] = {}
-
-    @classmethod
-    def get_available_providers(cls) -> dict[str, type[BaseLLMService]]:
+    @staticmethod
+    def get_available_providers() -> dict[str, type[BaseLLMService]]:
         """Get providers with configured API keys"""
         providers = {}
         if settings.gemini_api_key:
@@ -106,16 +93,17 @@ class MinecraftSchematicAgent:
         self.model = model or settings.llm_model
         provider = get_provider_for_model(self.model)
 
-        # Get available providers
-        self._providers = self.get_available_providers()
-        if provider not in self._providers:
+        # Validate provider availability
+        available_providers = self.get_available_providers()
+        if provider not in available_providers:
             raise ValueError(
                 f"Provider '{provider}' for model '{self.model}' not available. "
-                f"Available: {list(self._providers.keys())}"
+                f"Available: {list(available_providers.keys())}"
             )
 
         # Initialize LLM service with thinking level
-        self.llm = self._providers[provider](self.model, self.thinking_level)
+        llm_class = available_providers[provider]
+        self.llm = llm_class(self.model, self.thinking_level)
 
         # Initialize tools
         tools = [ReadCodeTool(), EditCodeTool()]
@@ -157,9 +145,6 @@ class MinecraftSchematicAgent:
         """
         turn_count = 0
 
-        # Working copy for LLM context
-        messages = list(conversation)
-
         # Main loop
         while True:
             if turn_count >= self.max_turns:
@@ -169,6 +154,7 @@ class MinecraftSchematicAgent:
                         "success": False,
                         "reason": TerminateReason.MAX_TURNS,
                         "message": "Agent hit max turns limit",
+                        "conversation": conversation,
                     },
                 )
                 return
@@ -193,7 +179,7 @@ class MinecraftSchematicAgent:
             # Stream response chunks (rebuild system prompt to include latest code)
             async for chunk in self.llm.generate_with_tools_streaming(
                 self._build_system_prompt(),
-                messages,
+                conversation,
                 self.tool_registry.get_tool_schemas(),
             ):
                 chunk: StreamChunk
@@ -302,10 +288,6 @@ class MinecraftSchematicAgent:
 
             # Save assistant message
             conversation.append(assistant_message)
-            yield ActivityEvent(
-                type=ActivityEventType.FULL_MESSAGE, data={"conversation": conversation}
-            )
-            messages.append(assistant_message)
 
             # No function calls - agent responded with content only
             if not tool_calls_list:
@@ -318,6 +300,7 @@ class MinecraftSchematicAgent:
                             "success": True,
                             "reason": TerminateReason.GOAL,
                             "message": "Agent responded with message",
+                            "conversation": conversation,
                         },
                     )
                     return
@@ -329,6 +312,7 @@ class MinecraftSchematicAgent:
                             "success": False,
                             "reason": TerminateReason.NO_COMPLETE_TASK,
                             "message": "Agent stopped without content or tool calls",
+                            "conversation": conversation,
                         },
                     )
                     return
@@ -383,8 +367,3 @@ class MinecraftSchematicAgent:
             if serialized_responses:
                 # Save tool responses
                 conversation.extend(serialized_responses)
-                yield ActivityEvent(
-                    type=ActivityEventType.FULL_MESSAGE,
-                    data={"conversation": conversation},
-                )
-                messages.extend(serialized_responses)
