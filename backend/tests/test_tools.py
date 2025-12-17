@@ -4,7 +4,6 @@ Tests for agent tools
 
 import pytest
 
-from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.services.session import SessionService
 
@@ -62,65 +61,5 @@ async def test_edit_code_non_unique_string(session_with_code):
 
     assert not result.is_success()
     assert "appears" in result.error and "times" in result.error
-
-
-@pytest.mark.asyncio
-async def test_complete_task_valid_code(temp_storage):
-    """Test completing task with valid code"""
-    session_id = SessionService.create_session()
-
-    valid_code = """
-x = 10
-y = 20
-result = x + y
-print(result)
-structure = {"width": 1, "height": 1, "depth": 1, "blocks": []}
-"""
-    SessionService.save_code(session_id, valid_code)
-
-    tool = CompleteTaskTool()
-    invocation = await tool.build({"session_id": session_id})
-    result = await invocation.execute()
-
-    assert result.is_success()
-    assert "completed successfully" in result.output.lower()
-
-
-@pytest.mark.asyncio
-async def test_complete_task_invalid_syntax(temp_storage):
-    """Test completing task with syntax errors"""
-    session_id = SessionService.create_session()
-
-    invalid_code = """
-def broken(
-    print("syntax error")
-"""
-    SessionService.save_code(session_id, invalid_code)
-
-    tool = CompleteTaskTool()
-    invocation = await tool.build({"session_id": session_id})
-    result = await invocation.execute()
-
-    assert not result.is_success()
-    assert "validation failed" in result.error.lower()
-    assert "Syntax error" in result.error
-
-
-@pytest.mark.asyncio
-async def test_complete_task_execution_error(temp_storage):
-    """Test completing task with execution errors"""
-    session_id = SessionService.create_session()
-
-    error_code = """
-x = 10 / 0  # Division by zero
-"""
-    SessionService.save_code(session_id, error_code)
-
-    tool = CompleteTaskTool()
-    invocation = await tool.build({"session_id": session_id})
-    result = await invocation.execute()
-
-    assert not result.is_success()
-    assert "validation failed" in result.error.lower()
 
 

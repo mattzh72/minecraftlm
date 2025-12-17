@@ -7,18 +7,27 @@ from typing import AsyncIterator
 
 import openai
 
-from app.agent.llms.base import BaseLLMService, StreamChunk
+from app.agent.llms.base import BaseLLMService, StreamChunk, ThinkingLevel
 from app.config import settings
 
 # Models that support reasoning
 REASONING_MODELS = ("gpt-5", "o1", "o3", "o4")
 
+# Reasoning effort mapping for OpenAI
+OPENAI_REASONING_EFFORT = {
+    "low": "low",
+    "med": "medium",
+    "high": "high",
+}
+
 
 class OpenAIService(BaseLLMService):
     """Service for interacting with OpenAI API using the Responses API."""
 
-    def __init__(self, model_id: str = "gpt-5.1"):
-        super().__init__(model_id)
+    def __init__(
+        self, model_id: str = "gpt-5.2", thinking_level: ThinkingLevel = "med"
+    ):
+        super().__init__(model_id, thinking_level)
         self.client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
 
     def _is_reasoning_model(self) -> bool:
@@ -61,11 +70,17 @@ class OpenAIService(BaseLLMService):
                     {
                         "type": "message",
                         "role": "user",
-                        "content": [{"type": "input_text", "text": msg.get("content", "")}],
+                        "content": [
+                            {"type": "input_text", "text": msg.get("content", "")}
+                        ],
                     }
                 )
 
             elif role == "assistant":
+                # Include reasoning items first (for ZDR mode with encrypted content)
+                for reasoning_item in msg.get("reasoning_items") or []:
+                    input_items.append(reasoning_item)
+
                 content_parts = []
 
                 # Add text content if present
@@ -133,21 +148,28 @@ class OpenAIService(BaseLLMService):
             "instructions": system_prompt,
             "input": input_items,
             "stream": True,
+            "store": False,  # ZDR mode - disable server-side storage
         }
 
         # Add tools if present
         if responses_tools:
             request_params["tools"] = responses_tools
 
-        # Enable reasoning for supported models
         if self._is_reasoning_model():
+            if self.thinking_level not in OPENAI_REASONING_EFFORT:
+                raise ValueError(f"Invalid thinking level: {self.thinking_level}")
+
             request_params["reasoning"] = {
-                "effort": "medium",
+                "effort": OPENAI_REASONING_EFFORT[self.thinking_level],
                 "summary": "auto",
             }
+            # Request encrypted reasoning content for ZDR passback
+            request_params["include"] = ["reasoning.encrypted_content"]
 
         # Track function calls by output_index
         function_calls: dict[int, dict] = {}
+        # Track reasoning items for ZDR passback
+        reasoning_items: list[dict] = []
 
         stream = await self.client.responses.create(**request_params)
 
@@ -168,7 +190,8 @@ class OpenAIService(BaseLLMService):
                 if getattr(item, "type", None) == "function_call":
                     output_index = event.output_index
                     function_calls[output_index] = {
-                        "id": getattr(item, "call_id", None) or getattr(item, "id", None),
+                        "id": getattr(item, "call_id", None)
+                        or getattr(item, "id", None),
                         "name": getattr(item, "name", ""),
                         "arguments": "",
                     }
@@ -202,6 +225,33 @@ class OpenAIService(BaseLLMService):
                         ]
                     )
 
+            # Reasoning item complete - capture for ZDR passback
+            elif event_type == "response.output_item.done":
+                item = event.item
+                if getattr(item, "type", None) == "reasoning":
+                    encrypted_content = getattr(item, "encrypted_content", None)
+                    if encrypted_content:
+                        # Convert summary objects to dicts
+                        summary_list = []
+                        for s in getattr(item, "summary", []) or []:
+                            summary_list.append(
+                                {
+                                    "type": getattr(s, "type", "summary_text"),
+                                    "text": getattr(s, "text", ""),
+                                }
+                            )
+                        reasoning_items.append(
+                            {
+                                "id": getattr(item, "id", None),
+                                "type": "reasoning",
+                                "summary": summary_list,
+                                "encrypted_content": encrypted_content,
+                            }
+                        )
+
             # Response complete
             elif event_type == "response.completed":
+                # Yield reasoning items for storage and passback
+                if reasoning_items:
+                    yield StreamChunk(reasoning_items=reasoning_items)
                 yield StreamChunk(finish_reason="stop")

@@ -5,6 +5,7 @@ import {
   CircleCheck,
   Wrench,
   ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { cn } from "@/lib/utils";
@@ -21,8 +22,8 @@ import { getToolCallLabel } from "@/lib/formatConversation";
 import type { ToolCallWithResult } from "@/lib/schemas";
 import { useStore } from "@/store/index.ts";
 import { formatConversationToUIMessages } from "@/lib/formatConversation";
-import { Frame, FramePanel, FrameTitle } from "./ui/frame.tsx";
 import { useMemo } from "react";
+import { useResizable } from "@/hooks/useResizable";
 
 type UserMessageProps = {
   content: string;
@@ -30,7 +31,7 @@ type UserMessageProps = {
 
 function UserMessage({ content }: UserMessageProps) {
   return (
-    <div className="text-sm text-foreground bg-muted border border-border rounded-lg p-2">
+    <div className="text-sm text-white/90 bg-black/30 rounded-lg p-2.5 shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)]">
       <div className="whitespace-pre-wrap">{content}</div>
     </div>
   );
@@ -68,7 +69,7 @@ function AssistantMessage({
   }
 
   return (
-    <div className="py-3 text-sm text-foreground border-b border-border/50">
+    <div className="py-3 text-sm text-white/85 border-b border-white/10">
       <div className="space-y-2">
         {hasThought && (
           <ThoughtDisplay content={thought_summary} isStreaming={isStreaming} />
@@ -129,25 +130,23 @@ function ToolCallWithResultDisplay({
   const IconComponent = !hasResult
     ? name === "edit_code"
       ? Pencil
-      : name === "complete_task"
-      ? CircleCheck
       : Wrench
     : hasError
-    ? X
-    : Check;
+      ? X
+      : Check;
 
   const iconColor = !hasResult
-    ? "text-muted-foreground"
+    ? "text-white/50"
     : hasError
-    ? "text-destructive"
-    : "text-success";
+      ? "text-red-400"
+      : "text-emerald-400";
 
   const isExpandable = !!displayContent;
   const shouldDefaultOpen = hasError && isExpandable;
 
   if (!isExpandable) {
     return (
-      <div className="text-sm py-1 flex items-center gap-1.5 text-muted-foreground">
+      <div className="text-sm py-1 flex items-center gap-1.5 text-white/60">
         <IconComponent size={14} className={iconColor} />
         <span className="font-medium">{label}</span>
       </div>
@@ -156,7 +155,7 @@ function ToolCallWithResultDisplay({
 
   return (
     <Collapsible className="text-sm" defaultOpen={shouldDefaultOpen}>
-      <CollapsibleTrigger className="group w-full text-left py-1 flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+      <CollapsibleTrigger className="group w-full text-left py-1 flex items-center gap-1.5 text-white/60 hover:text-white/90 transition-colors">
         <span className="relative size-3.5">
           <IconComponent
             size={14}
@@ -167,7 +166,7 @@ function ToolCallWithResultDisplay({
           />
           <ChevronDown
             size={14}
-            className="absolute inset-0 text-muted-foreground opacity-0 transition-all group-hover:opacity-100 group-data-[panel-open]:rotate-180"
+            className="absolute inset-0 text-white/50 opacity-0 transition-all group-hover:opacity-100 group-data-[panel-open]:rotate-180"
           />
         </span>
         <span className="font-medium">{label}</span>
@@ -177,8 +176,8 @@ function ToolCallWithResultDisplay({
           className={cn(
             "mt-1.5 p-2 rounded-lg text-xs overflow-auto max-h-48",
             hasError
-              ? "bg-destructive/10 text-destructive"
-              : "bg-muted text-muted-foreground"
+              ? "bg-red-500/20 text-red-300"
+              : "bg-black/20 text-white/60"
           )}
         >
           {displayContent}
@@ -194,7 +193,7 @@ type ErrorMessageProps = {
 
 function ErrorMessage({ content }: ErrorMessageProps) {
   return (
-    <div className="py-3 text-sm text-destructive">
+    <div className="py-3 text-sm text-red-400">
       <div className="whitespace-pre-wrap">{content}</div>
     </div>
   );
@@ -220,14 +219,15 @@ function MessageList() {
         const isLastAssistant =
           msg.type === "assistant" && idx === messages.length - 1;
         const isStreaming = isLoading && isLastAssistant;
+        const messageKey = `${msg.type}-${idx}`;
 
         if (msg.type === "user") {
-          return <UserMessage key={idx} content={msg.content} />;
+          return <UserMessage key={messageKey} content={msg.content} />;
         }
         if (msg.type === "assistant") {
           return (
             <AssistantMessage
-              key={idx}
+              key={messageKey}
               log={isStreaming}
               content={msg.content}
               thought_summary={msg.thought_summary || ""}
@@ -243,7 +243,7 @@ function MessageList() {
       {isLoading &&
         (messages.length === 0 ||
           messages[messages.length - 1].type !== "assistant") && (
-          <div className="py-3 text-sm text-foreground">
+          <div className="py-3 text-sm text-white/70">
             <ThinkingIndicator />
           </div>
         )}
@@ -252,7 +252,27 @@ function MessageList() {
   );
 }
 
-export function ChatPanel() {
+type ChatPanelProps = {
+  expanded: boolean;
+  setExpanded: (expanded: boolean) => void;
+  width: number;
+  onWidthChange: (width: number) => void;
+  onResizeStart?: () => void;
+  onResizeEnd?: () => void;
+};
+
+const MIN_WIDTH = 320;
+const MAX_WIDTH = 600;
+
+const GLASS_PANEL_CLASSES = cn(
+  "bg-black/30 backdrop-blur-2xl backdrop-saturate-150",
+  "border border-white/15",
+  "shadow-xl shadow-black/20",
+  "ring-1 ring-inset ring-white/10",
+  "rounded-2xl"
+);
+
+export function ChatPanel({ expanded, setExpanded, width, onWidthChange, onResizeStart, onResizeEnd }: ChatPanelProps) {
   const { handleSend } = useChat();
 
   const activeSessionId = useStore((s) => s.activeSessionId);
@@ -264,6 +284,15 @@ export function ChatPanel() {
 
   const isAgentBusy = agentState !== "idle" && agentState !== "error";
 
+  const { handleResizeStart } = useResizable({
+    width,
+    minWidth: MIN_WIDTH,
+    maxWidth: MAX_WIDTH,
+    onWidthChange,
+    onResizeStart,
+    onResizeEnd,
+  });
+
   const handleSubmit = (value: string) => {
     if (activeSession?.session_id) {
       handleSend(value, activeSession.session_id);
@@ -273,21 +302,56 @@ export function ChatPanel() {
   };
 
   return (
-    <Frame className="flex flex-col w-sm m-3 ml-0">
-      <FramePanel className="py-3">
-        <FrameTitle>Chat</FrameTitle>
-      </FramePanel>
-      <FramePanel className="flex-1 min-h-0 p-0 overflow-clip mb-2">
-        <AgentScroller autoScrollDeps={[activeSession?.conversation]}>
-          <MessageList />
-        </AgentScroller>
-      </FramePanel>
+    <div className={cn(GLASS_PANEL_CLASSES, "flex flex-col h-full")}>
+      {/* Resize handle on left edge - only when expanded */}
+      {expanded && (
+        <div
+          onMouseDown={handleResizeStart}
+          className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 group"
+        >
+          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-white/0 group-hover:bg-white/30 transition-colors" />
+        </div>
+      )}
 
-      <PromptBox
-        onSubmit={handleSubmit}
-        disabled={!activeSession?.session_id || isAgentBusy}
-        placeholder="Describe your Minecraft structure..."
-      />
-    </Frame>
+      {/* Header with title and collapse button */}
+      <div className={cn(
+        "flex items-center justify-between px-4 shrink-0",
+        expanded ? "py-2 border-b border-white/10" : "py-2.5"
+      )}>
+        <h2 className="font-semibold text-sm text-white/90">Chat</h2>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/10 flex items-center justify-center transition-all hover:scale-105"
+          aria-label={expanded ? "Collapse chat" : "Expand chat"}
+        >
+          <ChevronUp
+            size={16}
+            className={cn(
+              "text-white/60 transition-transform duration-300",
+              !expanded && "rotate-180"
+            )}
+          />
+        </button>
+      </div>
+
+      {/* Body - Messages and Input */}
+      {expanded && (
+        <>
+          <div className="flex-1 min-h-0 overflow-clip">
+            <AgentScroller autoScrollDeps={[activeSession?.conversation]}>
+              <MessageList />
+            </AgentScroller>
+          </div>
+
+          <div className="p-2 pt-0">
+            <PromptBox
+              onSubmit={handleSubmit}
+              disabled={!activeSession?.session_id || isAgentBusy}
+              placeholder="Design more..."
+            />
+          </div>
+        </>
+      )}
+    </div>
   );
 }

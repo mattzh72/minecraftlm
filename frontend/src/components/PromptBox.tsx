@@ -1,15 +1,17 @@
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useStore } from "@/store";
+import { ArrowUp } from "lucide-react";
 import { forwardRef } from "react";
 import TextareaAutosize from "react-textarea-autosize";
-import { ArrowUp } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { useStore } from "@/store";
 import { ModelSelector } from "./ModelSelector.tsx";
+import { ThinkingLevelSelector } from "./ThinkingLevelSelector.tsx";
 
 type PromptBoxProps = {
   onSubmit: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  variant?: "default" | "hero";
   className?: string;
 };
 
@@ -19,6 +21,7 @@ export const PromptBox = forwardRef<HTMLTextAreaElement, PromptBoxProps>(
       onSubmit,
       disabled = false,
       placeholder = "Type a message...",
+      variant = "default",
       className = "",
     },
     ref
@@ -50,9 +53,26 @@ export const PromptBox = forwardRef<HTMLTextAreaElement, PromptBoxProps>(
     return (
       <form
         onSubmit={handleSubmit}
+        data-variant={variant}
         className={cn(
-          "w-full flex flex-col gap-2",
-          "rounded-xl border border-border bg-background p-3 shadow-xs",
+          "w-full flex flex-col gap-3",
+          variant === "hero"
+            ? [
+                "relative rounded-3xl p-5",
+                "glass-panel-hero",
+                "hover:shadow-[var(--shadow-glass-hover)] hover:scale-[1.01]",
+                "before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit]",
+                "before:bg-gradient-to-b before:from-white/[0.35] before:via-white/[0.12] before:to-transparent before:opacity-80",
+              ]
+            : [
+                "rounded-xl p-3",
+                "bg-black/40",
+                "shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)]",
+                "border border-white/10",
+                "focus-within:bg-black/50",
+                "focus-within:shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]",
+              ],
+          "transition-all duration-200",
           className
         )}
       >
@@ -65,19 +85,36 @@ export const PromptBox = forwardRef<HTMLTextAreaElement, PromptBoxProps>(
           disabled={disabled}
           minRows={1}
           maxRows={5}
-          className="w-full px-1 resize-none bg-transparent outline-none text-foreground placeholder:text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+          className={cn(
+            "w-full px-1 resize-none bg-transparent outline-none",
+            variant === "hero"
+              ? "text-foreground/90 placeholder:text-muted-foreground/60"
+              : "text-white/90 placeholder:text-white/40",
+            "text-sm leading-relaxed",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+            "font-text"
+          )}
         />
 
-        <div className="flex justify-between">
-          <ModelSelector />
-          <Button
-            type="submit"
-            disabled={!isActive}
-            size="icon"
-            className="self-end"
-          >
-            <ArrowUp size={18} strokeWidth={2.5} />
-          </Button>
+        {/* Bottom row: thinking selector on left, model + submit on right */}
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <ThinkingLevelSelector />
+          <div className="flex items-center gap-2 shrink-0">
+            <ModelSelector />
+            <Button
+              type="submit"
+              disabled={!isActive}
+              size="icon"
+              className={cn(
+                "shrink-0",
+                "transition-all duration-200 transition-spring",
+                "hover:scale-105",
+                "active:scale-95"
+              )}
+            >
+              <ArrowUp size={18} strokeWidth={2.5} />
+            </Button>
+          </div>
         </div>
       </form>
     );

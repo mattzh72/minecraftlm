@@ -38,7 +38,11 @@ export default function ThumbnailViewer({ structureData, size = thumb.defaultSiz
         canvas,
         structure,
         resources,
-        { chunkSize: rend.chunkSize, drawDistance: rend.drawDistance }
+        {
+          chunkSize: rend.chunkSize,
+          drawDistance: rend.drawDistance,
+          sunlight: rend.sunlight,
+        }
       );
       renderer.setViewport(0, 0, canvas.width, canvas.height);
 
@@ -130,8 +134,7 @@ export default function ThumbnailViewer({ structureData, size = thumb.defaultSiz
       ref={canvasRef}
       width={size}
       height={size}
-      className="rounded-lg block"
-      style={{ width: size, height: size }}
+      className="w-full h-full object-cover rounded-lg block"
     />
   );
 }

@@ -1,41 +1,99 @@
-import { useRef, useMemo, useCallback, useState, useLayoutEffect } from "react";
+import { useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import { useStore } from "../store";
 import useDeepslateResources from "../hooks/useDeepslateResources";
 import useCamera from "../hooks/useCamera";
+import useFirstPersonCamera from "../hooks/useFirstPersonCamera";
 import useRenderLoop from "../hooks/useRenderLoop";
 import useMouseControls from "../hooks/useMouseControls";
+import useFirstPersonControls from "../hooks/useFirstPersonControls";
+import usePhysics from "../hooks/usePhysics";
+import useThumbnailCaptureOnComplete from "../hooks/useThumbnailCaptureOnComplete";
 
 export function MinecraftViewer() {
   const activeSessionId = useStore((s) => s.activeSessionId);
-  const sessions = useStore((s) => s.sessions);
-  const activeSession = useMemo(() => {
-    return activeSessionId ? sessions[activeSessionId] : null;
-  }, [activeSessionId, sessions]);
-
-
+  // Only subscribe to the structure data, not the entire session (avoids re-renders on conversation updates)
+  const structureData = useStore((s) =>
+    s.activeSessionId ? s.sessions[s.activeSessionId]?.structure : null
+  );
+  const thumbnailCaptureRequest = useStore((s) => s.thumbnailCaptureRequest);
+  const clearThumbnailCaptureRequest = useStore(
+    (s) => s.clearThumbnailCaptureRequest
+  );
+  const timeOfDay = useStore((s) => s.timeOfDay);
+  const viewerMode = useStore((s) => s.viewerMode);
+  const setViewerMode = useStore((s) => s.setViewerMode);
 
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
+
+  // Capture current canvas and upload thumbnail to backend
+  const captureAndUploadThumbnail = useCallback(async () => {
+    if (!activeSessionId || !canvasRef.current) return;
+    try {
+      const dataUrl = canvasRef.current.toDataURL('image/png');
+      await fetch(`/api/sessions/${activeSessionId}/thumbnail`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+    } catch (err) {
+      console.error('Error uploading thumbnail:', err);
+    }
+  }, [activeSessionId]);
 
   // Load rendering resources
   const { resources, isLoading, error } = useDeepslateResources();
 
   // Calculate structure size for camera initialization
   const structureSize = useMemo(() => {
-    if (!activeSession?.structure) return null;
-    return [activeSession.structure.width, activeSession.structure.height, activeSession.structure.depth];
-  }, [activeSession]);
+    if (!structureData) return null;
+    return [structureData.width, structureData.height, structureData.depth];
+  }, [structureData]);
 
-  // Camera controls
-  const camera = useCamera(structureSize);
+  // Orbit camera (for orbit mode)
+  const orbitCamera = useCamera(structureSize);
+
+  // First-person camera (for playable mode)
+  const fpCamera = useFirstPersonCamera(structureSize);
+
+  // Use the appropriate camera based on mode
+  const activeCamera = viewerMode === 'orbit' ? orbitCamera : fpCamera;
 
   // Render loop - recreate renderer when canvasSize changes
-  const { requestRender, resize } = useRenderLoop(
+  const { render, requestRender, resize, structureRef, resourcesRef } = useRenderLoop(
     canvasRef,
-    activeSession?.structure,
+    structureData,
     resources,
-    camera
+    activeCamera,
+    timeOfDay
   );
+
+  // Physics (only active in playable mode)
+  // Pass render directly since physics runs in its own animation frame
+  const physics = usePhysics(
+    fpCamera.cameraState,
+    structureRef,
+    resourcesRef,
+    viewerMode === 'playable',
+    render
+  );
+
+  // Exit callback for when pointer lock is lost
+  const exitPlayableMode = useCallback(() => {
+    setViewerMode('orbit');
+  }, [setViewerMode]);
+
+  useThumbnailCaptureOnComplete({
+    thumbnailCaptureRequest,
+    activeSessionId,
+    structureData,
+    isLoading,
+    error,
+    canvasRef,
+    requestRender,
+    captureAndUploadThumbnail,
+    clearThumbnailCaptureRequest,
+  });
 
   // Store resize in ref to avoid dependency issues
   const resizeRef = useRef(resize);
@@ -70,8 +128,18 @@ export function MinecraftViewer() {
     return () => observer.disconnect();
   }, [updateCanvasSize]);
 
-  // Mouse controls
-  useMouseControls(canvasRef, camera, requestRender);
+  // Mouse controls (orbit mode only)
+  useMouseControls(canvasRef, orbitCamera, requestRender, viewerMode === 'orbit');
+
+  // First-person controls (playable mode only)
+  useFirstPersonControls(
+    canvasRef,
+    fpCamera,
+    physics,
+    requestRender,
+    viewerMode === 'playable',
+    exitPlayableMode
+  );
 
   return (
     <div ref={containerRef} className="w-full h-full relative">

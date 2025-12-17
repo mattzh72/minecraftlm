@@ -4,7 +4,11 @@ import type {
   Model,
   ToolCall,
   RawAssistantMessage,
+  ThinkingLevel,
 } from "@/lib/schemas";
+import type { TimeOfDay } from "@/config";
+
+export type ViewerMode = "orbit" | "playable";
 
 export type AgentState =
   | "idle"
@@ -20,6 +24,15 @@ export type StoreStateBase = {
   sessions: Record<string, StoreSession>;
   activeSessionId: string | null;
 
+  // thumbnail capture request (triggered on successful task completion)
+  thumbnailCaptureRequest: { sessionId: string; nonce: number } | null;
+
+  // renderer time of day
+  timeOfDay: TimeOfDay;
+
+  // viewer mode (orbit camera vs playable first-person)
+  viewerMode: ViewerMode;
+
   // chat state
   agentState: AgentState;
   activeAssistantMessageIndex: number | null;
@@ -27,6 +40,9 @@ export type StoreStateBase = {
   // model state
   models: Model[];
   selectedModelId: string | null;
+
+  // thinking level state
+  selectedThinkingLevel: ThinkingLevel;
 
   error: string | null;
 };
@@ -53,15 +69,23 @@ export type StoreActions = {
     structureData: Record<string, unknown>
   ) => void;
   addSession: (session: StoreSession) => void;
+  removeSession: (sessionId: string) => void;
 
   setSelectedModelId: (id: string | null) => void;
   setModels: (models: Model[]) => void;
 
+  setSelectedThinkingLevel: (level: ThinkingLevel) => void;
+
   addAssistantMessage: (sessionId: string, message: string) => void;
   addStreamDelta: (sessionId: string, delta: string) => void;
   addToolCall: (sessionId: string, toolCall: ToolCall) => void;
+  addToolResult: (sessionId: string, toolCallId: string, result: string, hasError: boolean) => void;
 
-  // todo: add tool result
+  requestThumbnailCapture: (sessionId: string) => void;
+  clearThumbnailCaptureRequest: () => void;
+
+  setTimeOfDay: (time: TimeOfDay) => void;
+  setViewerMode: (mode: ViewerMode) => void;
 
   addThoughtSummary: (sessionId: string, thoughtSummary: string) => void;
 };
@@ -92,6 +116,17 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   sessions: {},
   activeSessionId: null,
+  thumbnailCaptureRequest: null,
+  requestThumbnailCapture: (sessionId: string) =>
+    set({
+      thumbnailCaptureRequest: { sessionId, nonce: Date.now() },
+    }),
+  clearThumbnailCaptureRequest: () => set({ thumbnailCaptureRequest: null }),
+
+  timeOfDay: "sunset",
+  setTimeOfDay: (time) => set({ timeOfDay: time }),
+  viewerMode: "orbit",
+  setViewerMode: (mode) => set({ viewerMode: mode }),
   activeSession: () => {
     const activeSessionId = get().activeSessionId;
     return activeSessionId ? get().sessions[activeSessionId] : null;
@@ -161,6 +196,38 @@ export const useStore = create<StoreState>()((set, get) => ({
     console.log(`addToolCall: newAssistantMessage`, newAssistantMessage);
     newConversation[newConversation.length - 1] = newAssistantMessage;
     console.log(`addToolCall: newConversation`, newConversation);
+    set({
+      sessions: {
+        ...get().sessions,
+        [sessionId]: { ...session, conversation: newConversation },
+      },
+    });
+  },
+
+  addToolResult: (sessionId: string, toolCallId: string, result: string, hasError: boolean) => {
+    const session = get().sessions[sessionId];
+    if (!session) return;
+
+    const newConversation = [...(session.conversation || [])];
+
+    // Find and update the tool call in the assistant message
+    for (let i = newConversation.length - 1; i >= 0; i--) {
+      const msg = newConversation[i];
+      if (msg.role === "assistant" && msg.tool_calls) {
+        const tcIndex = msg.tool_calls.findIndex((t) => t.id === toolCallId);
+        if (tcIndex !== -1) {
+          // Update the tool call with its result
+          const updatedToolCalls = [...msg.tool_calls];
+          updatedToolCalls[tcIndex] = {
+            ...updatedToolCalls[tcIndex],
+            result: { content: result, hasError },
+          };
+          newConversation[i] = { ...msg, tool_calls: updatedToolCalls };
+          break;
+        }
+      }
+    }
+
     set({
       sessions: {
         ...get().sessions,
@@ -269,17 +336,24 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   models: [],
   selectedModelId: null,
+  selectedThinkingLevel: "med",
   selectedModel: () => {
     const selectedModelId = get().selectedModelId;
     return get().models.find((m) => m.id === selectedModelId) || null;
   },
   setSelectedModelId: (id: string | null) => set({ selectedModelId: id }),
   setModels: (models: Model[]) => set({ models }),
+  setSelectedThinkingLevel: (level) => set({ selectedThinkingLevel: level }),
   clearSelectedModelId: () => set({ selectedModelId: null }),
 
   addSession: (session: StoreSession) => {
     console.log(`addSession`, { session });
     set({ sessions: { ...get().sessions, [session.session_id]: session } });
+  },
+
+  removeSession: (sessionId: string) => {
+    const { [sessionId]: _, ...remainingSessions } = get().sessions;
+    set({ sessions: remainingSessions });
   },
 
   addStructureData: (

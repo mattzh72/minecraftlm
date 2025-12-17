@@ -55,14 +55,6 @@ export function AgentScroller({
 
   return (
     <div className={cn("relative h-full", className)}>
-      {/* Top scroll mask */}
-      <div
-        className={cn(
-          "absolute top-0 inset-x-0 h-12 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none transition-opacity duration-200",
-          showTopMask ? "opacity-100" : "opacity-0"
-        )}
-      />
-
       {/* Scrollable content using COSS ScrollArea */}
       <ScrollArea
         orientation="vertical"
@@ -75,14 +67,6 @@ export function AgentScroller({
           <div ref={scrollEndRef} />
         </div>
       </ScrollArea>
-
-      {/* Bottom scroll mask */}
-      <div
-        className={cn(
-          "absolute bottom-0 inset-x-0 h-12 bg-gradient-to-t from-background to-transparent z-10 pointer-events-none transition-opacity duration-200",
-          showBottomMask ? "opacity-100" : "opacity-0"
-        )}
-      />
 
       {/* Jump button group */}
       <ButtonGroup

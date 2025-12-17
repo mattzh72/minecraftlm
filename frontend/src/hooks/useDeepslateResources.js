@@ -5,6 +5,7 @@ const BLOCK_FLAG_PATHS = {
   opaque: '/assets/block-flags/opaque.txt',
   transparent: '/assets/block-flags/transparent.txt',
   nonSelfCulling: '/assets/block-flags/non_self_culling.txt',
+  emissive: '/assets/block-flags/emissive.json',
 };
 
 const normalizeBlockId = (id) => (id.startsWith('minecraft:') ? id : `minecraft:${id}`);
@@ -30,6 +31,15 @@ const fetchBlockList = async (path, label) => {
   }
   const text = await res.text();
   return parseBlockList(text);
+};
+
+const fetchEmissiveBlocks = async () => {
+  const res = await fetch(BLOCK_FLAG_PATHS.emissive);
+  if (!res.ok) {
+    console.warn('Failed to fetch emissive.json, using defaults');
+    return {};
+  }
+  return await res.json();
 };
 
 const fetchAssets = async () => {
@@ -86,7 +96,7 @@ export default function useDeepslateResources() {
     const loadResources = async () => {
       try {
         const image = await loadAtlasImage();
-        const [assets, opaqueBlocks, transparentBlocks, nonSelfCullingBlocks] =
+        const [assets, opaqueBlocks, transparentBlocks, nonSelfCullingBlocks, emissiveBlocks] =
           await Promise.all([
             fetchAssets(),
             fetchBlockList(BLOCK_FLAG_PATHS.opaque, 'opaque.txt'),
@@ -95,12 +105,14 @@ export default function useDeepslateResources() {
               BLOCK_FLAG_PATHS.nonSelfCulling,
               'non_self_culling.txt'
             ),
+            fetchEmissiveBlocks(),
           ]);
 
         const loaded = loadDeepslateResources(image, assets, {
           opaque: opaqueBlocks,
           transparent: transparentBlocks,
           nonSelfCulling: nonSelfCullingBlocks,
+          emissive: emissiveBlocks,
         });
         setResources(loaded);
       } catch (err) {

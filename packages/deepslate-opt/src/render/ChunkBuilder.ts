@@ -1,17 +1,19 @@
 import { mat4, vec3 } from 'gl-matrix'
-import type { PlacedBlock, Resources, StructureProvider } from '../index.js'
+import type { Identifier, PlacedBlock, Resources, StructureProvider } from '../index.js'
 import { BlockPos, Direction, Vector } from '../index.js'
 import { Mesh } from './Mesh.js'
 import { SpecialRenderers } from './SpecialRenderer.js'
 
 type Chunk = { mesh: Mesh, transparentMesh: Mesh, origin: vec3 }
 type ChunkEntry = { mesh: Mesh, origin: vec3, transparent: boolean }
+export type EmissiveLight = { position: vec3, intensity: number, color: [number, number, number] }
 
 export class ChunkBuilder {
 	private chunks: (Chunk | null)[][][] = []
 	private readonly chunkSize: vec3
 	private meshesDirty = true
 	private meshCache: ChunkEntry[] = []
+	private emissiveLights: EmissiveLight[] = []
 
 	constructor(
 		private readonly gl: WebGLRenderingContext,
@@ -32,8 +34,10 @@ export class ChunkBuilder {
 		if (!this.structure)
 			return
 		this.markDirty()
-		
+
+		// Clear emissive lights when doing full rebuild
 		if (!chunkPositions) {
+			this.emissiveLights = []
 			this.chunks.forEach(x => x.forEach(y => y.forEach(chunk => {
 				if (!chunk) return
 				chunk.mesh.clear()
@@ -84,8 +88,8 @@ export class ChunkBuilder {
 				if (!specialMesh.isEmpty()) {
 					mesh.merge(specialMesh)
 				}
-				if (!mesh.isEmpty()) {	
-					this.finishChunkMesh(mesh, b.pos)
+				if (!mesh.isEmpty()) {
+					this.finishChunkMesh(mesh, b.pos, blockName, blockProps)
 					if (this.resources.getBlockFlags(b.state.getName())?.semi_transparent){
 						chunk.transparentMesh.merge(mesh)
 					} else {
@@ -181,16 +185,50 @@ export class ChunkBuilder {
 		return true
 	}
 
-	private finishChunkMesh(mesh: Mesh, pos: vec3) {
+	private finishChunkMesh(mesh: Mesh, pos: vec3, blockName: Identifier, blockProps: Record<string, string>) {
 		const t = mat4.create()
 		mat4.translate(t, t, pos)
 		mesh.transform(t)
 
+		// Determine emissive value based on block flags
+		const flags = this.resources.getBlockFlags(blockName)
+		let emissive = 0
+		if (flags?.emissive) {
+			// Check for conditional emission (e.g., lit property)
+			const conditional = flags.emissiveConditional
+			if (conditional) {
+				const propValue = blockProps[conditional]
+				// Only emit if the conditional property is true or not specified
+				if (propValue === undefined || propValue === 'true') {
+					emissive = flags.emissiveIntensity ?? 1.0
+				}
+			} else {
+				emissive = flags.emissiveIntensity ?? 1.0
+			}
+		}
+
+		// Collect emissive blocks as point lights
+		if (emissive > 0) {
+			// Place light at center of block
+			this.emissiveLights.push({
+				position: [pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5],
+				intensity: emissive,
+				color: [1.0, 0.85, 0.6], // Warm light color
+			})
+		}
+
 		for (const q of mesh.quads) {
 			const normal = q.normal()
-			q.forEach(v => v.normal = normal)
-			q.forEach(v => v.blockPos = new Vector(pos[0], pos[1], pos[2]))
+			q.forEach(v => {
+				v.normal = normal
+				v.blockPos = new Vector(pos[0], pos[1], pos[2])
+				v.emissive = emissive
+			})
 		}
+	}
+
+	public getEmissiveLights(): EmissiveLight[] {
+		return this.emissiveLights
 	}
 
 	private getChunk(chunkPos: vec3): Chunk {

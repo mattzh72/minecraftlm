@@ -9,11 +9,14 @@ export function useChat() {
   const addThoughtSummary = useStore((s) => s.addThoughtSummary);
   const addAssistantMessage = useStore((s) => s.addAssistantMessage);
   const addToolCall = useStore((s) => s.addToolCall);
+  const addToolResult = useStore((s) => s.addToolResult);
+  const requestThumbnailCapture = useStore((s) => s.requestThumbnailCapture);
 
   const handleSend = async (userMessage: string, sessionId: string) => {
-    // Read selectedModelId at call time to avoid stale closure issues
+    // Read selectedModelId and thinkingLevel at call time to avoid stale closure issues
     const selectedModelId = useStore.getState().selectedModelId;
-    console.log(`handleSend`, { userMessage, sessionId, selectedModelId });
+    const selectedThinkingLevel = useStore.getState().selectedThinkingLevel;
+    console.log(`handleSend`, { userMessage, sessionId, selectedModelId, selectedThinkingLevel });
     if (!userMessage.trim() || !sessionId) return;
 
     addUserMessage(sessionId, userMessage);
@@ -21,6 +24,7 @@ export function useChat() {
       sessionId,
       userMessage,
       selectedModelId,
+      selectedThinkingLevel,
     });
 
     try {
@@ -31,6 +35,7 @@ export function useChat() {
           session_id: sessionId,
           message: userMessage,
           model: selectedModelId,
+          thinking_level: selectedThinkingLevel,
         }),
       });
 
@@ -85,7 +90,15 @@ export function useChat() {
                     extra_content: {},
                   });
                   break;
-                case "tool_result":
+                case "tool_result": {
+                  // Add tool result to conversation
+                  const hasError = !!event.data.error;
+                  const resultContent = JSON.stringify({
+                    result: event.data.result,
+                    error: event.data.error,
+                  });
+                  addToolResult(sessionId, event.data.tool_call_id, resultContent, hasError);
+
                   // Check if this tool result includes a structure update
                   if (event.data.compilation?.structure_updated) {
                     try {
@@ -101,6 +114,7 @@ export function useChat() {
                     }
                   }
                   break;
+                }
                 case "text_delta":
                   setAgentState("streaming_text");
                   addStreamDelta(sessionId, event.data.delta);
@@ -125,6 +139,8 @@ export function useChat() {
                       // If 404, simply do nothing (don't throw or log)
                     } catch (err) {
                       console.error("Error fetching structure:", err);
+                    } finally {
+                      requestThumbnailCapture(sessionId);
                     }
                   }
                   break;

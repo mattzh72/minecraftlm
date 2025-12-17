@@ -17,16 +17,16 @@ export default function useCamera(structureSize) {
     target: null,
   });
 
-  // Initialize camera position when structure size changes
+  // Initialize camera position only once when first structure loads
+  const initializedRef = useRef(false);
+
   useEffect(() => {
-    if (structureSize) {
-      const maxDim = Math.max(structureSize[0], structureSize[1], structureSize[2]);
-      // Center of the structure in positive space; we orbit around this
-      const center = vec3.fromValues(
-        structureSize[0] / 2,
-        structureSize[1] / 2,
-        structureSize[2] / 2
-      );
+    if (structureSize && !initializedRef.current) {
+      initializedRef.current = true;
+
+      const [w, h, d] = structureSize;
+      const maxDim = Math.max(w, h, d);
+      const center = vec3.fromValues(w / 2, h / 2, d / 2);
       cameraState.current.target = center;
       cameraState.current.pitch = cam.defaultRotationX;
       cameraState.current.yaw = cam.defaultRotationY;

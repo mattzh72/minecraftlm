@@ -7,16 +7,34 @@ from typing import AsyncIterator
 
 import anthropic
 
-from app.agent.llms.base import BaseLLMService, StreamChunk
+from app.agent.llms.base import BaseLLMService, StreamChunk, ThinkingLevel
 from app.config import settings
+
+# Thinking budget mapping for Anthropic
+MAX_TOKENS = 64000
+ANTHROPIC_THINKING_BUDGETS = {
+    "low": 1024,
+    "med": 10000,
+    "high": 32000,
+}
 
 
 class AnthropicService(BaseLLMService):
     """Service for interacting with Anthropic Claude API."""
 
-    def __init__(self, model_id: str = "claude-opus-4-5-20251101"):
-        super().__init__(model_id)
+    def __init__(
+        self,
+        model_id: str = "claude-opus-4-5-20251101",
+        thinking_level: ThinkingLevel = "med",
+    ):
+        super().__init__(model_id, thinking_level)
         self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+    def _is_reasoning_model(self) -> bool:
+        """Check if the model supports thinking."""
+        return any(
+            x in self.model_id for x in ("claude-3", "claude-sonnet-4", "claude-opus-4")
+        )
 
     def _convert_tools(self, tools: list[dict]) -> list[dict]:
         """Convert OpenAI-style tool specs to Anthropic format."""
@@ -52,7 +70,10 @@ class AnthropicService(BaseLLMService):
 
                 # Add thinking block first if present (required by Anthropic when thinking is enabled)
                 if msg.get("thought_summary"):
-                    thinking_block = {"type": "thinking", "thinking": msg["thought_summary"]}
+                    thinking_block = {
+                        "type": "thinking",
+                        "thinking": msg["thought_summary"],
+                    }
                     # Include signature if available (required by Anthropic to verify thinking)
                     if msg.get("thinking_signature"):
                         thinking_block["signature"] = msg["thinking_signature"]
@@ -128,7 +149,7 @@ class AnthropicService(BaseLLMService):
             "model": self.model_id,
             "system": system_prompt,
             "messages": anthropic_messages,
-            "max_tokens": 16000,
+            "max_tokens": MAX_TOKENS,
         }
 
         # Add tools if present
@@ -136,12 +157,13 @@ class AnthropicService(BaseLLMService):
             request_params["tools"] = anthropic_tools
 
         # Enable extended thinking for Claude 3+ and Claude 4+ models
-        if any(
-            x in self.model_id for x in ("claude-3", "claude-sonnet-4", "claude-opus-4")
-        ):
+        if self._is_reasoning_model():
+            if self.thinking_level not in ANTHROPIC_THINKING_BUDGETS:
+                raise ValueError(f"Invalid thinking level: {self.thinking_level}")
+
             request_params["thinking"] = {
                 "type": "enabled",
-                "budget_tokens": 10000,
+                "budget_tokens": ANTHROPIC_THINKING_BUDGETS[self.thinking_level],
             }
 
         # Track current block type and accumulate tool input

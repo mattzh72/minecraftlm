@@ -62,13 +62,17 @@ export function formatConversationToUIMessages(
             arguments: tc.function?.arguments || "{}",
           };
 
-          // Attach result by ID if available
-          const result = tc.id ? toolResultMap.get(tc.id) : null;
-          if (result) {
-            toolCallWithResult.result = {
-              content: result.content,
-              hasError: result.hasError,
-            };
+          // Check for inline result first (added during streaming), then fall back to result map
+          if (tc.result) {
+            toolCallWithResult.result = tc.result;
+          } else {
+            const result = tc.id ? toolResultMap.get(tc.id) : null;
+            if (result) {
+              toolCallWithResult.result = {
+                content: result.content,
+                hasError: result.hasError,
+              };
+            }
           }
 
           tool_calls.push(toolCallWithResult);
@@ -123,10 +127,6 @@ export function getToolCallLabel(
   if (name === "edit_code") {
     if (!hasResult) return "Editing code...";
     return hasError ? "Edit failed" : "Edited code";
-  }
-  if (name === "complete_task") {
-    if (!hasResult) return "Validating...";
-    return hasError ? "Validation failed" : "Validated";
   }
 
   // Generic fallback

@@ -27,9 +27,11 @@ async def chat_stream(request: ChatRequest) -> AsyncIterator[str]:
     - complete: Task finished (success or error)
     """
     try:
-        # Create agent executor with optional model override
+        # Create agent executor with optional model override and thinking level
         agent = MinecraftSchematicAgent(
-            session_id=request.session_id, model=request.model
+            session_id=request.session_id,
+            model=request.model,
+            thinking_level=request.thinking_level,
         )
 
         # Run agent loop and stream events
@@ -64,10 +66,9 @@ async def chat(request: ChatRequest):
 
     The agent will:
     1. Use read_code to see current SDK code
-    2. Use edit_code to iteratively improve the code
-    3. Call complete_task when done (automatic validation)
-    4. Continue fixing if validation fails
-    5. Stop when validation passes
+    2. Use edit_code to iteratively improve the code (automatic validation after each edit)
+    3. Continue fixing if validation fails
+    4. When done, respond with a completion message
 
     Streams activity events (thoughts, tool calls, results) back as SSE.
     Frontend can read the final code from storage/sessions/{session_id}/code.py

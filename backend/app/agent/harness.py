@@ -16,7 +16,8 @@ from app.agent.llms import (
     GeminiService,
     OpenAIService,
 )
-from app.agent.tools.complete_task import CompleteTaskTool
+from app.agent.llms.base import ThinkingLevel
+from app.agent.tools.base import ToolResult
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
@@ -88,9 +89,16 @@ class MinecraftSchematicAgent:
             providers["anthropic"] = AnthropicService
         return providers
 
-    def __init__(self, session_id: str, model: str | None = None, max_turns: int = 20):
+    def __init__(
+        self,
+        session_id: str,
+        model: str | None = None,
+        thinking_level: ThinkingLevel = "med",
+        max_turns: int = 20,
+    ):
         self.session_id = session_id
         self.max_turns = max_turns
+        self.thinking_level = thinking_level
 
         # Use provided model or fall back to config
         self.model = model or settings.llm_model
@@ -104,13 +112,13 @@ class MinecraftSchematicAgent:
                 f"Available: {list(self._providers.keys())}"
             )
 
-        # Initialize LLM service
-        self.llm = self._providers[provider](self.model)
+        # Initialize LLM service with thinking level
+        self.llm = self._providers[provider](self.model, self.thinking_level)
 
         self.session_service = SessionService()
 
         # Initialize tools
-        tools = [ReadCodeTool(), EditCodeTool(), CompleteTaskTool()]
+        tools = [ReadCodeTool(), EditCodeTool()]
         self.tool_registry = ToolRegistry(tools)
 
         # Load system prompt template and SDK docs
@@ -123,8 +131,8 @@ class MinecraftSchematicAgent:
             "[[SDK_API_SCENE]]": f"02-api-scene.md\n\n{(docs_dir / '02-api-scene.md').read_text()}",
             "[[SDK_BLOCKS_REFERENCE]]": f"03-blocks-reference.md\n\n{(docs_dir / '03-blocks-reference.md').read_text()}",
             "[[SDK_BLOCK_LIST]]": f"04-block-list.md\n\n{(docs_dir / '04-block-list.md').read_text()}",
-            "[[SDK_PITFALLS]]": f"05-pitfalls.md\n\n{(docs_dir / '05-pitfalls.md').read_text()}",
-            "[[SDK_TERRAIN]]": f"06-terrain-guide.md\n\n{(docs_dir / '06-terrain-guide.md').read_text()}",
+            "[[SDK_TERRAIN]]": f"05-terrain-guide.md\n\n{(docs_dir / '05-terrain-guide.md').read_text()}",
+            "[[SDK_GUIDELINES]]": f"06-implementation-guidelines.md\n\n{(docs_dir / '06-implementation-guidelines.md').read_text()}",
         }
 
     def _build_system_prompt(self) -> str:
@@ -186,6 +194,7 @@ class MinecraftSchematicAgent:
             accumulated_thought = ""
             accumulated_thinking_signature = None
             accumulated_tool_calls = {}  # index -> tool call dict
+            accumulated_reasoning_items = None  # For OpenAI ZDR passback
 
             # Stream response chunks (rebuild system prompt to include latest code)
             async for chunk in self.llm.generate_with_tools_streaming(
@@ -261,6 +270,10 @@ class MinecraftSchematicAgent:
                         if tc_delta.get("id"):
                             accumulated_tool_calls[idx]["id"] = tc_delta["id"]
 
+                # Handle reasoning items (OpenAI ZDR passback)
+                if chunk.reasoning_items:
+                    accumulated_reasoning_items = chunk.reasoning_items
+
             # Build tool calls from accumulated data
             tool_calls_list: list[ToolCall] = []
             for tc_data in accumulated_tool_calls.values():
@@ -286,6 +299,7 @@ class MinecraftSchematicAgent:
                 thought_summary=accumulated_thought or None,
                 thinking_signature=accumulated_thinking_signature,
                 tool_calls=tool_calls_list if tool_calls_list else None,
+                reasoning_items=accumulated_reasoning_items,
             ).model_dump()
 
             # Save assistant message
@@ -320,7 +334,6 @@ class MinecraftSchematicAgent:
                     return
 
             # Process function calls
-            task_completed = False
             serialized_responses = []
 
             for tool_call in tool_calls_list:
@@ -341,22 +354,26 @@ class MinecraftSchematicAgent:
                 )
 
                 if not invocation:
-                    tool_result = {"error": f"Tool {func_name} not found"}
+                    result = ToolResult(
+                        error=f"Tool {func_name} not found", tool_call_id=tool_call.id
+                    )
                 else:
                     result = await invocation.execute()
-                    tool_result = result.to_dict()
+                    result.tool_call_id = tool_call.id
 
-                    # Check if this is complete_task
-                    if func_name == "complete_task" and result.is_success():
-                        task_completed = True
+                yield ActivityEvent(type="tool_result", data=result.to_dict())
 
-                yield ActivityEvent(type="tool_result", data=tool_result)
-
-                # Build tool response
+                # Build tool response (without tool_call_id in content, it's in the message itself)
                 tool_response = ToolMessage(
                     role="tool",
                     tool_call_id=tool_call.id,
-                    content=json.dumps(tool_result),
+                    content=json.dumps(
+                        {
+                            k: v
+                            for k, v in result.to_dict().items()
+                            if k != "tool_call_id"
+                        }
+                    ),
                     name=func_name,
                 ).model_dump()
                 serialized_responses.append(tool_response)
@@ -366,15 +383,3 @@ class MinecraftSchematicAgent:
                 conversation.extend(serialized_responses)
                 self.session_service.save_conversation(self.session_id, conversation)
                 messages.extend(serialized_responses)
-
-            # If task completed successfully, stop
-            if task_completed:
-                yield ActivityEvent(
-                    type="complete",
-                    data={
-                        "success": True,
-                        "reason": TerminateReason.GOAL,
-                        "message": "Task completed successfully",
-                    },
-                )
-                return

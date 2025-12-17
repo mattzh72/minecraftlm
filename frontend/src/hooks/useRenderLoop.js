@@ -1,25 +1,35 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { ThreeStructureRenderer } from 'deepslate-opt';
 import { structureFromJsonData } from '../utils/deepslate';
-import { Config } from '../config';
+import { Config, TimePresets } from '../config';
 
 /**
  * Hook to manage WebGL rendering loop
  * Recreates renderer when canvas size changes to ensure correct projection
+ * @param {React.RefObject} canvasRef - Reference to the canvas element
+ * @param {object} structureData - Structure data to render
+ * @param {object} resources - Deepslate resources
+ * @param {object} camera - Camera object
+ * @param {string} timeOfDay - Time of day preset ('day', 'sunset', 'night')
  */
-export default function useRenderLoop(canvasRef, structureData, resources, camera) {
+export default function useRenderLoop(canvasRef, structureData, resources, camera, timeOfDay = 'sunset') {
   const rendererRef = useRef(null);
   const animationFrameRef = useRef(null);
+  const structureRef = useRef(null);
+  const resourcesRef = useRef(null);
+  const cameraRef = useRef(camera);
 
-  // Render function
+  // Keep camera ref updated
+  cameraRef.current = camera;
+
+  // Render function - uses ref to avoid recreating when camera changes
   const render = useCallback(() => {
-    if (!rendererRef.current || !camera) return;
+    if (!rendererRef.current || !cameraRef.current) return;
 
-    const view = camera.getViewMatrix();
+    const view = cameraRef.current.getViewMatrix();
     rendererRef.current.drawStructure(view);
     rendererRef.current.drawGrid(view);
-    console.log('[useRenderLoop] render frame');
-  }, [camera]);
+  }, []);
 
   // Request a render frame
   const requestRender = useCallback(() => {
@@ -40,6 +50,8 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
 
     // Create structure from JSON data
     const structure = structureFromJsonData(structureData);
+    structureRef.current = structure;
+    resourcesRef.current = resources;
     console.log('[useRenderLoop] structure blocks', structureData.blocks?.length);
 
     // Clean up old animation frame
@@ -61,6 +73,7 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
         chunkSize: Config.renderer.chunkSize,
         drawDistance: Config.renderer.drawDistance,
         useInvisibleBlockBuffer: Config.renderer.useInvisibleBlockBuffer,
+        sunlight: Config.renderer.sunlight,
       }
     );
     rendererRef.current = renderer;
@@ -70,7 +83,9 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     renderer.setViewport(0, 0, canvas.width, canvas.height);
 
     // Render
-    animationFrameRef.current = requestAnimationFrame(render);
+    animationFrameRef.current = requestAnimationFrame(() => {
+      render();
+    });
 
     // Cleanup
     return () => {
@@ -85,6 +100,15 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     };
   }, [structureData, resources, render]);
 
+  // Update sunlight when timeOfDay changes
+  useEffect(() => {
+    if (!rendererRef.current || !timeOfDay) return;
+    const preset = TimePresets[timeOfDay];
+    if (preset) {
+      rendererRef.current.setSunlight(preset);
+      requestRender();
+    }
+  }, [timeOfDay, requestRender]);
 
   // Resize viewport AND update projection matrix, then re-render
   const resize = useCallback(() => {
@@ -97,8 +121,10 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
 
   return {
     rendererRef,
-    render,
-    requestRender,
+    structureRef,
+    resourcesRef,
+    render,          // Direct render (use when already in animation frame)
+    requestRender,   // Scheduled render (use from event handlers)
     animationFrameRef,
     resize,
   };

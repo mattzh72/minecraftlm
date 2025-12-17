@@ -20,6 +20,7 @@ class EditCodeParams(BaseModel):
     session_id: str
     old_string: str
     new_string: str
+    replace_all: bool = False
 
 
 class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
@@ -33,6 +34,12 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
 
     async def execute(self) -> ToolResult:
         try:
+            # Validate old_string is not empty
+            if not self.params.old_string:
+                return ToolResult(
+                    error="old_string cannot be empty. Please provide the exact string to replace."
+                )
+
             # Load current code
             code = SessionService.load_code(self.params.session_id)
 
@@ -41,15 +48,15 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
                 return ToolResult(
                     error=f"Could not find the old_string in the code. "
                     f"Make sure the string matches exactly, including whitespace and indentation. "
-                    f"Check the Current Code section in the system prompt."
                 )
 
             # Count occurrences
             occurrences = code.count(self.params.old_string)
-            if occurrences > 1:
+            if occurrences > 1 and not self.params.replace_all:
                 return ToolResult(
                     error=f"The old_string appears {occurrences} times in the code. "
-                    f"Please provide a longer, unique string that appears only once."
+                    f"Please provide a longer, unique string that appears only once, "
+                    f"or use replace_all=true to replace all occurrences."
                 )
 
             # Perform replacement
@@ -61,7 +68,13 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
             # Auto-compile and validate for immediate feedback
             compilation = self._compile_and_validate(new_code)
 
-            return ToolResult(output="Code edited successfully", compilation=compilation)
+            # Build success message
+            if self.params.replace_all and occurrences > 1:
+                success_msg = f"Code edited successfully (replaced {occurrences} occurrences)"
+            else:
+                success_msg = "Code edited successfully"
+
+            return ToolResult(output=success_msg, compilation=compilation)
 
         except FileNotFoundError:
             return ToolResult(error=f"Session {self.params.session_id} not found")
@@ -119,24 +132,51 @@ class EditCodeTool(BaseDeclarativeTool):
         schema = make_tool_schema(
             name="edit_code",
             description=(
-                "Make a precise edit to the SDK code by replacing old_string with new_string. "
-                "The old_string must match exactly (including whitespace and indentation). "
-                "Reference the Current Code section in the system prompt for line numbers."
+                "Edit the SDK code by replacing old_string with new_string.\n\n"
+                "After every edit, the code is automatically compiled and executed. You will receive "
+                "immediate feedback on whether the code is valid or contains errors.\n\n"
+                "Matching behavior:\n"
+                "- old_string must match EXACTLY, including whitespace, indentation, and newlines\n"
+                "- By default, old_string must appear exactly once in the file\n"
+                "- If old_string appears multiple times, you must either provide more context to make it unique, "
+                "or set replace_all=true\n\n"
+                "Response format:\n"
+                "On success, you receive:\n"
+                "- output: 'Code edited successfully' (or 'replaced N occurrences' if replace_all=true)\n"
+                "- compilation.status: 'success' or 'error'\n"
+                "- compilation.block_count: number of blocks in the structure (if valid)\n"
+                "- compilation.bounding_box: {min: [x,y,z], max: [x,y,z]} (if valid)\n"
+                "- compilation.error: error message with line number (if invalid)\n\n"
+                "Possible errors:\n"
+                "- 'Could not find the old_string in the code' - old_string doesn't match exactly\n"
+                "- 'The old_string appears N times' - need longer context or replace_all=true\n"
+                "- 'old_string cannot be empty' - must provide text to replace\n"
+                "- compilation.error contains syntax/runtime errors with line numbers"
             ),
             parameters={
                 "old_string": {
                     "type": "string",
                     "description": (
-                        "The exact string to replace. Must match exactly including all whitespace. "
-                        "Must be unique (appear only once in the file)."
+                        "The exact string to find and replace. Must match exactly including whitespace, "
+                        "indentation, and newlines. Cannot be empty. Must be unique unless replace_all=true."
                     ),
                 },
                 "new_string": {
                     "type": "string",
-                    "description": "The new string to replace it with",
+                    "description": (
+                        "The replacement string. Can be empty to delete the old_string. "
+                        "Must have valid Python syntax and proper indentation."
+                    ),
+                },
+                "replace_all": {
+                    "type": "boolean",
+                    "description": (
+                        "If false (default), old_string must appear exactly once. "
+                        "If true, replaces all occurrences. Use for renaming variables or functions."
+                    ),
                 },
             },
-            required=["old_string", "new_string"],
+            required=["old_string", "new_string", "replace_all"],
         )
         super().__init__("edit_code", schema)
 
