@@ -41,18 +41,19 @@ async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> No
     Handles:
     - Loading conversation from disk before starting agent
     - Setting model on session
-    - Processing full_message events (save to disk)
+    - Capturing full_message events (save to disk ONLY at task completion)
     - Forwarding frontend events to buffer
 
-    The buffer accumulates ALL events for the task lifetime. On resume,
-    frontend replays the entire stream from since=0 to rebuild in-progress state.
-    Disk has complete messages, buffer has all streaming deltas.
+    The buffer accumulates ALL events for the task lifetime. Disk write happens
+    only once at the end, making buffer and disk mutually exclusive.
     """
+    final_conversation = None  # Track last full conversation for disk save at end
+
     try:
         # Load conversation from disk and add user message
         conversation = await SessionService.load_conversation(request.session_id)
         conversation.append({"role": "user", "content": request.message})
-        # Persist user message immediately
+        # Persist user message immediately (so session isn't lost if task crashes)
         await SessionService.save_conversation(request.session_id, conversation)
         # Lock model to session
         await SessionService.set_model(request.session_id, request.model)
@@ -65,15 +66,15 @@ async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> No
 
         async for event in agent.run(conversation):
             if event.type == "full_message":
-                # Save complete messages to disk for persistence
-                conv_data = event.data.get("conversation", [])
-                await SessionService.save_conversation(request.session_id, conv_data)
-                # Don't clear buffer - keep all events for potential resume/replay
+                # Capture conversation but don't write to disk yet
+                final_conversation = event.data.get("conversation", [])
             elif event.type not in INTERNAL_EVENTS:
                 # Forward to frontend via buffer
                 buffer.append(_make_sse(event.type, event.data))
 
-        # Mark complete on success
+        # Write to disk only at the end (single write)
+        if final_conversation:
+            await SessionService.save_conversation(request.session_id, final_conversation)
         buffer.mark_complete()
 
     except FileNotFoundError:
@@ -86,6 +87,12 @@ async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> No
         error_msg = str(e)
         logger.exception("Error while running agent for session %s", request.session_id)
         buffer.append(_make_sse("complete", {"success": False, "error": error_msg}))
+        # Still try to save whatever conversation we have on error
+        if final_conversation:
+            try:
+                await SessionService.save_conversation(request.session_id, final_conversation)
+            except Exception:
+                logger.exception("Failed to save conversation on error for session %s", request.session_id)
         buffer.mark_complete(error=error_msg)
 
 
