@@ -20,6 +20,7 @@ class EditCodeParams(BaseModel):
     session_id: str
     old_string: str
     new_string: str
+    replace_all: bool = False
 
 
 class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
@@ -33,6 +34,12 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
 
     async def execute(self) -> ToolResult:
         try:
+            # Validate old_string is not empty
+            if not self.params.old_string:
+                return ToolResult(
+                    error="old_string cannot be empty. Please provide the exact string to replace."
+                )
+
             # Load current code
             code = SessionService.load_code(self.params.session_id)
 
@@ -45,10 +52,11 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
 
             # Count occurrences
             occurrences = code.count(self.params.old_string)
-            if occurrences > 1:
+            if occurrences > 1 and not self.params.replace_all:
                 return ToolResult(
                     error=f"The old_string appears {occurrences} times in the code. "
-                    f"Please provide a longer, unique string that appears only once."
+                    f"Please provide a longer, unique string that appears only once, "
+                    f"or use replace_all=true to replace all occurrences."
                 )
 
             # Perform replacement
@@ -60,7 +68,13 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
             # Auto-compile and validate for immediate feedback
             compilation = self._compile_and_validate(new_code)
 
-            return ToolResult(output="Code edited successfully", compilation=compilation)
+            # Build success message
+            if self.params.replace_all and occurrences > 1:
+                success_msg = f"Code edited successfully (replaced {occurrences} occurrences)"
+            else:
+                success_msg = "Code edited successfully"
+
+            return ToolResult(output=success_msg, compilation=compilation)
 
         except FileNotFoundError:
             return ToolResult(error=f"Session {self.params.session_id} not found")
@@ -126,12 +140,20 @@ class EditCodeTool(BaseDeclarativeTool):
                     "type": "string",
                     "description": (
                         "The exact string to replace. Must match exactly including all whitespace. "
-                        "Must be unique (appear only once in the file)."
+                        "By default, must be unique (appear only once in the file) unless replace_all is true."
                     ),
                 },
                 "new_string": {
                     "type": "string",
                     "description": "The new string to replace it with",
+                },
+                "replace_all": {
+                    "type": "boolean",
+                    "description": (
+                        "If true, replace all occurrences of old_string. "
+                        "If false (default), old_string must be unique. "
+                        "Use this for renaming variables/functions across the file."
+                    ),
                 },
             },
             required=["old_string", "new_string"],
