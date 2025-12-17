@@ -182,6 +182,9 @@ class Terrain(Object3D):
         self._water_levels: Optional[np.ndarray] = None  # Int: water level per column
         self._beach_mask: Optional[np.ndarray] = None  # Boolean: True = beach zone
 
+        # Flattened areas mask (set by flatten_for_structure)
+        self._flattened_mask: Optional[np.ndarray] = None  # Boolean: True = flattened for structure
+
     def generate(self) -> "Terrain":
         """Generate complete terrain.
 
@@ -772,6 +775,10 @@ class Terrain(Object3D):
                 if self._beach_mask is not None and self._beach_mask[z, x]:
                     continue
 
+                # Skip flattened areas (reserved for structures)
+                if self._flattened_mask is not None and self._flattened_mask[z, x]:
+                    continue
+
                 # Use noise to vary placement within grid cell
                 noise_val = decor_noise.noise2d(x / 20.0, z / 20.0)
                 if noise_val > 0.3:  # ~35% of grid cells get trees
@@ -789,6 +796,9 @@ class Terrain(Object3D):
                         if self._water_mask is not None and self._water_mask[tree_z, tree_x]:
                             continue
                         if self._beach_mask is not None and self._beach_mask[tree_z, tree_x]:
+                            continue
+                        # Also check offset position isn't flattened
+                        if self._flattened_mask is not None and self._flattened_mask[tree_z, tree_x]:
                             continue
 
                         height = self.heightmap.get(tree_x, tree_z)
@@ -810,6 +820,10 @@ class Terrain(Object3D):
                 if self._water_mask is not None and self._water_mask[z, x]:
                     continue
                 if self._beach_mask is not None and self._beach_mask[z, x]:
+                    continue
+
+                # Skip flattened areas (reserved for structures)
+                if self._flattened_mask is not None and self._flattened_mask[z, x]:
                     continue
 
                 noise_val = flower_noise.noise2d(x / 5.0, z / 5.0)
@@ -868,6 +882,20 @@ class Terrain(Object3D):
             self.heightmap.generate()
 
         self.heightmap.flatten_area(x, z, width, depth, target_height, falloff)
+
+        # Mark the flattened area (no decorations should spawn here)
+        if self._flattened_mask is None:
+            self._flattened_mask = np.zeros(
+                (self.config.depth, self.config.width), dtype=bool
+            )
+
+        # Mark the core flattened area (excluding falloff which blends with terrain)
+        x_start = max(0, x)
+        x_end = min(self.config.width, x + width)
+        z_start = max(0, z)
+        z_end = min(self.config.depth, z + depth)
+        self._flattened_mask[z_start:z_end, x_start:x_end] = True
+
         return self
 
     def add_mountain(

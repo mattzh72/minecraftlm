@@ -35,3 +35,4 @@ Creativity and counting. A 6-wheel car requires creative interpretation (truck? 
 | Date | Model | Result | Notes |
 |------|-------|--------|-------|
 | 2025-12-15 | gemini-3-pro-preview | Partial | Good shape, 6 wheels, windows. Wheels are single blocks, no mirrors |
+| 2025-12-17 | gemini-3-pro-preview | Pass | Truck with 6 multi-block wheels, windshield, headlights, taillight, antenna, symmetric design |

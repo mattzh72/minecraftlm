@@ -5,7 +5,7 @@
 
 ## Prompt
 
-> Design the most detailed 747 airplane you possibly can. Make it HIGH FIDELITY. I'm expecting over 50+ components that comprise of this airplane spanning over 1000 blocks. Make sure everything connects, and the plane looks like a plane.
+> Build me a 747 airplane.
 
 ## Tests
 
@@ -35,3 +35,4 @@ Complex vehicle with many interconnected parts. All components (fuselage, wings,
 | Date | Model | Result | Notes |
 |------|-------|--------|-------|
 | 2025-12-15 | gemini-3-pro-preview | Fail | Wheels disconnected, nose cone artifacts |
+| 2025-12-17 | gemini-3-pro-preview | Pass | Engines on wings, tail with red stripe detail, windows along fuselage |

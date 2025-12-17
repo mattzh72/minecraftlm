@@ -43,3 +43,4 @@ Exact counting (10 flags) and pentagon geometry. Turn 2 tests static renderer aw
 | Date | Model | Result | Notes |
 |------|-------|--------|-------|
 | 2025-12-15 | gemini-3-pro-preview | T1: Pass, T2: Fail | Correct pentagon + 10 flags. Only 1 water block |
+| 2025-12-17 | gemini-3-pro-preview | T1: Pass, T2: Partial | Pentagon with flags, good terrain/landscaping. Waterfall has pool but lacks visible flow down cliff |

@@ -35,4 +35,4 @@ Baseline creativity. Windmills have distinctive features (blades, tower). Tests 
 
 | Date | Model | Result | Notes |
 |------|-------|--------|-------|
-| | | | |
+| 2025-12-17 | gemini-3-pro-preview | Pass | Tower with stone base and wooden cap, 4 shaped blades with frames, balcony, on hill with extended terrain, lanterns, flowers, trees |

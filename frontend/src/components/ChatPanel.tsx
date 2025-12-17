@@ -1,29 +1,27 @@
 import {
-  Check,
-  X,
-  Pencil,
-  CircleCheck,
-  Wrench,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
-import { Streamdown } from "streamdown";
-import { cn } from "@/lib/utils";
-import {
   Collapsible,
-  CollapsibleTrigger,
   CollapsiblePanel,
+  CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useChat } from "@/hooks/use-chat";
-import { PromptBox } from "./PromptBox.tsx";
-import { AgentScroller } from "./AgentScroller";
-import { ThinkingIndicator, ThoughtDisplay } from "./ActivityRenderer";
-import { getToolCallLabel } from "@/lib/formatConversation";
-import type { ToolCallWithResult } from "@/lib/schemas";
-import { useStore } from "@/store/index.ts";
-import { formatConversationToUIMessages } from "@/lib/formatConversation";
-import { useMemo } from "react";
 import { useResizable } from "@/hooks/useResizable";
+import { formatConversationToUIMessages, getToolCallLabel } from "@/lib/formatConversation";
+import type { ToolCallWithResult } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
+import { useStore } from "@/store/index.ts";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Pencil,
+  Wrench,
+  X
+} from "lucide-react";
+import { useMemo } from "react";
+import { Streamdown } from "streamdown";
+import { ThinkingIndicator, ThoughtDisplay } from "./ActivityRenderer";
+import { AgentScroller } from "./AgentScroller";
+import { PromptBox } from "./PromptBox.tsx";
 
 type UserMessageProps = {
   content: string;
