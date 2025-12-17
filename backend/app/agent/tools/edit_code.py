@@ -132,31 +132,51 @@ class EditCodeTool(BaseDeclarativeTool):
         schema = make_tool_schema(
             name="edit_code",
             description=(
-                "Make a precise edit to the SDK code by replacing old_string with new_string. "
-                "The old_string must match exactly (including whitespace and indentation). "
+                "Edit the SDK code by replacing old_string with new_string.\n\n"
+                "After every edit, the code is automatically compiled and executed. You will receive "
+                "immediate feedback on whether the code is valid or contains errors.\n\n"
+                "Matching behavior:\n"
+                "- old_string must match EXACTLY, including whitespace, indentation, and newlines\n"
+                "- By default, old_string must appear exactly once in the file\n"
+                "- If old_string appears multiple times, you must either provide more context to make it unique, "
+                "or set replace_all=true\n\n"
+                "Response format:\n"
+                "On success, you receive:\n"
+                "- output: 'Code edited successfully' (or 'replaced N occurrences' if replace_all=true)\n"
+                "- compilation.status: 'success' or 'error'\n"
+                "- compilation.block_count: number of blocks in the structure (if valid)\n"
+                "- compilation.bounding_box: {min: [x,y,z], max: [x,y,z]} (if valid)\n"
+                "- compilation.error: error message with line number (if invalid)\n\n"
+                "Possible errors:\n"
+                "- 'Could not find the old_string in the code' - old_string doesn't match exactly\n"
+                "- 'The old_string appears N times' - need longer context or replace_all=true\n"
+                "- 'old_string cannot be empty' - must provide text to replace\n"
+                "- compilation.error contains syntax/runtime errors with line numbers"
             ),
             parameters={
                 "old_string": {
                     "type": "string",
                     "description": (
-                        "The exact string to replace. Must match exactly including all whitespace. "
-                        "By default, must be unique (appear only once in the file) unless replace_all is true."
+                        "The exact string to find and replace. Must match exactly including whitespace, "
+                        "indentation, and newlines. Cannot be empty. Must be unique unless replace_all=true."
                     ),
                 },
                 "new_string": {
                     "type": "string",
-                    "description": "The new string to replace it with",
+                    "description": (
+                        "The replacement string. Can be empty to delete the old_string. "
+                        "Must have valid Python syntax and proper indentation."
+                    ),
                 },
                 "replace_all": {
                     "type": "boolean",
                     "description": (
-                        "If true, replace all occurrences of old_string. "
-                        "If false (default), old_string must be unique. "
-                        "Use this for renaming variables/functions across the file."
+                        "If false (default), old_string must appear exactly once. "
+                        "If true, replaces all occurrences. Use for renaming variables or functions."
                     ),
                 },
             },
-            required=["old_string", "new_string"],
+            required=["old_string", "new_string", "replace_all"],
         )
         super().__init__("edit_code", schema)
 
