@@ -69,6 +69,7 @@ export type StoreActions = {
     structureData: Record<string, unknown>
   ) => void;
   addSession: (session: StoreSession) => void;
+  removeSession: (sessionId: string) => void;
 
   setSelectedModelId: (id: string | null) => void;
   setModels: (models: Model[]) => void;
@@ -348,6 +349,11 @@ export const useStore = create<StoreState>()((set, get) => ({
   addSession: (session: StoreSession) => {
     console.log(`addSession`, { session });
     set({ sessions: { ...get().sessions, [session.session_id]: session } });
+  },
+
+  removeSession: (sessionId: string) => {
+    const { [sessionId]: _, ...remainingSessions } = get().sessions;
+    set({ sessions: remainingSessions });
   },
 
   addStructureData: (
