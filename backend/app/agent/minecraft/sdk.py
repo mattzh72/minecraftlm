@@ -276,18 +276,6 @@ class Block(Object3D):
         )
         self.fill: bool = bool(fill)
 
-    def set_properties(self, properties: Dict[str, str]) -> "Block":
-        self.properties = self._catalog.assert_properties(
-            self.block_id, dict(properties)
-        )
-        return self
-
-    def merge_properties(self, extra: Dict[str, str]) -> "Block":
-        merged = dict(self.properties)
-        merged.update(extra)
-        self.properties = self._catalog.assert_properties(self.block_id, merged)
-        return self
-
     def clone(self, deep: bool = True) -> "Block":
         new_block = Block(
             self.block_id,
@@ -322,19 +310,10 @@ class Block(Object3D):
         self.fill = False
         return self
 
-    def facing(self, direction: str) -> "Block":
-        """Set facing direction (north/south/east/west). Returns self for chaining."""
-        self.merge_properties({"facing": direction})
-        return self
-
     def tap(self, fn: Callable[["Block"], None]) -> "Block":
         """Execute a side-effect function and return self for chaining."""
         fn(self)
         return self
-
-    def with_properties(self, properties: Dict[str, str]) -> "Block":
-        """Merge properties and return self for chaining. Alias for merge_properties."""
-        return self.merge_properties(properties)
 
 
 class Scene(Object3D):
@@ -440,82 +419,3 @@ class Scene(Object3D):
             "depth": int(depth),
             "blocks": blocks,
         }
-
-
-# --- Orientation helpers (block-state aware) ---
-
-_CARDINALS: Tuple[str, ...] = ("north", "east", "south", "west")
-
-
-def facing_from_vector(x: float, z: float) -> str:
-    """
-    Compute the dominant horizontal facing from a vector (ignores Y).
-
-    Args:
-        x: X component (east-west).
-        z: Z component (south-north).
-    """
-    if abs(x) >= abs(z):
-        return "east" if x >= 0 else "west"
-    return "south" if z >= 0 else "north"
-
-
-def stair_properties(
-    *,
-    facing: str = "north",
-    upside_down: bool = False,
-    shape: str = "straight",
-) -> Dict[str, str]:
-    """
-    Helper for stair block states: facing + half + shape.
-
-    - facing: one of ``"north" | "south" | "east" | "west"``
-    - upside_down: if True, uses ``half="top"``; otherwise ``half="bottom"``
-    - shape: one of ``"straight" | "inner_left" | "inner_right"
-      | "outer_left" | "outer_right"``
-    """
-    if facing not in _CARDINALS:
-        raise ValueError(f'Invalid stair facing "{facing}"')
-    return {
-        "facing": facing,
-        "half": "top" if upside_down else "bottom",
-        "shape": shape,
-    }
-
-
-def axis_properties(axis: str = "y") -> Dict[str, str]:
-    """
-    Helper for logs/pillars: set axis based on orientation.
-
-    - axis: one of ``"x" | "y" | "z"``
-    """
-    if axis not in ("x", "y", "z"):
-        raise ValueError(f'Invalid axis "{axis}"')
-    return {"axis": axis}
-
-
-def slab_properties(*, top: bool = False, double: bool = False) -> Dict[str, str]:
-    """
-    Helper for slabs: choose placement type.
-
-    - bottom slab: ``slab_properties()``
-    - top slab: ``slab_properties(top=True)``
-    - double slab: ``slab_properties(double=True)``
-    """
-    slab_type = "double" if double else "top" if top else "bottom"
-    return {"type": slab_type}
-
-
-def make_stair(
-    block_id: str,
-    *,
-    direction: str = "north",
-    upside_down: bool = False,
-    catalog: Optional[BlockCatalog] = None,
-) -> Block:
-    """Quick factory for a single-block stair with orientation helpers."""
-    props = stair_properties(facing=direction, upside_down=upside_down)
-    return Block(block_id, properties=props, catalog=catalog)
-
-
-# --- Composition helpers ---
