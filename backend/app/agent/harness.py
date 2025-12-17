@@ -16,6 +16,7 @@ from app.agent.llms import (
     GeminiService,
     OpenAIService,
 )
+from app.agent.llms.base import ThinkingLevel
 from app.agent.tools.base import ToolResult
 from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
@@ -89,9 +90,16 @@ class MinecraftSchematicAgent:
             providers["anthropic"] = AnthropicService
         return providers
 
-    def __init__(self, session_id: str, model: str | None = None, max_turns: int = 20):
+    def __init__(
+        self,
+        session_id: str,
+        model: str | None = None,
+        thinking_level: ThinkingLevel = "med",
+        max_turns: int = 20,
+    ):
         self.session_id = session_id
         self.max_turns = max_turns
+        self.thinking_level = thinking_level
 
         # Use provided model or fall back to config
         self.model = model or settings.llm_model
@@ -105,8 +113,8 @@ class MinecraftSchematicAgent:
                 f"Available: {list(self._providers.keys())}"
             )
 
-        # Initialize LLM service
-        self.llm = self._providers[provider](self.model)
+        # Initialize LLM service with thinking level
+        self.llm = self._providers[provider](self.model, self.thinking_level)
 
         self.session_service = SessionService()
 

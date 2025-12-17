@@ -100,6 +100,7 @@ export const sessionDetailsResponseSchema = z.object({
   session_id: z.string(),
   conversation: rawConversationSchema,
   structure: structureDataSchema,
+  model: z.string().nullish(),
 });
 
 export const storeSessionSchema = sessionLiteSchema.extend({
@@ -113,6 +114,9 @@ export const modelSchema = z.object({
   id: z.string(),
   provider: providerSchema,
 });
+
+export const thinkingLevelSchema = z.enum(["low", "med", "high"]);
+export type ThinkingLevel = z.infer<typeof thinkingLevelSchema>;
 
 export const modelsResponseSchema = z.object({
   models: z.array(modelSchema),

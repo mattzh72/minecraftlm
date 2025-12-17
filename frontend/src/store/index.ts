@@ -4,6 +4,7 @@ import type {
   Model,
   ToolCall,
   RawAssistantMessage,
+  ThinkingLevel,
 } from "@/lib/schemas";
 import type { TimeOfDay } from "@/config";
 
@@ -40,6 +41,9 @@ export type StoreStateBase = {
   models: Model[];
   selectedModelId: string | null;
 
+  // thinking level state
+  selectedThinkingLevel: ThinkingLevel;
+
   error: string | null;
 };
 
@@ -65,9 +69,12 @@ export type StoreActions = {
     structureData: Record<string, unknown>
   ) => void;
   addSession: (session: StoreSession) => void;
+  removeSession: (sessionId: string) => void;
 
   setSelectedModelId: (id: string | null) => void;
   setModels: (models: Model[]) => void;
+
+  setSelectedThinkingLevel: (level: ThinkingLevel) => void;
 
   addAssistantMessage: (sessionId: string, message: string) => void;
   addStreamDelta: (sessionId: string, delta: string) => void;
@@ -329,17 +336,24 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
   models: [],
   selectedModelId: null,
+  selectedThinkingLevel: "med",
   selectedModel: () => {
     const selectedModelId = get().selectedModelId;
     return get().models.find((m) => m.id === selectedModelId) || null;
   },
   setSelectedModelId: (id: string | null) => set({ selectedModelId: id }),
   setModels: (models: Model[]) => set({ models }),
+  setSelectedThinkingLevel: (level) => set({ selectedThinkingLevel: level }),
   clearSelectedModelId: () => set({ selectedModelId: null }),
 
   addSession: (session: StoreSession) => {
     console.log(`addSession`, { session });
     set({ sessions: { ...get().sessions, [session.session_id]: session } });
+  },
+
+  removeSession: (sessionId: string) => {
+    const { [sessionId]: _, ...remainingSessions } = get().sessions;
+    set({ sessions: remainingSessions });
   },
 
   addStructureData: (

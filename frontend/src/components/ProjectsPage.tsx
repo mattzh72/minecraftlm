@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/store";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FiTrash2 } from "react-icons/fi";
 import { PromptBox } from "./PromptBox";
 import { SuggestionButtons } from "./SuggestionButton.tsx";
 import ThumbnailViewer from "./ThumbnailViewer";
@@ -13,6 +14,7 @@ export function ProjectsPage() {
   const { createSession } = useSession();
   const addSessions = useStore((s) => s.addSessions);
   const addStructureData = useStore((s) => s.addStructureData);
+  const removeSession = useStore((s) => s.removeSession);
   const sessions = useStore((s) => s.sessions);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -21,7 +23,10 @@ export function ProjectsPage() {
   // Fetch all sessions on mount
   useEffect(() => {
     fetch("/api/sessions")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         const result = listSessionsResponseSchema.parse(data);
         const sessions = result.sessions;
@@ -70,6 +75,22 @@ export function ProjectsPage() {
   // Navigate to an existing session
   const handleSelectSession = (sessionId: string) => {
     navigate(`/session/${sessionId}`);
+  };
+
+  // Delete a session
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation(); // Prevent triggering the card click
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to delete session: ${response.status}`);
+      }
+      removeSession(sessionId);
+    } catch (error) {
+      console.error("Error deleting session:", error);
+    }
   };
 
   const formatRelativeTime = (isoString: string) => {
@@ -184,6 +205,22 @@ export function ProjectsPage() {
 
                   {/* Gradient overlay for text readability */}
                   <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/50 via-black/20 to-transparent pointer-events-none" />
+
+                  {/* Delete button - visible on hover */}
+                  <button
+                    onClick={(e) => handleDeleteSession(e, session.session_id)}
+                    className={cn(
+                      "absolute top-3 left-3 p-2 rounded-full",
+                      "bg-black/50 backdrop-blur-sm",
+                      "text-white/60 hover:text-red-400 hover:bg-black/70",
+                      "opacity-0 group-hover:opacity-100",
+                      "transition-all duration-200",
+                      "z-10"
+                    )}
+                    aria-label="Delete project"
+                  >
+                    <FiTrash2 size={14} />
+                  </button>
 
                   {/* Metadata overlay */}
                   <div className="absolute top-0 right-0 p-3 text-white">
