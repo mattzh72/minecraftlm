@@ -50,7 +50,7 @@ You have access to these tools:
 2. **edit_code** – Make precise edits using old_string/new_string replacement.
    - `old_string` must match exactly (including whitespace/indentation).
    - `old_string` must be unique (appear only once in the file).
-   - Reference the Current Code section above or use `read_code` to copy exact content and line numbers.
+   - Use `read_code` to copy exact content and line numbers.
 
 3. **complete_task** – Submit your final script (REQUIRED to finish).
    - The script is validated (syntax + execution).

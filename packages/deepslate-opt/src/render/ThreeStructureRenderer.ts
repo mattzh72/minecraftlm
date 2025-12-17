@@ -854,7 +854,11 @@ export class ThreeStructureRenderer {
 				}
 
 				vec3 calcEmissiveLighting(vec3 worldPos, vec3 normal) {
-					vec3 totalLight = vec3(0.0);
+					// Minecraft-style behavior: multiple nearby light sources shouldn't linearly "stack" to infinity.
+					// We approximate this by taking the brightest emissive contribution per-fragment instead of summing,
+					// which prevents clustered emissive blocks from blowing out the scene.
+					vec3 bestLight = vec3(0.0);
+					float bestLum = 0.0;
 
 					for (int i = 0; i < MAX_EMISSIVE_LIGHTS; i++) {
 						if (i >= numEmissiveLights) break;
@@ -880,10 +884,15 @@ export class ThreeStructureRenderer {
 
 						// Apply tint and global intensity
 						vec3 tintedColor = lightColor * emissiveTint;
-						totalLight += tintedColor * intensity * attenuation * wrappedNdl * emissiveGlobalIntensity;
+						vec3 contrib = tintedColor * intensity * attenuation * wrappedNdl * emissiveGlobalIntensity;
+						float lum = dot(contrib, vec3(0.2126, 0.7152, 0.0722));
+						if (lum > bestLum) {
+							bestLum = lum;
+							bestLight = contrib;
+						}
 					}
 
-					return totalLight;
+					return bestLight;
 				}
 
 				void main(void) {
@@ -1001,16 +1010,95 @@ export class ThreeStructureRenderer {
 	}
 
 	public setSunlight(sunlight?: SunlightOptions) {
-		const merged: SunlightOptions = {
-			...this.sunlight,
-			...(sunlight ?? {}),
-			direction: sunlight?.direction ?? this.sunlight.direction,
-		}
-		this.sunlight = buildSunlightSettings(merged)
+		// Treat the provided options as the new "source of truth" (with DEFAULT_SUNLIGHT as fallback),
+		// not as a patch on top of the previous sunlight. Otherwise, fields that are absent in a preset
+		// (e.g. `emissive` for day/sunset) can unintentionally persist from the previous preset.
+		this.sunlight = buildSunlightSettings(sunlight)
+
+		this.syncShadowResources()
+		this.syncPostProcessingResources()
+
 		this.applySunlightUniforms(this.opaqueMaterial)
 		this.applySunlightUniforms(this.transparentMaterial)
 		this.applySkyUniforms()
 		this.applySunDiscUniforms()
+		this.applyPostProcessUniforms()
+	}
+
+	private syncShadowResources() {
+		if (this.sunlight.shadow.enabled) {
+			const size = this.sunlight.shadow.mapSize
+			if (!this.shadowMap || this.shadowMap.width !== size || this.shadowMap.height !== size) {
+				this.shadowMap?.dispose()
+				this.shadowMap = null
+				this.initShadowMap()
+			}
+			return
+		}
+
+		this.shadowMap?.dispose()
+		this.shadowMap = null
+	}
+
+	private syncPostProcessingResources() {
+		if (!this.sunlight.postProcess.enabled) return
+
+		// Initialize post-processing lazily in case the renderer started with post-processing disabled.
+		if (this.sceneTarget && this.postProcessQuad && this.ssaoMaterial && this.bloomBrightMaterial && this.bloomBlurMaterial && this.godRaysMaterial && this.compositeMaterial) {
+			return
+		}
+
+		// Clean up any partially-initialized resources before re-creating.
+		this.sceneTarget?.dispose()
+		this.depthTarget?.dispose()
+		this.bloomBrightTarget?.dispose()
+		this.bloomBlurTarget1?.dispose()
+		this.bloomBlurTarget2?.dispose()
+		this.godRaysTarget?.dispose()
+		this.aoTarget?.dispose()
+		this.postProcessQuad?.geometry.dispose()
+		this.ssaoMaterial?.dispose()
+		this.bloomBrightMaterial?.dispose()
+		this.bloomBlurMaterial?.dispose()
+		this.godRaysMaterial?.dispose()
+		this.compositeMaterial?.dispose()
+
+		this.sceneTarget = null
+		this.depthTarget = null
+		this.bloomBrightTarget = null
+		this.bloomBlurTarget1 = null
+		this.bloomBlurTarget2 = null
+		this.godRaysTarget = null
+		this.aoTarget = null
+		this.postProcessQuad = null
+		this.ssaoMaterial = null
+		this.bloomBrightMaterial = null
+		this.bloomBlurMaterial = null
+		this.godRaysMaterial = null
+		this.compositeMaterial = null
+
+		const size = this.renderer.getSize(new THREE.Vector2())
+		this.initPostProcessing(Math.max(1, size.x), Math.max(1, size.y))
+	}
+
+	private applyPostProcessUniforms() {
+		const pp = this.sunlight.postProcess
+
+		const ssaoUniforms = this.ssaoMaterial?.uniforms
+		if (ssaoUniforms?.aoRadius) ssaoUniforms.aoRadius.value = pp.ao.radius
+		if (ssaoUniforms?.aoIntensity) ssaoUniforms.aoIntensity.value = pp.ao.intensity
+
+		const bloomBrightUniforms = this.bloomBrightMaterial?.uniforms
+		if (bloomBrightUniforms?.threshold) bloomBrightUniforms.threshold.value = pp.bloom.threshold
+
+		const compositeUniforms = this.compositeMaterial?.uniforms
+		if (compositeUniforms?.bloomIntensity) compositeUniforms.bloomIntensity.value = pp.bloom.intensity
+
+		const godRaysUniforms = this.godRaysMaterial?.uniforms
+		if (godRaysUniforms?.intensity) godRaysUniforms.intensity.value = pp.godRays.intensity
+		if (godRaysUniforms?.decay) godRaysUniforms.decay.value = pp.godRays.decay
+		if (godRaysUniforms?.density) godRaysUniforms.density.value = pp.godRays.density
+		if (godRaysUniforms?.numSamples) godRaysUniforms.numSamples.value = pp.godRays.samples
 	}
 
 	private applySunDiscUniforms() {
@@ -1098,6 +1186,17 @@ export class ThreeStructureRenderer {
 		if (uniforms.exposure) uniforms.exposure.value = this.sunlight.exposure
 		if (uniforms.fogDensity) uniforms.fogDensity.value = this.sunlight.fog.density
 		if (uniforms.fogHeightFalloff) uniforms.fogHeightFalloff.value = this.sunlight.fog.heightFalloff
+
+		// Shadow settings
+		if (uniforms.shadowEnabled) uniforms.shadowEnabled.value = this.sunlight.shadow.enabled
+		if (uniforms.shadowBias) uniforms.shadowBias.value = this.sunlight.shadow.bias
+		if (uniforms.shadowNormalBias) uniforms.shadowNormalBias.value = this.sunlight.shadow.normalBias
+		if (uniforms.shadowIntensity) uniforms.shadowIntensity.value = this.sunlight.shadow.intensity
+		if (uniforms.shadowSoftness) uniforms.shadowSoftness.value = this.sunlight.shadow.softness
+		if (uniforms.shadowMapSize?.value instanceof THREE.Vector2) {
+			uniforms.shadowMapSize.value.set(this.sunlight.shadow.mapSize, this.sunlight.shadow.mapSize)
+		}
+		if (uniforms.shadowMap) uniforms.shadowMap.value = this.shadowMap?.texture ?? null
 
 		// Emissive settings
 		if (uniforms.emissiveRange) uniforms.emissiveRange.value = this.sunlight.emissive.range
