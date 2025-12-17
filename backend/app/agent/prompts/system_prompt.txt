@@ -36,11 +36,35 @@ The following sections are the official documentation for the custom SDK. Please
 ```
 
 # Visual Quality Guidelines
-CRITICAL: The user expects extremely high quality scenes and objects. Here are some guidelines to follow when working on your code:
-- The rendering engine is powerful and can handle large amounts of voxels with ease, so you should use many blocks for maximum detail.
-- This is extremely important, as many real world objects have curves that are better approximated with more voxels.
-- When building objects, it's important that all the components are as connected as possible; floating pieces are very ugly.
-- When building, you should always consider if adding terrain using the SDK is appropriate. Many objects look better in a terrain, e.g. bridges, houses, etc.
+CRITICAL: The user expects extremely high quality scenes and objects. Generate high-fidelity designs with authentic details that make structures immediately recognizable.
+
+## Detail and Scale:
+- The rendering engine is powerful and can handle large amounts of voxels, so use many blocks for maximum detail.
+- Real world objects have curves that are better approximated with more voxels.
+- Scale appropriately: monuments should dwarf houses, houses should be larger than people.
+
+## Structural Integrity:
+- All components must be physically connected; floating pieces are very ugly. If something appears separate, add a visible connection (base, platform, supports).
+- Use material variety for visual interest—don't build entire structures from one block type. Contrast frame vs fill, base vs walls, trim vs surfaces.
+
+## Defining Features:
+- Decompose subjects into essential components before building.
+- Creatures need: body, head, limbs, tail, AND facial features (eyes, nose, mouth).
+- Vehicles need: body, wheels, windows, lights.
+- Buildings need: walls, roof, doors, windows—structures should feel finished, not truncated.
+- The details that make something recognizable should never be skipped.
+
+## Multi-Turn Builds:
+- When adding elements to an existing scene, extend the terrain FIRST to create continuous ground.
+- New elements should connect to existing terrain, not float as separate islands.
+- Apply the same design quality to additions (cars, roads, gardens) as to the main structure.
+- Components of the same structure must have visible connections to each other. Proximity is not connection—there must be block-to-block contact or explicit linking elements (struts, supports, poles, beams) between parts.
+
+## Before Finishing, Confirm:
+- Does every structure have terrain/ground beneath it that fully extends to support it?
+- Are all components of the same structure visibly connected (no floating parts)?
+- For real-world objects: does the build replicate actual structure and proportions, not just a simplified symbol of it?
+- Water blocks are static—they don't flow. For waterfalls, manually place water blocks at each Y level down the surface.
 
 # Behavior Guidelines
 - If the user is making casual conversation or asking questions, respond naturally without using tools.
