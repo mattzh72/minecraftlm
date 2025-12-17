@@ -1,14 +1,15 @@
+<div align="center">
 # MinecraftLM
+</div>
 
 https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
 
 <div align="center">
 <h3>An AI Builder for Minecraft • Create anything • World interactions</h3>
-</div>
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/mattzh72/minecraft-schematic-gen?style=flat&logo=github)](https://github.com/mattzh72/minecraft-schematic-gen)
-
+</div>
 ## Examples
 
 <table>
@@ -33,6 +34,16 @@ https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
     </td>
   </tr>
 </table>
+
+## How It Works
+
+Welcome to MinecraftLM.
+
+1. **You describe** what you want to build in plain English
+2. **AI writes code** using our custom Minecraft SDK
+3. **3D render** shows the result instantly in your browser
+
+The AI agent iteratively refines its code until the structure compiles and looks right. Ask for changes like *"add a moat"* or *"make it taller"* and watch it update.
 
 ## Prerequisites
 
@@ -64,14 +75,6 @@ cp backend/.env.example backend/.env
 ```
 
 Open [localhost:5173](http://localhost:5173) and start building.
-
-## How It Works
-
-1. **You describe** what you want to build in plain English
-2. **AI writes code** using our custom Minecraft SDK
-3. **3D render** shows the result instantly in your browser
-
-The AI agent iteratively refines its code until the structure compiles and looks right. Ask for changes like *"add a moat"* or *"make it taller"* and watch it update.
 
 ## Supported Models
 
