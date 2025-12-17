@@ -4,8 +4,8 @@ Tests for tool registry
 
 import pytest
 
-from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
+from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
 
 
@@ -13,8 +13,8 @@ from app.agent.tools.registry import ToolRegistry
 def registry():
     """Create a tool registry with standard tools"""
     tools = [
+        ReadCodeTool(),
         EditCodeTool(),
-        CompleteTaskTool(),
     ]
     return ToolRegistry(tools)
 
@@ -22,8 +22,8 @@ def registry():
 def test_registry_initialization(registry):
     """Test that registry initializes with tools"""
     assert len(registry.tools) == 2
+    assert "read_code" in registry.tools
     assert "edit_code" in registry.tools
-    assert "complete_task" in registry.tools
 
 
 def test_get_tool(registry):
@@ -43,8 +43,8 @@ def test_get_all_tool_names(registry):
     """Test getting all tool names"""
     names = registry.get_all_tool_names()
     assert len(names) == 2
+    assert "read_code" in names
     assert "edit_code" in names
-    assert "complete_task" in names
 
 
 def test_get_tool_schemas(registry):

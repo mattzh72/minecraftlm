@@ -67,10 +67,9 @@ async def chat(request: ChatRequest):
 
     The agent will:
     1. Use read_code to see current SDK code
-    2. Use edit_code to iteratively improve the code
-    3. Call complete_task when done (automatic validation)
-    4. Continue fixing if validation fails
-    5. Stop when validation passes
+    2. Use edit_code to iteratively improve the code (automatic validation after each edit)
+    3. Continue fixing if validation fails
+    4. When done, respond with a completion message
 
     The agent runs as a background task. Use GET /sessions/{session_id}/stream
     to subscribe to the event stream.

@@ -90,11 +90,11 @@ def assistant_with_multiple_tool_calls():
                 "extra_content": {},
             },
             {
-                "id": "call_complete1",
+                "id": "call_edit2",
                 "type": "function",
                 "function": {
-                    "name": "complete_task",
-                    "arguments": json.dumps({"message": "Done!"}),
+                    "name": "read_code",
+                    "arguments": json.dumps({}),
                 },
                 "thought_signature": None,
                 "extra_content": {},
@@ -225,7 +225,7 @@ class TestAnthropicMessageConversion:
 
         # Check tool call details
         assert content[2]["name"] == "edit_code"
-        assert content[3]["name"] == "complete_task"
+        assert content[3]["name"] == "read_code"
 
     def test_convert_full_conversation(self, service, full_conversation):
         """Full conversation should maintain correct structure"""

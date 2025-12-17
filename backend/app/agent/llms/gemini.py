@@ -14,11 +14,18 @@ from google.genai.types import Content, FunctionCall, FunctionDeclaration, Part
 from app.agent.llms.base import BaseLLMService, StreamChunk, ThinkingLevel
 from app.config import settings
 
-# Thinking budget mapping for Gemini
+# Thinking budget mapping for Gemini 2.5 series models
 GEMINI_THINKING_BUDGETS = {
     "low": 1024,
     "med": 8192,
     "high": 24576,
+}
+
+# Thinking level mapping for Gemini 3+ models
+GEMINI_THINKING_LEVELS = {
+    "low": "low",
+    "med": "high",  # Map medium to high for Gemini 3+
+    "high": "high",
 }
 
 
@@ -34,6 +41,14 @@ class GeminiService(BaseLLMService):
         clean_model_id = model_id.removeprefix("gemini/")
         super().__init__(clean_model_id, thinking_level)
         self.client = genai.Client(api_key=settings.gemini_api_key)
+
+    def _is_gemini_3_or_later(self) -> bool:
+        """Check if the model is Gemini 3 or later (supports thinkingLevel)."""
+        # Gemini 3 models have "3" in their name (e.g., gemini-3-pro-preview)
+        # Gemini 2.5 models have "2.5" in their name (e.g., gemini-2.5-flash)
+        model_lower = self.model_id.lower()
+        # Check for Gemini 3+ models
+        return "gemini-3" in model_lower or "gemini3" in model_lower
 
     def _convert_tools(self, tools: list[dict]) -> list[FunctionDeclaration]:
         """Convert OpenAI-style tool specs into Gemini FunctionDeclarations."""
@@ -158,19 +173,30 @@ class GeminiService(BaseLLMService):
         tool_declarations = self._convert_tools(tools)
         contents = self._convert_messages(messages)
 
-        # Get thinking budget based on level
+        # Validate thinking level
         if self.thinking_level not in GEMINI_THINKING_BUDGETS:
             raise ValueError(f"Invalid thinking level: {self.thinking_level}")
+
+        # Build thinking config based on model version
+        if self._is_gemini_3_or_later():
+            # Gemini 3+ models use thinkingLevel parameter
+            thinking_config = types.ThinkingConfig(
+                include_thoughts=True,
+                thinking_level=GEMINI_THINKING_LEVELS[self.thinking_level],
+            )
+        else:
+            # Gemini 2.5 and earlier use thinkingBudget parameter
+            thinking_config = types.ThinkingConfig(
+                include_thoughts=True,
+                thinking_budget=GEMINI_THINKING_BUDGETS[self.thinking_level],
+            )
 
         config = types.GenerateContentConfig(
             system_instruction=system_prompt,
             tools=[types.Tool(function_declarations=tool_declarations)]
             if tool_declarations
             else None,
-            thinking_config=types.ThinkingConfig(
-                include_thoughts=True,
-                thinking_budget=GEMINI_THINKING_BUDGETS[self.thinking_level],
-            ),
+            thinking_config=thinking_config,
             temperature=1.0,
         )
 

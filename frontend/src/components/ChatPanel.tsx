@@ -119,9 +119,7 @@ function ToolCallWithResultDisplay({
   const IconComponent = !hasResult
     ? name === "edit_code"
       ? Pencil
-      : name === "complete_task"
-        ? CircleCheck
-        : Wrench
+      : Wrench
     : hasError
       ? X
       : Check;

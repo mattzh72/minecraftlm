@@ -24,7 +24,7 @@ export type StoreStateBase = {
   sessions: Record<string, StoreSession>;
   activeSessionId: string | null;
 
-  // thumbnail capture request (triggered on complete_task)
+  // thumbnail capture request (triggered on successful task completion)
   thumbnailCaptureRequest: { sessionId: string; nonce: number } | null;
 
   // renderer time of day
