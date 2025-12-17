@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 /**
- * Hook to capture and upload a thumbnail after a successful complete_task.
+ * Hook to capture and upload a thumbnail after successful task completion.
  */
 export default function useThumbnailCaptureOnComplete({
   thumbnailCaptureRequest,

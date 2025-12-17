@@ -47,7 +47,6 @@ export function useChat() {
       const decoder = new TextDecoder();
       let lineBuffer = "";
       let eventLines: string[] = [];
-      let sawCompleteTaskCall = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -80,9 +79,6 @@ export function useChat() {
                   break;
                 case "tool_call":
                   setAgentState("tool_calling");
-                  if (event.data.name === "complete_task") {
-                    sawCompleteTaskCall = true;
-                  }
                   addToolCall(sessionId, {
                     type: "function",
                     function: {
@@ -125,7 +121,7 @@ export function useChat() {
                   break;
                 case "complete":
                   setAgentState("idle");
-                  if (event.data.success && sawCompleteTaskCall) {
+                  if (event.data.success) {
                     try {
                       const structureRes = await fetch(
                         `/api/sessions/${sessionId}/structure`

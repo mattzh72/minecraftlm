@@ -128,10 +128,6 @@ export function getToolCallLabel(
     if (!hasResult) return "Editing code...";
     return hasError ? "Edit failed" : "Edited code";
   }
-  if (name === "complete_task") {
-    if (!hasResult) return "Validating...";
-    return hasError ? "Validation failed" : "Validated";
-  }
 
   // Generic fallback
   if (!hasResult) return `${name}...`;

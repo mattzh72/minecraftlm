@@ -87,7 +87,6 @@ async def test_agent_e2e_simple_structure():
 
     # Verify tools were used
     assert "edit_code" in tool_calls, "Agent should have edited code"
-    assert "complete_task" in tool_calls, "Agent should have called complete_task"
 
     # Verify code was written
     final_code = SessionService.load_code(session_id)

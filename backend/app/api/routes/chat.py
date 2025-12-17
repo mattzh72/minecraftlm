@@ -66,10 +66,9 @@ async def chat(request: ChatRequest):
 
     The agent will:
     1. Use read_code to see current SDK code
-    2. Use edit_code to iteratively improve the code
-    3. Call complete_task when done (automatic validation)
-    4. Continue fixing if validation fails
-    5. Stop when validation passes
+    2. Use edit_code to iteratively improve the code (automatic validation after each edit)
+    3. Continue fixing if validation fails
+    4. When done, respond with a completion message
 
     Streams activity events (thoughts, tool calls, results) back as SSE.
     Frontend can read the final code from storage/sessions/{session_id}/code.py

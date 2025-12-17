@@ -18,7 +18,6 @@ from app.agent.llms import (
 )
 from app.agent.llms.base import ThinkingLevel
 from app.agent.tools.base import ToolResult
-from app.agent.tools.complete_task import CompleteTaskTool
 from app.agent.tools.edit_code import EditCodeTool
 from app.agent.tools.read_code import ReadCodeTool
 from app.agent.tools.registry import ToolRegistry
@@ -119,7 +118,7 @@ class MinecraftSchematicAgent:
         self.session_service = SessionService()
 
         # Initialize tools
-        tools = [ReadCodeTool(), EditCodeTool(), CompleteTaskTool()]
+        tools = [ReadCodeTool(), EditCodeTool()]
         self.tool_registry = ToolRegistry(tools)
 
         # Load system prompt template and SDK docs
@@ -335,7 +334,6 @@ class MinecraftSchematicAgent:
                     return
 
             # Process function calls
-            task_completed = False
             serialized_responses = []
 
             for tool_call in tool_calls_list:
@@ -363,10 +361,6 @@ class MinecraftSchematicAgent:
                     result = await invocation.execute()
                     result.tool_call_id = tool_call.id
 
-                    # Check if this is complete_task
-                    if func_name == "complete_task" and result.is_success():
-                        task_completed = True
-
                 yield ActivityEvent(type="tool_result", data=result.to_dict())
 
                 # Build tool response (without tool_call_id in content, it's in the message itself)
@@ -389,15 +383,3 @@ class MinecraftSchematicAgent:
                 conversation.extend(serialized_responses)
                 self.session_service.save_conversation(self.session_id, conversation)
                 messages.extend(serialized_responses)
-
-            # If task completed successfully, stop
-            if task_completed:
-                yield ActivityEvent(
-                    type="complete",
-                    data={
-                        "success": True,
-                        "reason": TerminateReason.GOAL,
-                        "message": "Task completed successfully",
-                    },
-                )
-                return
