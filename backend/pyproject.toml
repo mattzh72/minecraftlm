@@ -14,7 +14,6 @@ dependencies = [
     "anthropic>=0.75.0",
     "openai>=1.0.0",
     "cachetools>=6.2.2",
-    "aiofiles>=25.1.0",
 ]
 
 [project.optional-dependencies]

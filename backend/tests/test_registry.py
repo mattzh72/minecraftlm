@@ -66,7 +66,7 @@ async def test_build_invocation(registry, temp_storage):
     """Test building a tool invocation"""
     from app.services.session import SessionService
 
-    session_id = SessionService.create_session()
+    session_id = await SessionService.create_session()
 
     invocation = await registry.build_invocation(
         "edit_code", {"session_id": session_id, "old_string": "x", "new_string": "y"}

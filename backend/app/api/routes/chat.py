@@ -50,15 +50,13 @@ async def run_agent_task(request: ChatRequest, buffer: SessionEventBuffer) -> No
     except FileNotFoundError:
         error_msg = f"Session {request.session_id} not found"
         logger.error("Session not found: %s", request.session_id)
-        buffer.append(_make_sse("error", {"message": error_msg}))
-        buffer.append(_make_sse("complete", {"success": False, "reason": error_msg}))
+        buffer.append(_make_sse("complete", {"success": False, "error": error_msg}))
         buffer.mark_complete(error=error_msg)
 
     except Exception as e:
         error_msg = str(e)
         logger.exception("Error while running agent for session %s", request.session_id)
-        buffer.append(_make_sse("error", {"message": f"Error: {error_msg}"}))
-        buffer.append(_make_sse("complete", {"success": False, "reason": error_msg}))
+        buffer.append(_make_sse("complete", {"success": False, "error": error_msg}))
         buffer.mark_complete(error=error_msg)
 
 

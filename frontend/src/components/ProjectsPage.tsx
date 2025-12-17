@@ -11,7 +11,7 @@ import ThumbnailViewer from "./ThumbnailViewer";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
-  const { createSession } = useSession();
+  const { createSession, clearActiveSession } = useSession();
   const addSessions = useStore((s) => s.addSessions);
   const addStructureData = useStore((s) => s.addStructureData);
   const removeSession = useStore((s) => s.removeSession);
@@ -19,6 +19,12 @@ export function ProjectsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const hasSessions = useStore((s) => Object.keys(s.sessions).length > 0);
+
+  // Clear active session when landing on projects page
+  // This handles browser back button and direct URL navigation
+  useEffect(() => {
+    clearActiveSession();
+  }, [clearActiveSession]);
 
   // Fetch all sessions on mount
   useEffect(() => {
@@ -64,7 +70,6 @@ export function ProjectsPage() {
     if (!message.trim() || isCreating) return;
     setIsCreating(true);
     const newSessionId = await createSession(message.trim());
-    console.log(`newSessionId`, newSessionId);
     setIsCreating(false);
 
     if (newSessionId) {

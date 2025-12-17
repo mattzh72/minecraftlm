@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useChat } from "@/hooks/use-chat";
 import { useSession } from "@/hooks/useSession";
 import { useStore } from "@/store";
 import { useEffect, useMemo, useState } from "react";
@@ -24,6 +25,7 @@ export function SessionPage() {
   const navigate = useNavigate();
   const activeSessionId = useStore((s) => s.activeSessionId);
   const { isLoading, restoreSession, clearActiveSession } = useSession();
+  const { cancelStream } = useChat();
   const urlSessionId = useSessionIdFromUrl();
 
   const [chatExpanded, setChatExpanded] = useState(true);
@@ -35,7 +37,12 @@ export function SessionPage() {
     if (urlSessionId && urlSessionId !== activeSessionId) {
       restoreSession(urlSessionId);
     }
-  }, [urlSessionId, activeSessionId, restoreSession]);
+
+    // Cleanup: cancel any active SSE stream when unmounting or switching sessions
+    return () => {
+      cancelStream();
+    };
+  }, [urlSessionId, activeSessionId, restoreSession, cancelStream]);
 
   const handleBackToProjects = () => {
     clearActiveSession();
@@ -50,7 +57,6 @@ export function SessionPage() {
   const structureData = useMemo(() => {
     return activeSession?.structure || null;
   }, [activeSession]);
-  console.log(`[SessionPage] structureData`, structureData);
 
   return (
     <div className="h-screen w-screen relative overflow-hidden">

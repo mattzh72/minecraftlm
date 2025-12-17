@@ -42,7 +42,6 @@ type AssistantMessageProps = {
   thought_summary: string;
   tool_calls: ToolCallWithResult[];
   isStreaming: boolean;
-  log: boolean;
 };
 
 function AssistantMessage({
@@ -50,7 +49,6 @@ function AssistantMessage({
   thought_summary,
   tool_calls,
   isStreaming = false,
-  log = false,
 }: AssistantMessageProps) {
   const hasContent = content && content.trim();
   const hasThought = thought_summary && thought_summary.trim();
@@ -58,15 +56,6 @@ function AssistantMessage({
 
   // Show thinking indicator when streaming with no content yet
   const showThinkingIndicator = isStreaming && !hasThought && !hasContent;
-
-  if (log) {
-    console.log({
-      hasContent,
-      hasThought,
-      hasToolCalls,
-      showThinkingIndicator,
-    });
-  }
 
   return (
     <div className="py-3 text-sm text-white/85 border-b border-white/10">
@@ -207,14 +196,12 @@ function MessageList() {
   const activeSession = useMemo(() => {
     return activeSessionId ? sessions[activeSessionId] : null;
   }, [activeSessionId, sessions]);
-  console.log(`[MessageList] activeSession`, activeSession);
   const messages = formatConversationToUIMessages(
     activeSession?.conversation ?? []
   );
   const agentState = useStore((s) => s.agentState);
   const isLoading = agentState !== "idle" && agentState !== "error";
   const error = useStore((s) => s.error);
-  console.log(`messageList`, { messages, agentState, isLoading, error, activeSession });
   return (
     <>
       {messages.map((msg, idx) => {
@@ -230,7 +217,6 @@ function MessageList() {
           return (
             <AssistantMessage
               key={messageKey}
-              log={isStreaming}
               content={msg.content}
               thought_summary={msg.thought_summary || ""}
               tool_calls={msg.tool_calls}

@@ -30,6 +30,7 @@ from app.models import (
     ToolMessage,
     UserMessage,
 )
+from app.services.event_buffer import get_buffer
 from app.services.session import SessionService
 
 # Event types emitted by the agent
@@ -167,6 +168,10 @@ class MinecraftSchematicAgent:
         # Add user message
         conversation.append(UserMessage(role="user", content=user_message).model_dump())
         await self.session_service.save_conversation(self.session_id, conversation)
+        # Clear buffer after disk save to prevent duplication on refresh
+        buffer = get_buffer(self.session_id)
+        if buffer:
+            buffer.clear()
 
         # Conversation is already in OpenAI format
         messages = list(conversation)
@@ -306,6 +311,10 @@ class MinecraftSchematicAgent:
             # Save assistant message
             conversation.append(assistant_message)
             await self.session_service.save_conversation(self.session_id, conversation)
+            # Clear buffer after disk save to prevent duplication on refresh
+            buffer = get_buffer(self.session_id)
+            if buffer:
+                buffer.clear()
             messages.append(assistant_message)
 
             # No function calls - agent responded with content only
@@ -388,6 +397,10 @@ class MinecraftSchematicAgent:
                 # Save tool responses
                 conversation.extend(serialized_responses)
                 await self.session_service.save_conversation(self.session_id, conversation)
+                # Clear buffer after disk save to prevent duplication on refresh
+                buffer = get_buffer(self.session_id)
+                if buffer:
+                    buffer.clear()
                 messages.extend(serialized_responses)
 
             # If task completed successfully, stop

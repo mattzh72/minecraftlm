@@ -26,7 +26,7 @@ async def test_edit_code_tool(session_with_code):
     assert "edited successfully" in result.output.lower()
 
     # Verify the change
-    updated_code = SessionService.load_code(session_with_code)
+    updated_code = await SessionService.load_code(session_with_code)
     assert '"minecraft:stone"' in updated_code
     assert '"minecraft:oak_planks"' not in updated_code
 
@@ -67,7 +67,7 @@ async def test_edit_code_non_unique_string(session_with_code):
 @pytest.mark.asyncio
 async def test_complete_task_valid_code(temp_storage):
     """Test completing task with valid code"""
-    session_id = SessionService.create_session()
+    session_id = await SessionService.create_session()
 
     valid_code = """
 x = 10
@@ -76,7 +76,7 @@ result = x + y
 print(result)
 structure = {"width": 1, "height": 1, "depth": 1, "blocks": []}
 """
-    SessionService.save_code(session_id, valid_code)
+    await SessionService.save_code(session_id, valid_code)
 
     tool = CompleteTaskTool()
     invocation = await tool.build({"session_id": session_id})
@@ -89,13 +89,13 @@ structure = {"width": 1, "height": 1, "depth": 1, "blocks": []}
 @pytest.mark.asyncio
 async def test_complete_task_invalid_syntax(temp_storage):
     """Test completing task with syntax errors"""
-    session_id = SessionService.create_session()
+    session_id = await SessionService.create_session()
 
     invalid_code = """
 def broken(
     print("syntax error")
 """
-    SessionService.save_code(session_id, invalid_code)
+    await SessionService.save_code(session_id, invalid_code)
 
     tool = CompleteTaskTool()
     invocation = await tool.build({"session_id": session_id})
@@ -109,12 +109,12 @@ def broken(
 @pytest.mark.asyncio
 async def test_complete_task_execution_error(temp_storage):
     """Test completing task with execution errors"""
-    session_id = SessionService.create_session()
+    session_id = await SessionService.create_session()
 
     error_code = """
 x = 10 / 0  # Division by zero
 """
-    SessionService.save_code(session_id, error_code)
+    await SessionService.save_code(session_id, error_code)
 
     tool = CompleteTaskTool()
     invocation = await tool.build({"session_id": session_id})
@@ -122,5 +122,3 @@ x = 10 / 0  # Division by zero
 
     assert not result.is_success()
     assert "validation failed" in result.error.lower()
-
-

@@ -39,7 +39,7 @@ async def test_agent_e2e_simple_structure():
         )
 
     # Create session (uses real storage)
-    session_id = SessionService.create_session()
+    session_id = await SessionService.create_session()
     print(f"\nCreated session: {session_id}")
 
     # Verify session files were created
@@ -90,11 +90,11 @@ async def test_agent_e2e_simple_structure():
     assert "complete_task" in tool_calls, "Agent should have called complete_task"
 
     # Verify code was written
-    final_code = SessionService.load_code(session_id)
+    final_code = await SessionService.load_code(session_id)
     print(f"\nFinal code:\n{final_code}")
 
     # Verify conversation was saved
-    conversation = SessionService.load_conversation(session_id)
+    conversation = await SessionService.load_conversation(session_id)
     assert len(conversation) >= 2
     assert conversation[0]["role"] == "user"
 

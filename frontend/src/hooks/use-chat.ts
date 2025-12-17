@@ -26,6 +26,14 @@ export function useChat() {
       sessionId: string,
       sawCompleteTaskCallRef: { current: boolean }
     ): Promise<boolean> => {
+      // Validate this event is for the current active session
+      // This prevents stale events from updating state after session switch
+      const currentActiveSession = useStore.getState().activeSessionId;
+      if (currentActiveSession !== sessionId) {
+        console.warn(`[processEvent] Ignoring event for stale session ${sessionId}, active is ${currentActiveSession}`);
+        return false; // Stop processing this stream
+      }
+
       switch (event.type) {
         case "turn_start":
           setAgentState("thinking");
@@ -84,30 +92,30 @@ export function useChat() {
           return true;
 
         case "complete":
-          setAgentState("idle");
-          if (event.data.success && sawCompleteTaskCallRef.current) {
-            try {
-              const structureRes = await fetch(
-                `/api/sessions/${sessionId}/structure`
-              );
-              if (structureRes.ok) {
-                const structureData = await structureRes.json();
-                addStructureData(sessionId, structureData);
-              } else if (structureRes.status !== 404) {
-                console.error("Error fetching structure:", structureRes.statusText);
+          if (event.data.success) {
+            setAgentState("idle");
+            if (sawCompleteTaskCallRef.current) {
+              try {
+                const structureRes = await fetch(
+                  `/api/sessions/${sessionId}/structure`
+                );
+                if (structureRes.ok) {
+                  const structureData = await structureRes.json();
+                  addStructureData(sessionId, structureData);
+                } else if (structureRes.status !== 404) {
+                  console.error("Error fetching structure:", structureRes.statusText);
+                }
+              } catch (err) {
+                console.error("Error fetching structure:", err);
+              } finally {
+                requestThumbnailCapture(sessionId);
               }
-            } catch (err) {
-              console.error("Error fetching structure:", err);
-            } finally {
-              requestThumbnailCapture(sessionId);
             }
+          } else {
+            console.error("Chat error:", event.data.error);
+            setAgentState("error");
           }
           return false; // Stream complete
-
-        case "error":
-          console.error("Chat error:", event.data.message);
-          setAgentState("error");
-          return false; // Stream complete on error
       }
     },
     [
@@ -127,7 +135,9 @@ export function useChat() {
    * Handles parsing and processing events until completion.
    */
   const subscribeToStream = useCallback(
-    async (sessionId: string, isResume: boolean = false) => {
+    async (sessionId: string, isResume: boolean = false, since: number = 0) => {
+      console.log(`[subscribeToStream] Starting subscription`, { sessionId, isResume, since });
+
       // Cancel any existing subscription
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -136,8 +146,13 @@ export function useChat() {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
+
       try {
-        const response = await fetch(`/api/sessions/${sessionId}/stream`, {
+        const url = since > 0
+          ? `/api/sessions/${sessionId}/stream?since=${since}`
+          : `/api/sessions/${sessionId}/stream`;
+
+        const response = await fetch(url, {
           signal: abortController.signal,
         });
 
@@ -168,12 +183,14 @@ export function useChat() {
               try {
                 const rawData = JSON.parse(dataStr);
                 const event = sseEvent.parse(rawData);
+                console.log(`[subscribeToStream] Received event:`, event.type, event.data);
                 const shouldContinue = await processEvent(
                   event,
                   sessionId,
                   sawCompleteTaskCallRef
                 );
                 if (!shouldContinue) {
+                  console.log(`[subscribeToStream] Stream complete`);
                   return; // Stream complete
                 }
               } catch (parseErr) {
@@ -204,7 +221,6 @@ export function useChat() {
       // Read selectedModelId and thinkingLevel at call time to avoid stale closure issues
       const selectedModelId = useStore.getState().selectedModelId;
       const selectedThinkingLevel = useStore.getState().selectedThinkingLevel;
-      console.log(`handleSend`, { userMessage, sessionId, selectedModelId, selectedThinkingLevel });
       if (!userMessage.trim() || !sessionId) return;
 
       addUserMessage(sessionId, userMessage);
@@ -238,26 +254,76 @@ export function useChat() {
   );
 
   /**
+   * Process buffered events from the status response.
+   * Returns true if stream is complete, false if still running.
+   */
+  const processBufferedEvents = useCallback(
+    async (sessionId: string, events: string[]): Promise<boolean> => {
+      const sawCompleteTaskCallRef = { current: false };
+
+      for (const eventStr of events) {
+        try {
+          // Events are pre-serialized SSE strings like "data: {...}\n\n"
+          // Extract the JSON from the SSE format
+          const match = eventStr.match(/^data:\s*(.+)$/m);
+          if (!match) continue;
+
+          const rawData = JSON.parse(match[1]);
+          const event = sseEvent.parse(rawData);
+          const shouldContinue = await processEvent(event, sessionId, sawCompleteTaskCallRef);
+
+          if (!shouldContinue) {
+            return true; // Stream complete
+          }
+        } catch (err) {
+          console.error("[processBufferedEvents] Error parsing event:", err, eventStr);
+        }
+      }
+
+      return false; // Not complete yet
+    },
+    [processEvent]
+  );
+
+  /**
    * Check session status and resume stream if task is running.
-   * Call this when entering/switching to a session.
+   *
+   * IMPORTANT: The conversation is already loaded from the backend via restoreSession.
+   * We should NOT replay buffered events as that would duplicate messages.
+   * We only need to subscribe to the live stream if the task is still running.
    */
   const checkAndResumeSession = useCallback(
     async (sessionId: string) => {
+      console.log(`[checkAndResumeSession] Checking status for session ${sessionId}`);
       try {
         const response = await fetch(`/api/sessions/${sessionId}/status`);
         if (!response.ok) return;
 
+        // Check if session is still active after async fetch completes
+        const currentActive = useStore.getState().activeSessionId;
+        if (currentActive !== sessionId) {
+          console.log(`[checkAndResumeSession] Session changed, aborting (current: ${currentActive})`);
+          return;
+        }
+
         const status = await response.json();
+        console.log(`[checkAndResumeSession] Status response:`, {
+          status: status.status,
+          eventCount: status.event_count,
+          error: status.error,
+        });
 
         if (status.status === "running") {
-          // Task is still running, resume the stream
+          // Task is still running - subscribe to stream for new events
+          // Start from current event count to avoid replaying already-persisted events
+          console.log(`[checkAndResumeSession] Subscribing to stream with since=${status.event_count}`);
           setAgentState("thinking");
-          await subscribeToStream(sessionId, true);
-        } else if (status.has_events && status.status === "completed") {
-          // Task completed while we were away, replay events to update UI
-          await subscribeToStream(sessionId, true);
+          await subscribeToStream(sessionId, true, status.event_count);
+        } else {
+          console.log(`[checkAndResumeSession] Task not running (${status.status}), no stream needed`);
         }
-        // If status is "idle" or "error" with no events, do nothing
+        // If status is "completed", "error", or "idle" - conversation is already loaded
+        // from the backend, nothing to do here
       } catch (err) {
         console.error("Error checking session status:", err);
       }

@@ -6,6 +6,9 @@ SSE streams poll the list for new events.
 """
 
 import asyncio
+import json
+import re
+import threading
 from typing import AsyncIterator
 
 from cachetools import TTLCache
@@ -22,10 +25,17 @@ class SessionEventBuffer:
         self.events: list[str] = []  # Pre-serialized SSE strings
         self.is_complete: bool = False
         self.error: str | None = None
+        self._lock = threading.Lock()
 
     def append(self, sse_string: str) -> None:
         """Add a pre-serialized SSE string to the buffer."""
-        self.events.append(sse_string)
+        with self._lock:
+            self.events.append(sse_string)
+
+    def clear(self) -> None:
+        """Clear all events from the buffer."""
+        with self._lock:
+            self.events.clear()
 
     def mark_complete(self, error: str | None = None) -> None:
         """Mark the buffer as complete (agent finished)."""
@@ -104,3 +114,58 @@ def is_task_running(session_id: str) -> bool:
     if buffer is None:
         return False
     return not buffer.is_complete and len(buffer.events) > 0
+
+
+def reconstruct_conversation_from_buffer(buffer: SessionEventBuffer) -> dict | None:
+    """
+    Parse SSE events and reconstruct the in-progress assistant message.
+
+    Returns an assistant message dict if there's content, None otherwise.
+    """
+    thought_summary = ""
+    content = ""
+    tool_calls = []
+
+    # Regex to extract JSON from SSE format: "data: {...}\n\n"
+    data_pattern = re.compile(r"^data:\s*(.+)$", re.MULTILINE)
+
+    with buffer._lock:
+        for event_str in buffer.events:
+            # Parse SSE format
+            match = data_pattern.search(event_str)
+            if not match:
+                continue
+
+            try:
+                event = json.loads(match.group(1))
+            except json.JSONDecodeError:
+                continue
+
+            event_type = event.get("type")
+            event_data = event.get("data", {})
+
+            if event_type == "thought":
+                thought_summary += event_data.get("delta", "")
+            elif event_type == "text_delta":
+                content += event_data.get("delta", "")
+            elif event_type == "tool_call":
+                # Format tool call to match conversation schema
+                tool_calls.append({
+                    "id": event_data.get("id"),
+                    "type": "function",
+                    "function": {
+                        "name": event_data.get("name", ""),
+                        "arguments": json.dumps(event_data.get("args", {})),
+                    },
+                })
+            # turn_start just indicates new message, no data to extract
+
+    # Only return if we have any content
+    if thought_summary or content or tool_calls:
+        return {
+            "role": "assistant",
+            "content": content,
+            "thought_summary": thought_summary if thought_summary else None,
+            "tool_calls": tool_calls if tool_calls else None,
+        }
+    return None

@@ -99,7 +99,6 @@ export function formatConversationToUIMessages(
     }
   }
 
-  console.log(`formatConversationToUIMessages`, { uiMessages });
   return uiMessages;
 }
 
