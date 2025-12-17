@@ -41,7 +41,6 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
                 return ToolResult(
                     error=f"Could not find the old_string in the code. "
                     f"Make sure the string matches exactly, including whitespace and indentation. "
-                    f"Check the Current Code section in the system prompt."
                 )
 
             # Count occurrences
@@ -121,7 +120,6 @@ class EditCodeTool(BaseDeclarativeTool):
             description=(
                 "Make a precise edit to the SDK code by replacing old_string with new_string. "
                 "The old_string must match exactly (including whitespace and indentation). "
-                "Reference the Current Code section in the system prompt for line numbers."
             ),
             parameters={
                 "old_string": {
