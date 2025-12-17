@@ -1,5 +1,3 @@
-<div align="center">
-
 # MinecraftLM
 
 https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
