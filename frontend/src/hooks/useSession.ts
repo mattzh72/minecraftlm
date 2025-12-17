@@ -6,6 +6,7 @@ import { sessionDetailsResponseSchema } from "@/lib/schemas";
 
 export function useSession() {
   const setActiveSession = useStore((s) => s.setActiveSession);
+  const setSelectedModelId = useStore((s) => s.setSelectedModelId);
   const { handleSend } = useChat();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -60,9 +61,13 @@ export function useSession() {
         conversation: session.conversation,
         structure: session.structure,
       });
+      // Restore the model that was used for this session
+      if (session.model) {
+        setSelectedModelId(session.model);
+      }
       setIsLoading(false);
     },
-    [createSession]
+    [setActiveSession, setSelectedModelId]
   );
   const clearActiveSession = useCallback(() => {
     setActiveSession(null);

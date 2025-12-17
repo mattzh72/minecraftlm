@@ -5,6 +5,7 @@ import { ArrowUp } from "lucide-react";
 import { forwardRef } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { ModelSelector } from "./ModelSelector.tsx";
+import { ThinkingLevelSelector } from "./ThinkingLevelSelector.tsx";
 
 type PromptBoxProps = {
   onSubmit: (value: string) => void;
@@ -95,21 +96,25 @@ export const PromptBox = forwardRef<HTMLTextAreaElement, PromptBoxProps>(
           )}
         />
 
-        <div className="flex justify-end gap-2">
-          <ModelSelector />
-          <Button
-            type="submit"
-            disabled={!isActive}
-            size="icon"
-            className={cn(
-              "self-end",
-              "transition-all duration-200 transition-spring",
-              "hover:scale-105",
-              "active:scale-95"
-            )}
-          >
-            <ArrowUp size={18} strokeWidth={2.5} />
-          </Button>
+        {/* Bottom row: thinking selector on left, model + submit on right */}
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <ThinkingLevelSelector />
+          <div className="flex items-center gap-2 shrink-0">
+            <ModelSelector />
+            <Button
+              type="submit"
+              disabled={!isActive}
+              size="icon"
+              className={cn(
+                "shrink-0",
+                "transition-all duration-200 transition-spring",
+                "hover:scale-105",
+                "active:scale-95"
+              )}
+            >
+              <ArrowUp size={18} strokeWidth={2.5} />
+            </Button>
+          </div>
         </div>
       </form>
     );
