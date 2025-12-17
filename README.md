@@ -1,13 +1,11 @@
 <div align="center">
 
-# minecraft-schematic-gen
+# MinecraftLM
 
-**Describe it. AI builds it. In Minecraft.**
+**Describe it. AI builds it. In Minecraft. Turn natural language into Minecraft structures. Powered by Claude, GPT, and Gemini.**
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/mattzh72/minecraft-schematic-gen?style=flat&logo=github)](https://github.com/mattzh72/minecraft-schematic-gen)
-
-Turn natural language into Minecraft structures. Powered by Claude, GPT, and Gemini.
 
 </div>
 
@@ -36,12 +34,12 @@ TODO: Add a GIF showing: user types prompt → agent thinks → 3D structure app
   </tr>
   <tr>
     <td align="center">
-      <img src="evaluation/screenshots/eval-016/2025-12-17-03.23.00.png" width="400"/><br/>
-      <sub><b>"A grand spiral staircase"</b></sub>
+      <img src="evaluation/screenshots/eval-015/2025-12-17-03.20.43.png" width="400"/><br/>
+      <sub><b>"A windmill on a hill"</b></sub>
     </td>
     <td align="center">
-      <img src="evaluation/screenshots/eval-001/2025-12-17-01.20.06.png" width="400"/><br/>
-      <sub><b>"A home with garden, road, and car"</b></sub>
+      <img src="evaluation/screenshots/eval-003/2025-12-17-03.02.41.png" width="400"/><br/>
+      <sub><b>"The Golden Gate Bridge"</b></sub>
     </td>
   </tr>
 </table>
