@@ -1,17 +1,23 @@
-# MinecraftLM <span style="font-size: 75%;">An Agentic System for Generative 3D Voxel Worlds</span>
+<div align="center">
+  
+# MinecraftLM
+
+</div>
 
 <div align="center">
+<h3>An Agentic System for Generative 3D Voxel Worlds</h3>
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/mattzh72/minecraft-schematic-gen?style=flat&logo=github)](https://github.com/mattzh72/minecraft-schematic-gen)
 [![Discord](https://img.shields.io/discord/1451023766153855081?logo=discord&label=Discord&color=5865F2)](https://discord.gg/UNfAA4bte2)
-</div>
 
 Project Team: [Matt Zhou](https://x.com/Mattzh1314), [Johnathan Chiu](https://x.com/johnathanchewy), [Preston Bourne](https://x.com/prestonb0urne), [Avinash Jain](https://x.com/avinashj_)
+</div>
+
+
 
 https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
 
----
 
 ## Table of Contents
 
@@ -27,8 +33,6 @@ https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
 - [Technical Architecture](#technical-architecture)
 - [Configuration](#configuration)
 - [License](#license)
-
----
 
 ## Overview
 
@@ -58,8 +62,6 @@ The agent operates in an iterative refinement loop—generating code, validating
     </td>
   </tr>
 </table>
-
----
 
 ## Quick Start
 
@@ -91,8 +93,6 @@ cp backend/.env.example backend/.env
 ```
 
 Open [localhost:5173](http://localhost:5173) and start building.
-
----
 
 ## Agent Design Capabilities
 
@@ -139,8 +139,6 @@ Architecture requires integrating structure, interiors, and details:
 
 <!-- TODO: Add GIF of multi-turn building session with interior walkthrough -->
 
----
-
 ## Interactive Scene Experience
 
 Structures render in a real-time WebGL viewer with camera controls and physics-based exploration.
@@ -172,8 +170,6 @@ Three presets alter scene atmosphere:
 | **Night** | Moonlight with starfield; emissive blocks (glowstone, lanterns, torches) cast warm light |
 
 <!-- TODO: Add GIF comparing same scene across day/sunset/night lighting -->
-
----
 
 ## Technical Architecture
 
@@ -208,8 +204,6 @@ minecraft-schematic-gen/
 | **OpenAI** | GPT-4.1, GPT-5 |
 | **Google** | Gemini 3 Pro |
 
----
-
 ## Configuration
 
 You need **one** API key from any supported provider:
@@ -229,8 +223,6 @@ OPENAI_API_KEY=sk-...
 GEMINI_API_KEY=...
 ```
 
----
-
 ## Star History
 
 <a href="https://star-history.com/#mattzh72/minecraft-schematic-gen">
@@ -240,9 +232,3 @@ GEMINI_API_KEY=...
     <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=mattzh72/minecraft-schematic-gen&type=Date" width="100%" />
   </picture>
 </a>
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE) for details.
