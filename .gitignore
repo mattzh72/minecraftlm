@@ -10,8 +10,6 @@ __pycache__/
 .idea
 .env
 
-CLAUDE.md
-AGENTS.md
 
 # Distribution / packaging
 .Python
