@@ -46,7 +46,7 @@ Create vehicles with realistic proportions and details—aircraft with proper wi
 ### Terrain & Landscapes
 Generate natural landscapes with mountains, valleys, rivers, and vegetation. Place structures on terrain and watch them integrate seamlessly with automatic foundation filling.
 
-<img height="300" alt="CleanShot 2025-12-18 at 02 40 42@2x" src="https://github.com/user-attachments/assets/e11ec85f-203d-465a-ad35-cc0bcf2f8f7d" />
+<img height="300" alt="CleanShot 2025-12-18 at 03 48 57@2x" src="https://github.com/user-attachments/assets/62d40912-b6b0-4bbe-acc5-41ba083019f1" />
 <img height="300" alt="CleanShot 2025-12-18 at 03 30 31@2x" src="https://github.com/user-attachments/assets/e594e537-f49a-440c-ab68-aef093b598e3" />
 
 
@@ -54,6 +54,7 @@ Generate natural landscapes with mountains, valleys, rivers, and vegetation. Pla
 The agent can interpret artistic concepts and build abstract sculptures, pixel art, or fantastical creations.
 
 <img height="300" alt="CleanShot 2025-12-18 at 03 24 26@2x" src="https://github.com/user-attachments/assets/c11acf7e-b89d-4169-8cc2-823c3e326e3f" />
+<img height="300" alt="CleanShot 2025-12-18 at 03 51 39@2x" src="https://github.com/user-attachments/assets/0440298d-284a-496a-b911-d59fc805c2ac" />
 
 ## Quick Start
 
