@@ -1,7 +1,6 @@
-# MinecraftLM
+# MinecraftLM <small>An Agentic System for Generative 3D Voxel Worlds</small>
 
 <div align="center">
-<h3>An Agentic System for Generative 3D Voxel Worlds</h3>
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/mattzh72/minecraft-schematic-gen?style=flat&logo=github)](https://github.com/mattzh72/minecraft-schematic-gen)
