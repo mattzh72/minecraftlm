@@ -208,6 +208,7 @@ export function MinecraftViewer() {
           Error: {error}
         </div>
       )}
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/useSession";
 import { useStore } from "@/store";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { BlockAnimation } from "./BlockAnimation";
 import { ChatPanel } from "./ChatPanel";
@@ -28,6 +28,28 @@ export function SessionPage() {
   const [chatExpanded, setChatExpanded] = useState(true);
   const [chatWidth, setChatWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
+
+  // FPS counter
+  const [fps, setFps] = useState(0);
+  const frameTimesRef = useRef<number[]>([]);
+  const lastFpsUpdateRef = useRef(0);
+
+  useEffect(() => {
+    let animationId: number;
+    const measureFps = (now: number) => {
+      frameTimesRef.current.push(now);
+      if (frameTimesRef.current.length > 60) frameTimesRef.current.shift();
+      if (now - lastFpsUpdateRef.current > 500 && frameTimesRef.current.length > 1) {
+        const times = frameTimesRef.current;
+        const elapsed = times[times.length - 1] - times[0];
+        setFps(Math.round((times.length - 1) / (elapsed / 1000)));
+        lastFpsUpdateRef.current = now;
+      }
+      animationId = requestAnimationFrame(measureFps);
+    };
+    animationId = requestAnimationFrame(measureFps);
+    return () => cancelAnimationFrame(animationId);
+  }, []);
 
   // Restore session from URL param on mount or when URL changes
   useEffect(() => {
@@ -83,6 +105,11 @@ export function SessionPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* FPS counter - bottom left */}
+      <div className="absolute bottom-4 left-4 z-20 px-2 py-1 bg-black/25 backdrop-blur-sm rounded-md text-xs font-mono text-white/70 border border-white/10">
+        {fps} <span className="opacity-50">fps</span>
       </div>
 
       {/* Floating back button - dark glass treatment */}
