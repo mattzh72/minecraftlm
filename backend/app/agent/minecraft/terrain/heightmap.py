@@ -851,6 +851,8 @@ class HeightMap:
         # Calculate rim zone
         rim_width = max(3, radius // 4) if rim_height > 0 else 0
         bowl_radius = radius - rim_width
+        if bowl_radius <= 0:
+            bowl_radius = 1
 
         for z in range(max(0, center_z - radius - 2), min(self.config.depth, center_z + radius + 3)):
             for x in range(max(0, center_x - radius - 2), min(self.config.width, center_x + radius + 3)):
@@ -866,7 +868,8 @@ class HeightMap:
                 if effective_distance <= bowl_radius:
                     # Inside the bowl - carve down
                     t = effective_distance / bowl_radius
-                    bowl_factor = (1 - t ** falloff_inner)
+                    t = float(max(0.0, min(1.0, t)))
+                    bowl_factor = 1 - (t ** falloff_inner)
 
                     # Add floor detail
                     floor_val = floor_noise.noise2d(x / 8.0, z / 8.0)

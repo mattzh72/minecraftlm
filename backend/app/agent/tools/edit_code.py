@@ -2,6 +2,8 @@
 EditCode tool - Make precise edits to SDK code using old_string/new_string
 """
 
+import asyncio
+
 from pydantic import BaseModel
 
 from app.agent.tools.base import (
@@ -86,7 +88,7 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
         Compile and validate the code, returning compilation status.
         If valid, saves the structure for immediate UI rendering.
         """
-        validation = CodeValidator.validate_code(code)
+        validation = await asyncio.to_thread(CodeValidator.validate_code, code)
 
         if validation.is_valid:
             # Save structure for UI to render immediately
@@ -113,6 +115,7 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
                 "structure_updated": True,
                 "block_count": len(blocks),
                 "bounding_box": bounding_box,
+                "warnings": validation.warnings or [],
             }
         else:
             error_msg = validation.error
@@ -122,6 +125,7 @@ class EditCodeInvocation(BaseToolInvocation[EditCodeParams, str]):
                 "status": "error",
                 "error": error_msg,
                 "structure_updated": False,
+                "warnings": validation.warnings or [],
             }
 
 
