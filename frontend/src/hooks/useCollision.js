@@ -2,31 +2,78 @@ import { vec3 } from '../utils/deepslate';
 import { Config } from '../config';
 
 const { playable } = Config;
+const AIR_BLOCKS = new Set([
+  'minecraft:air',
+  'minecraft:cave_air',
+  'minecraft:void_air',
+]);
+const ICE_BLOCKS = new Set([
+  'minecraft:ice',
+  'minecraft:packed_ice',
+  'minecraft:blue_ice',
+  'minecraft:frosted_ice',
+]);
+
+const isStairBlock = (blockName) => blockName?.endsWith('_stairs');
+const isSlabBlock = (blockName) => blockName?.endsWith('_slab');
+
+const getBlockCollisionHeight = (block) => {
+  if (!block) return 1;
+  const name = block.state.getName().toString();
+  if (isSlabBlock(name)) {
+    const type = block.state.getProperty?.('type');
+    if (type === 'bottom') return 0.5;
+    if (type === 'top') return 1; // top slab occupies upper half, so top is at full block height
+    if (type === 'double') return 1;
+    return 0.5;
+  }
+  return 1;
+};
 
 /**
  * Check if a block at the given position is solid
  */
-export function isBlockSolid(structure, resources, x, y, z) {
+export function isBlockSolid(structure, resources, x, y, z, blockOverride = null) {
   if (!structure || !resources) return false;
 
   const blockX = Math.floor(x);
   const blockY = Math.floor(y);
   const blockZ = Math.floor(z);
 
-  const block = structure.getBlock([blockX, blockY, blockZ]);
+  const block = blockOverride ?? structure.getBlock([blockX, blockY, blockZ]);
   if (!block) return false;
 
   // Check block flags for opacity
-  const blockName = block.state.getName();
-  const flags = resources.getBlockFlags?.(blockName);
+  const blockName = block.state.getName().toString();
+  const isFluid = typeof block.state.isFluid === 'function' ? block.state.isFluid() : false;
 
-  // If we have flags, use opaque flag; otherwise assume solid if block exists
-  if (flags) {
-    return flags.opaque === true;
+  // Ignore fluids and air-like blocks for collisions
+  if (AIR_BLOCKS.has(blockName) || isFluid) {
+    return false;
   }
 
-  // Fallback: treat any non-air block as solid
-  return blockName.toString() !== 'minecraft:air';
+  const flags = resources.getBlockFlags?.(blockName);
+
+  if (flags) {
+    // Treat transparent (but non-fluid) blocks like glass as solid for collisions
+    if (flags.opaque === true || (flags.semi_transparent === true && !isFluid)) {
+      return true;
+    }
+  }
+
+  // Stairs (and similar) should be collidable even though they are non-opaque
+  if (
+    isStairBlock(blockName) ||
+    isSlabBlock(blockName) ||
+    blockName.endsWith('_leaves') ||
+    blockName.endsWith('_fence') ||
+    blockName.endsWith('_wall') ||
+    ICE_BLOCKS.has(blockName)
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -62,6 +109,41 @@ export function checkAABBCollision(structure, resources, position) {
   }
 
   return false;
+}
+
+/**
+ * Find the first solid block intersecting the player's AABB
+ * Returns { block, position: [x, y, z] } or null
+ */
+function findFirstSolidCollision(structure, resources, position) {
+  if (!structure || !resources) return null;
+
+  const halfW = playable.playerWidth / 2;
+  const halfD = playable.playerDepth / 2;
+  const epsilon = 0.001;
+
+  const feetY = position[1] - playable.playerHeight + epsilon;
+  const headY = position[1];
+
+  const minX = Math.floor(position[0] - halfW);
+  const maxX = Math.floor(position[0] + halfW);
+  const minY = Math.floor(feetY);
+  const maxY = Math.floor(headY);
+  const minZ = Math.floor(position[2] - halfD);
+  const maxZ = Math.floor(position[2] + halfD);
+
+  for (let x = minX; x <= maxX; x++) {
+    for (let y = minY; y <= maxY; y++) {
+      for (let z = minZ; z <= maxZ; z++) {
+        const block = structure.getBlock([x, y, z]);
+        if (isBlockSolid(structure, resources, x, y, z, block)) {
+          return { block, position: [x, y, z] };
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -101,7 +183,8 @@ export function checkGrounded(structure, resources, position) {
  * Uses axis-by-axis collision for sliding behavior
  * Returns the new valid position
  */
-export function attemptMove(structure, resources, currentPos, delta) {
+export function attemptMove(structure, resources, currentPos, delta, options = {}) {
+  const { isGrounded = false } = options;
   if (!structure || !resources) {
     // No collision data, allow free movement
     const newPos = vec3.create();
@@ -111,19 +194,38 @@ export function attemptMove(structure, resources, currentPos, delta) {
 
   const newPos = vec3.clone(currentPos);
 
-  // Try X movement
-  const testX = vec3.clone(newPos);
-  testX[0] += delta[0];
-  if (!checkAABBCollision(structure, resources, testX)) {
-    newPos[0] = testX[0];
-  }
+  const tryAxisMove = (axisIndex, deltaValue) => {
+    if (deltaValue === 0) return;
 
-  // Try Z movement
-  const testZ = vec3.clone(newPos);
-  testZ[2] += delta[2];
-  if (!checkAABBCollision(structure, resources, testZ)) {
-    newPos[2] = testZ[2];
-  }
+    const testPos = vec3.clone(newPos);
+    testPos[axisIndex] += deltaValue;
+    const collision = findFirstSolidCollision(structure, resources, testPos);
+
+    if (!collision) {
+      newPos[axisIndex] = testPos[axisIndex];
+      return;
+    }
+
+    // If we bumped into stairs or slabs while grounded, attempt to step up onto them
+    const blockName = collision.block.state.getName().toString();
+    if (isGrounded && (isStairBlock(blockName) || isSlabBlock(blockName))) {
+      const targetFeetY = collision.position[1] + getBlockCollisionHeight(collision.block);
+      const feetY = newPos[1] - playable.playerHeight;
+      const climbHeight = targetFeetY - feetY;
+      // Limit climb to a single stair height to avoid walking up walls
+      if (climbHeight > 0 && climbHeight <= 1.05) {
+        const steppedPos = vec3.clone(testPos);
+        steppedPos[1] = newPos[1] + climbHeight;
+        if (!checkAABBCollision(structure, resources, steppedPos)) {
+          vec3.copy(newPos, steppedPos);
+        }
+      }
+    }
+  };
+
+  // Try X then Z movement (with sliding)
+  tryAxisMove(0, delta[0]);
+  tryAxisMove(2, delta[2]);
 
   return newPos;
 }
@@ -146,9 +248,11 @@ export function attemptVerticalMove(structure, resources, currentPos, deltaY) {
     // Collision detected, find the valid position
     if (deltaY < 0) {
       // Moving down, snap to top of block
-      const feetY = currentPos[1] - playable.playerHeight;
-      const blockY = Math.floor(feetY + deltaY);
-      newPos[1] = blockY + 1 + playable.playerHeight;
+      const collision = findFirstSolidCollision(structure, resources, newPos);
+      const blockTop = collision
+        ? collision.position[1] + getBlockCollisionHeight(collision.block)
+        : Math.floor(currentPos[1] - playable.playerHeight + deltaY) + 1;
+      newPos[1] = blockTop + playable.playerHeight;
       return { position: newPos, hitGround: true, hitCeiling: false };
     } else {
       // Moving up, hit ceiling

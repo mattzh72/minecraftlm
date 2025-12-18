@@ -218,21 +218,62 @@ class MinecraftSchematicAgent:
     async def _execute_tool(self, tool_call: ToolCall) -> tuple[ToolResult, dict]:
         """Execute a single tool call and return result + serialized response"""
         func_name = tool_call.function.name
-        func_args = json.loads(tool_call.function.arguments or "{}")
+
+        try:
+            func_args = json.loads(tool_call.function.arguments or "{}")
+        except json.JSONDecodeError as e:
+            result = ToolResult(
+                error=f"Invalid JSON in tool arguments: {str(e)}",
+                tool_call_id=tool_call.id
+            )
+            tool_response = ToolMessage(
+                role="tool",
+                tool_call_id=tool_call.id,
+                content=json.dumps(result.to_dict()),
+                name=func_name,
+            ).model_dump()
+            return result, tool_response
 
         # Inject session_id
         tool_params = dict(func_args) if func_args else {}
         tool_params["session_id"] = self.session_id
 
-        invocation = await self.tool_registry.build_invocation(func_name, tool_params)
+        try:
+            invocation = await self.tool_registry.build_invocation(func_name, tool_params)
 
-        if not invocation:
+            if not invocation:
+                result = ToolResult(
+                    error=f"Tool {func_name} not found", tool_call_id=tool_call.id
+                )
+            else:
+                result = await invocation.execute()
+                result.tool_call_id = tool_call.id
+
+        except Exception as e:
+            # Catch validation errors and other exceptions during tool invocation
+            # Return them as tool errors so the agent can see and potentially retry
+            from pydantic import ValidationError
+
+            if isinstance(e, ValidationError):
+                # Format Pydantic errors cleanly for the agent
+                errors = e.errors()
+                missing = [err["loc"][0] for err in errors if err["type"] == "missing"]
+                invalid = [f"{err['loc'][0]}: {err['msg']}" for err in errors if err["type"] != "missing"]
+
+                parts = [f"Invalid parameters for {func_name}."]
+                if missing:
+                    parts.append(f"Missing required: {missing}")
+                if invalid:
+                    parts.append(f"Invalid values: {invalid}")
+                parts.append(f"Provided: {list(func_args.keys())}")
+                error_msg = " ".join(parts)
+            else:
+                error_msg = f"Tool execution error: {str(e)}"
+
             result = ToolResult(
-                error=f"Tool {func_name} not found", tool_call_id=tool_call.id
+                error=error_msg,
+                tool_call_id=tool_call.id
             )
-        else:
-            result = await invocation.execute()
-            result.tool_call_id = tool_call.id
 
         # Build serialized response for conversation
         tool_response = ToolMessage(

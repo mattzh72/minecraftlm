@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import type { TimeOfDay } from "@/config";
 import type { ViewerMode } from "@/store";
 import { useStore } from "@/store";
-import { Eye, Footprints, Moon, Sun, Sunset } from "lucide-react";
+import { Eye, Footprints, Moon, Sunset } from "lucide-react";
 
 const VIEWER_MODES: { value: ViewerMode; icon: typeof Eye }[] = [
   { value: "orbit", icon: Eye },
@@ -33,9 +33,6 @@ export function ViewerToolbar() {
         }}
         className="gap-0.5"
       >
-        <Toggle value="day" aria-label="Day" className={iconToggleClassName}>
-          <Sun className="size-4" />
-        </Toggle>
         <Toggle
           value="sunset"
           aria-label="Sunset"

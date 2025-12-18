@@ -89,7 +89,9 @@ export default function usePhysics(
     const horizontalDelta = vec3.fromValues(moveX, 0, moveZ);
 
     // 3. Apply horizontal movement with collision
-    const afterHorizontal = attemptMove(structure, resources, position, horizontalDelta);
+    const afterHorizontal = attemptMove(structure, resources, position, horizontalDelta, {
+      isGrounded: physicsState.current.isGrounded,
+    });
 
     // 4. Apply vertical movement with collision
     const verticalDelta = physicsState.current.velocity[1] * dt;
