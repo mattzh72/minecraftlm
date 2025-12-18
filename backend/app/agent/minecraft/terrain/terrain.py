@@ -17,6 +17,8 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
+import random
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -191,7 +193,7 @@ class Terrain(Object3D):
     Supports mountains with stone surfaces and snow caps.
 
     Example:
-        config = TerrainConfig(width=128, depth=128)
+        config = TerrainConfig(width=256, depth=256)
         terrain = Terrain(config)
         terrain.generate()
 
@@ -199,7 +201,7 @@ class Terrain(Object3D):
         scene.add(terrain)
 
         # Query terrain
-        height = terrain.get_height_at(64, 64)
+        height = terrain.get_height_at(128, 128)
     """
 
     def __init__(
@@ -285,6 +287,8 @@ class Terrain(Object3D):
         # Add biome-specific surface overlays (e.g., snow layers)
         if self.config.biome == "snowy_plains":
             self._add_snow_layers()
+        if self.config.biome == "badlands":
+            self._add_badlands_spires()
 
         # Add decorations if enabled (only on plains, not water/beach)
         if self.config.generate_decorations:
@@ -819,6 +823,221 @@ class Terrain(Object3D):
                 self.children.append(snow_block)
 
                 x += run_length
+
+    def _add_badlands_spires(self) -> None:
+        """Generate eroded badlands spires with terracotta banding."""
+        from app.agent.minecraft.terrain.noise import PerlinNoise
+
+        width = self.config.width
+        depth = self.config.depth
+        placement_noise = PerlinNoise(seed=self.config.seed + 7000)
+        shape_noise = PerlinNoise(seed=self.config.seed + 7101)
+        band_noise = PerlinNoise(seed=self.config.seed + 7002)
+        speckle_noise = PerlinNoise(seed=self.config.seed + 7003)
+
+        terracotta_palette = [
+            "minecraft:terracotta",
+            "minecraft:orange_terracotta",
+            "minecraft:yellow_terracotta",
+            "minecraft:red_terracotta",
+            "minecraft:brown_terracotta",
+            "minecraft:white_terracotta",
+            "minecraft:light_gray_terracotta",
+        ]
+        sandstone_palette = [
+            "minecraft:red_sandstone",
+            "minecraft:cut_red_sandstone",
+            "minecraft:smooth_red_sandstone",
+        ]
+
+        rng = random.Random(self.config.seed + 7100)
+        grid = 12
+
+        def is_available(cx: int, cz: int) -> bool:
+            if self._terrain_type is not None and self._terrain_type[cz, cx] != 0:
+                return False
+            if self._water_mask is not None and self._water_mask[cz, cx]:
+                return False
+            if self._beach_mask is not None and self._beach_mask[cz, cx]:
+                return False
+            if self._flattened_mask is not None and self._flattened_mask[cz, cx]:
+                return False
+            return True
+
+        for z in range(0, depth, grid):
+            for x in range(0, width, grid):
+                if not is_available(x, z):
+                    continue
+
+                n = placement_noise.noise2d(x / 40.0, z / 40.0)
+                if n < 0.1:
+                    continue
+
+                # Jitter spire center within the grid cell to avoid regularity.
+                cx = x + rng.randrange(0, grid)
+                cz = z + rng.randrange(0, grid)
+                if not (1 <= cx < width - 1 and 1 <= cz < depth - 1):
+                    continue
+                if not is_available(cx, cz):
+                    continue
+
+                strength = max(0.0, min(1.0, (n - 0.1) / 0.9))
+                kind_roll = rng.random()
+                if kind_roll < 0.25:
+                    # Ridges: long, connected eroded formations.
+                    feature_type = "ridge"
+                    base_radius = rng.randint(18, 34) + int(strength * 8)
+                    max_height = rng.randint(16, 34) + int(strength * 10)
+                    exponent = 1.25
+                    plateau_min = 0.22
+                elif kind_roll < 0.55:
+                    # Buttes / mesas: broad, flat-ish tops.
+                    feature_type = "butte"
+                    base_radius = rng.randint(20, 45) + int(strength * 10)
+                    max_height = rng.randint(10, 24) + int(strength * 8)
+                    exponent = 0.6
+                    plateau_min = 0.35
+                elif kind_roll < 0.85:
+                    # Thick spires: tall, substantial columns.
+                    feature_type = "spire"
+                    base_radius = rng.randint(8, 16) + int(strength * 4)
+                    max_height = rng.randint(22, 50) + int(strength * 12)
+                    exponent = 2.1
+                    plateau_min = 0.0
+                else:
+                    # Small spires (fill-in detail).
+                    feature_type = "small_spire"
+                    base_radius = rng.randint(6, 12) + int(strength * 3)
+                    max_height = rng.randint(16, 30) + int(strength * 8)
+                    exponent = 1.7
+                    plateau_min = 0.0
+
+                angle = rng.random() * math.tau
+                cos_a = math.cos(angle)
+                sin_a = math.sin(angle)
+                if feature_type == "ridge":
+                    stretch_x = 6.0 + rng.random() * 8.0
+                    stretch_z = 2.0 + rng.random() * 2.5
+                elif feature_type == "butte":
+                    stretch_x = 1.6 + rng.random() * 2.0
+                    stretch_z = 1.6 + rng.random() * 2.0
+                else:
+                    stretch_x = 1.0 + rng.random() * 0.9
+                    stretch_z = 1.0 + rng.random() * 0.9
+
+                bounds = int((base_radius + 3) * max(stretch_x, stretch_z)) + 2
+
+                def local_ground_y(sample_radius: int) -> int:
+                    candidates: List[int] = []
+                    offsets = [
+                        (0, 0),
+                        (sample_radius, 0),
+                        (-sample_radius, 0),
+                        (0, sample_radius),
+                        (0, -sample_radius),
+                        (sample_radius, sample_radius),
+                        (sample_radius, -sample_radius),
+                        (-sample_radius, sample_radius),
+                        (-sample_radius, -sample_radius),
+                    ]
+                    for ox, oz in offsets:
+                        sx = max(0, min(width - 1, cx + ox))
+                        sz = max(0, min(depth - 1, cz + oz))
+                        candidates.append(int(self.heightmap.get(sx, sz)))
+                    return min(candidates) if candidates else int(self.heightmap.get(cx, cz))
+
+                ground_y = local_ground_y(min(18, max(10, base_radius // 2)))
+                for dz in range(-bounds, bounds + 1):
+                    wz = cz + dz
+                    if wz < 0 or wz >= depth:
+                        continue
+                    for dx in range(-bounds, bounds + 1):
+                        wx = cx + dx
+                        if wx < 0 or wx >= width:
+                            continue
+                        if not is_available(wx, wz):
+                            continue
+
+                        # Elliptical, rotated distance for more natural spires.
+                        rx = dx * cos_a - dz * sin_a
+                        rz = dx * sin_a + dz * cos_a
+                        dist = math.sqrt((rx / stretch_x) ** 2 + (rz / stretch_z) ** 2)
+
+                        boundary_warp = shape_noise.noise2d(wx / 7.0, wz / 7.0) * 1.1
+                        boundary = max(0.9, base_radius + boundary_warp)
+                        if dist > boundary:
+                            continue
+
+                        r_norm = dist / boundary
+                        profile = (1.0 - r_norm) ** exponent
+                        if plateau_min > 0.0:
+                            profile = max(profile, plateau_min * max(0.0, 1.0 - r_norm * 0.85))
+
+                        jagged = shape_noise.noise2d((wx + 100) / 4.0, (wz - 100) / 4.0) * 0.25
+                        jagged += shape_noise.noise2d(wx / 2.6, wz / 2.6) * 0.10
+                        spike_boost = 0.0
+                        if feature_type in ("spire", "small_spire") and dist < 0.9:
+                            spike_boost = 0.22
+                        if feature_type == "ridge" and r_norm < 0.25:
+                            spike_boost = 0.12
+
+                        col_height = int(round(max_height * max(0.0, profile + jagged + spike_boost)))
+                        if col_height <= 0:
+                            continue
+
+                        base_y = min(int(self.heightmap.get(wx, wz)), ground_y)
+                        # Embed into terrain so formations look connected.
+                        embed = 4 + int(round(max(0.0, profile) * 10.0))
+                        if feature_type in ("ridge", "butte"):
+                            embed += 2
+
+                        def block_for(local_y: int) -> str:
+                            abs_y = base_y + local_y
+                            band_offset = int(round(band_noise.noise2d(wx / 12.0, wz / 12.0) * 3.0))
+                            use_sandstone = local_y <= 1 or r_norm > 0.78
+                            if use_sandstone:
+                                stripe = (abs_y // 2 + band_offset) % len(sandstone_palette)
+                                block_id = sandstone_palette[stripe]
+                            else:
+                                stripe = (abs_y // 2 + band_offset) % len(terracotta_palette)
+                                block_id = terracotta_palette[stripe]
+
+                            speckle = speckle_noise.noise2d(wx / 6.0, (wz + abs_y * 0.35) / 6.0)
+                            if speckle > 0.62:
+                                return "minecraft:terracotta"
+                            if speckle < -0.62:
+                                return "minecraft:light_gray_terracotta"
+                            return block_id
+
+                        start_y = -embed
+                        seg_start = start_y
+                        current_id = block_for(start_y)
+                        for local_y in range(start_y + 1, col_height):
+                            next_id = block_for(local_y)
+                            if next_id != current_id:
+                                seg_height = local_y - seg_start
+                                block = Block(
+                                    current_id,
+                                    size=(1, seg_height, 1),
+                                    fill=True,
+                                    catalog=self.catalog,
+                                )
+                                block.position.set(wx, base_y + seg_start, wz)
+                                self.children.append(block)
+                                seg_start = local_y
+                                current_id = next_id
+
+                        # Final segment
+                        seg_height = col_height - seg_start
+                        if seg_height > 0:
+                            block = Block(
+                                current_id,
+                                size=(1, seg_height, 1),
+                                fill=True,
+                                catalog=self.catalog,
+                            )
+                            block.position.set(wx, base_y + seg_start, wz)
+                            self.children.append(block)
 
     def _add_decorations(self) -> None:
         """Add trees and vegetation to terrain.
