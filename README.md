@@ -1,6 +1,6 @@
 # MinecraftLM
 
-### Build 3D Worlds from Text — No Code Required
+### Build 3D Minecraft Worlds from Text
 
 Project Team: [Matt Zhou](https://x.com/Mattzh1314), [Johnathan Chiu](https://x.com/johnathanchewy), [Preston Bourne](https://x.com/prestonb0urne), [Avinash Jain](https://x.com/avinashj_)
 
@@ -71,22 +71,18 @@ You'll need these installed on your machine:
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/mattzh72/minecraft-schematic-gen
-cd minecraft-schematic-gen
+git clone https://github.com/mattzh72/minecraftlm.git
+cd minecraftlm
 ```
 
 **2. Install backend dependencies**
 ```bash
-cd backend
-uv sync
-cd ..
+cd backend && uv sync && cd ..
 ```
 
 **3. Install frontend dependencies** (this also builds the 3D renderer)
 ```bash
-cd frontend
-npm install
-cd ..
+cd frontend && npm install && cd ..
 ```
 
 **4. Configure your API key**
@@ -100,6 +96,7 @@ Edit `backend/.env` and add your API key (see [Configuration](#configuration) be
 ```bash
 ./run.sh
 ```
+(OR in development mode `./run.sh --reload`)
 
 This starts both the backend server (port 8000) and frontend (port 5173) with hot reload enabled.
 
@@ -152,12 +149,11 @@ Choose any provider and get an API key:
 The app will automatically detect which providers you've configured and show only those models in the selector:
 
 | Provider | Available Models |
-|----------|-----------------|
-| **Anthropic** | Claude Sonnet 4.5, Claude Opus 4.5 |
-| **OpenAI** | GPT-4.1, GPT-5 |
-| **Google** | Gemini 3 Pro |
+|----------|------------------|
+| **Anthropic** | Claude Opus 4.5  |
+| **OpenAI** | GPT-5.2          |
+| **Google** | Gemini 3 Pro     |
 
-**Note**: Different models have different strengths. Claude models tend to be good at detailed architectural work, while GPT models may excel at creative interpretations. Experiment to find what works best for your use case.
 
 ---
 
