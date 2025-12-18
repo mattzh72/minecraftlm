@@ -7,6 +7,8 @@ import { ChunkBuilder, EmissiveLight } from './ChunkBuilder.js'
 import { Mesh } from './Mesh.js'
 import type { Resources } from './StructureRenderer.js'
 
+const MAX_EMISSIVE_LIGHTS = 8192; // Large upper bound to effectively treat emissive count as unbounded within shader limits
+
 type SunDiscOptions = {
 	size?: number,
 	distance?: number,
@@ -119,6 +121,17 @@ type ThreeStructureRendererOptions = {
 	sunlight?: SunlightOptions,
 }
 
+const makeFloatTexture = (data: Float32Array, width: number, height: number = 1) => {
+	const tex = new THREE.DataTexture(data, Math.max(1, width), Math.max(1, height), THREE.RGBAFormat, THREE.FloatType)
+	tex.needsUpdate = true
+	tex.magFilter = THREE.NearestFilter
+	tex.minFilter = THREE.NearestFilter
+	tex.wrapS = THREE.ClampToEdgeWrapping
+	tex.wrapT = THREE.ClampToEdgeWrapping
+	tex.flipY = false
+	return tex
+}
+
 const DEFAULT_SUNLIGHT: Omit<SunlightSettings, 'direction'> & { direction: [number, number, number] } = {
 	direction: [-0.5, 0.25, 0.5],
 	color: [1.0, 0.75, 0.45],
@@ -190,14 +203,11 @@ const DEFAULT_SUNLIGHT: Omit<SunlightSettings, 'direction'> & { direction: [numb
 		},
 	},
 	emissive: {
-		range: 8.0,
-		intensity: 1.0,
+		range: 16.0,
+		intensity: 3.5,
 		tint: [1.0, 0.85, 0.6],
 	},
 }
-
-// Maximum number of emissive point lights supported
-const MAX_EMISSIVE_LIGHTS = 32
 
 function buildSunlightSettings(options?: SunlightOptions): SunlightSettings {
 	const direction = vec3.clone(options?.direction ?? vec3.fromValues(...DEFAULT_SUNLIGHT.direction))
@@ -367,13 +377,15 @@ export class ThreeStructureRenderer {
 	private readonly camera: THREE.PerspectiveCamera
 	private readonly skyCamera: THREE.Camera
 	private readonly atlasTexture: THREE.DataTexture
-	private readonly opaqueMaterial: THREE.RawShaderMaterial
-	private readonly transparentMaterial: THREE.RawShaderMaterial
-	private readonly coloredMaterial: THREE.RawShaderMaterial
+	private opaqueMaterial: THREE.RawShaderMaterial
+	private transparentMaterial: THREE.RawShaderMaterial
+	private coloredMaterial: THREE.RawShaderMaterial
 	private readonly lineMaterial: THREE.LineBasicMaterial
 	private readonly skyMaterial: THREE.ShaderMaterial
 	private readonly shadowDepthMaterial: THREE.RawShaderMaterial
 	private shadowMap: THREE.WebGLRenderTarget | null = null
+	private emissiveLightDataTex: THREE.DataTexture | null = null
+	private emissiveLightColorTex: THREE.DataTexture | null = null
 	private readonly shadowCamera: THREE.OrthographicCamera
 	private sunlight: SunlightSettings
 	private skyMesh?: THREE.Mesh
@@ -405,6 +417,7 @@ export class ThreeStructureRenderer {
 	public useInvisibleBlocks: boolean
 	private readonly drawDistance?: number
 	private pixelSize: number
+	private readonly maxEmissiveTextureSize: number
 
 	constructor(
 		canvas: HTMLCanvasElement,
@@ -420,6 +433,7 @@ export class ThreeStructureRenderer {
 		})
 		this.renderer.autoClear = false
 		this.renderer.setClearColor(0x000000, 1)
+		this.maxEmissiveTextureSize = this.renderer.capabilities.maxTextureSize ?? 8192
 
 		this.structureScene = new THREE.Scene()
 		this.skyScene = new THREE.Scene()
@@ -446,6 +460,9 @@ export class ThreeStructureRenderer {
 
 		this.atlasTexture = this.createAtlasTexture(this.resources.getTextureAtlas())
 		this.pixelSize = this.resources.getPixelSize?.() ?? 0
+		// Initialize placeholder emissive textures to avoid null samplers in shaders
+		this.emissiveLightDataTex = makeFloatTexture(new Float32Array([0, 0, 0, 0]), 1)
+		this.emissiveLightColorTex = makeFloatTexture(new Float32Array([0, 0, 0, 0]), 1)
 
 		this.shadowDepthMaterial = this.createShadowDepthMaterial()
 		this.initShadowMap()
@@ -519,6 +536,8 @@ export class ThreeStructureRenderer {
 		this.prepareCamera(viewMatrix)
 		this.positionSunDisc(viewMatrix)
 		this.updateSkyUniforms(viewMatrix)
+		// Refresh emissive light buffers (all lights)
+		this.updateEmissiveLightUniforms()
 
 		// 0. Render shadow map first
 		this.renderShadowPass()
@@ -670,38 +689,51 @@ export class ThreeStructureRenderer {
 
 	private updateEmissiveLightUniforms() {
 		const lights = this.chunkBuilder.getEmissiveLights()
-		const numLights = Math.min(lights.length, MAX_EMISSIVE_LIGHTS)
+		const count = lights.length
+		const maxSide = this.maxEmissiveTextureSize || 8192
+		const texWidth = Math.min(maxSide, Math.max(1, Math.ceil(Math.sqrt(Math.max(1, count)))))
+		const texHeight = Math.min(maxSide, Math.max(1, Math.ceil(count / texWidth)))
+		const capacity = texWidth * texHeight
+		const writeCount = Math.min(count, capacity)
 
-		const updateMaterial = (material: THREE.RawShaderMaterial) => {
-			const uniforms = material.uniforms
-			if (!uniforms.emissiveLightPositions || !uniforms.emissiveLightColors ||
-				!uniforms.emissiveLightIntensities || !uniforms.numEmissiveLights) return
+		// Build packed textures: data (pos.xyz, intensity) and color (rgb)
+		const dataArray = new Float32Array(texWidth * texHeight * 4)
+		const colorArray = new Float32Array(texWidth * texHeight * 4)
+		for (let i = 0; i < writeCount; i++) {
+			const light = lights[i]
+			dataArray[i * 4 + 0] = light.position[0]
+			dataArray[i * 4 + 1] = light.position[1]
+			dataArray[i * 4 + 2] = light.position[2]
+			dataArray[i * 4 + 3] = light.intensity
 
-			const positions = uniforms.emissiveLightPositions.value as THREE.Vector3[]
-			const colors = uniforms.emissiveLightColors.value as THREE.Vector3[]
-			const intensities = uniforms.emissiveLightIntensities.value as number[]
-
-			for (let i = 0; i < MAX_EMISSIVE_LIGHTS; i++) {
-				if (i < numLights) {
-					const light = lights[i]
-					positions[i].set(light.position[0], light.position[1], light.position[2])
-					colors[i].set(light.color[0], light.color[1], light.color[2])
-					intensities[i] = light.intensity
-				} else {
-					positions[i].set(0, 0, 0)
-					colors[i].set(0, 0, 0)
-					intensities[i] = 0
-				}
-			}
-
-			uniforms.numEmissiveLights.value = numLights
+			colorArray[i * 4 + 0] = light.color[0]
+			colorArray[i * 4 + 1] = light.color[1]
+			colorArray[i * 4 + 2] = light.color[2]
+			colorArray[i * 4 + 3] = 1.0
 		}
 
-		updateMaterial(this.opaqueMaterial)
-		updateMaterial(this.transparentMaterial)
+		// Dispose old textures to avoid leaks
+		this.emissiveLightDataTex?.dispose()
+		this.emissiveLightColorTex?.dispose()
+		this.emissiveLightDataTex = makeFloatTexture(dataArray, texWidth, texHeight)
+		this.emissiveLightColorTex = makeFloatTexture(colorArray, texWidth, texHeight)
 
-		if (numLights > 0) {
-			console.log('[ThreeStructureRenderer] emissive lights', { count: numLights })
+		const apply = (material: THREE.RawShaderMaterial) => {
+			const uniforms = material.uniforms
+			if (!uniforms) return
+			if (uniforms.emissiveLightData) uniforms.emissiveLightData.value = this.emissiveLightDataTex
+			if (uniforms.emissiveLightColors) uniforms.emissiveLightColors.value = this.emissiveLightColorTex
+			if (uniforms.emissiveLightCount) uniforms.emissiveLightCount.value = writeCount
+			if (uniforms.emissiveLightTexSize && uniforms.emissiveLightTexSize.value instanceof THREE.Vector2) {
+				uniforms.emissiveLightTexSize.value.set(texWidth, texHeight)
+			}
+		}
+
+		apply(this.opaqueMaterial)
+		apply(this.transparentMaterial)
+
+		if (writeCount > 0) {
+			console.log('[ThreeStructureRenderer] emissive lights', { count: writeCount })
 		}
 	}
 
@@ -811,11 +843,11 @@ export class ThreeStructureRenderer {
 				uniform bool shadowEnabled;
 
 				// Emissive point lights
-				#define MAX_EMISSIVE_LIGHTS 32
-				uniform vec3 emissiveLightPositions[MAX_EMISSIVE_LIGHTS];
-				uniform vec3 emissiveLightColors[MAX_EMISSIVE_LIGHTS];
-				uniform float emissiveLightIntensities[MAX_EMISSIVE_LIGHTS];
-				uniform int numEmissiveLights;
+				#define MAX_EMISSIVE_LIGHTS ${MAX_EMISSIVE_LIGHTS}
+				uniform sampler2D emissiveLightData;   // xyz = position, w = intensity
+				uniform sampler2D emissiveLightColors; // rgb = color
+				uniform int emissiveLightCount;
+				uniform vec2 emissiveLightTexSize;
 				uniform float emissiveRange;
 				uniform float emissiveGlobalIntensity;
 				uniform vec3 emissiveTint;
@@ -865,12 +897,20 @@ export class ThreeStructureRenderer {
 					vec3 bestLight = vec3(0.0);
 					float bestLum = 0.0;
 
+					// Sample emissive lights from textures; loop is capped by MAX_EMISSIVE_LIGHTS to satisfy GLSL unrolling rules
 					for (int i = 0; i < MAX_EMISSIVE_LIGHTS; i++) {
-						if (i >= numEmissiveLights) break;
+						if (i >= emissiveLightCount) break;
 
-						vec3 lightPos = emissiveLightPositions[i];
-						vec3 lightColor = emissiveLightColors[i];
-						float intensity = emissiveLightIntensities[i];
+						float fx = mod(float(i), emissiveLightTexSize.x);
+						float fy = floor(float(i) / emissiveLightTexSize.x);
+						vec2 uv = vec2(
+							(fx + 0.5) / emissiveLightTexSize.x,
+							(fy + 0.5) / emissiveLightTexSize.y
+						);
+						vec4 posInt = texture2D(emissiveLightData, uv);
+						vec3 lightPos = posInt.xyz;
+						float intensity = posInt.w;
+						vec3 lightColor = texture2D(emissiveLightColors, uv).rgb;
 
 						vec3 lightDir = lightPos - worldPos;
 						float dist = length(lightDir);
@@ -966,16 +1006,6 @@ export class ThreeStructureRenderer {
 		}
 		direction.normalize()
 
-		// Initialize emissive light arrays
-		const emissiveLightPositions: THREE.Vector3[] = []
-		const emissiveLightColors: THREE.Vector3[] = []
-		const emissiveLightIntensities: number[] = []
-		for (let i = 0; i < MAX_EMISSIVE_LIGHTS; i++) {
-			emissiveLightPositions.push(new THREE.Vector3(0, 0, 0))
-			emissiveLightColors.push(new THREE.Vector3(1, 0.85, 0.6))
-			emissiveLightIntensities.push(0)
-		}
-
 		return {
 			atlas: { value: this.atlasTexture },
 			pixelSize: { value: this.pixelSize },
@@ -1003,10 +1033,10 @@ export class ThreeStructureRenderer {
 			shadowMapSize: { value: new THREE.Vector2(this.sunlight.shadow.mapSize, this.sunlight.shadow.mapSize) },
 			shadowEnabled: { value: this.sunlight.shadow.enabled },
 			// Emissive point light uniforms
-			emissiveLightPositions: { value: emissiveLightPositions },
-			emissiveLightColors: { value: emissiveLightColors },
-			emissiveLightIntensities: { value: emissiveLightIntensities },
-			numEmissiveLights: { value: 0 },
+			emissiveLightData: { value: this.emissiveLightDataTex },
+			emissiveLightColors: { value: this.emissiveLightColorTex },
+			emissiveLightCount: { value: 0 },
+			emissiveLightTexSize: { value: new THREE.Vector2(1, 1) },
 			// Global emissive settings
 			emissiveRange: { value: this.sunlight.emissive.range },
 			emissiveGlobalIntensity: { value: this.sunlight.emissive.intensity },

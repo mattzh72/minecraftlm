@@ -22,6 +22,7 @@ export default function usePhysics(
     isGrounded: false,
     movementIntent: { forward: 0, right: 0 },
     isRunning: false,
+    jumpCount: 0, // Track jumps for double jump (0 = can jump, 1 = can double jump, 2 = no more jumps)
   });
 
   const animationFrameRef = useRef(null);
@@ -46,11 +47,18 @@ export default function usePhysics(
     }
   }, [rendererRef, RUN_FOV]);
 
-  // Jump (called by controls)
+  // Jump (called by controls) - supports double jump
   const jump = useCallback(() => {
+    const maxJumps = 2; // Allow double jump
     if (physicsState.current.isGrounded) {
+      // First jump from ground
       physicsState.current.velocity[1] = playable.jumpVelocity;
       physicsState.current.isGrounded = false;
+      physicsState.current.jumpCount = 1;
+    } else if (physicsState.current.jumpCount < maxJumps) {
+      // Double jump in mid-air
+      physicsState.current.velocity[1] = playable.jumpVelocity;
+      physicsState.current.jumpCount += 1;
     }
   }, []);
 
@@ -106,15 +114,23 @@ export default function usePhysics(
     if (hitGround) {
       physicsState.current.velocity[1] = 0;
       physicsState.current.isGrounded = true;
+      physicsState.current.jumpCount = 0; // Reset jump count on landing
     } else if (hitCeiling) {
       physicsState.current.velocity[1] = 0;
     }
 
     // 6. Update grounded state
     if (!hitGround) {
+      const wasGrounded = physicsState.current.isGrounded;
       physicsState.current.isGrounded = checkGrounded(structure, resources, newPos);
-      if (physicsState.current.isGrounded && physicsState.current.velocity[1] < 0) {
-        physicsState.current.velocity[1] = 0;
+      if (physicsState.current.isGrounded) {
+        if (physicsState.current.velocity[1] < 0) {
+          physicsState.current.velocity[1] = 0;
+        }
+        physicsState.current.jumpCount = 0; // Reset jump count on landing
+      } else if (wasGrounded && !physicsState.current.isGrounded) {
+        // Just walked off an edge - count as first "jump" used
+        physicsState.current.jumpCount = 1;
       }
     }
 
@@ -152,6 +168,7 @@ export default function usePhysics(
       physicsState.current.velocity = vec3.fromValues(0, 0, 0);
       physicsState.current.movementIntent = { forward: 0, right: 0 };
       physicsState.current.isRunning = false;
+      physicsState.current.jumpCount = 0;
       prevRunningStateRef.current = false;
 
       // Reset FOV to base when exiting playable mode

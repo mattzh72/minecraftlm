@@ -16,18 +16,54 @@ const ICE_BLOCKS = new Set([
 
 const isStairBlock = (blockName) => blockName?.endsWith('_stairs');
 const isSlabBlock = (blockName) => blockName?.endsWith('_slab');
+const COLLISION_EPSILON = 1e-4;
 
-const getBlockCollisionHeight = (block) => {
-  if (!block) return 1;
+const getBlockCollisionBox = (block, position) => {
+  const [x, y, z] = position;
   const name = block.state.getName().toString();
+  const type = block.state.getProperty?.('type');
+
   if (isSlabBlock(name)) {
-    const type = block.state.getProperty?.('type');
-    if (type === 'bottom') return 0.5;
-    if (type === 'top') return 1; // top slab occupies upper half, so top is at full block height
-    if (type === 'double') return 1;
-    return 0.5;
+    if (type === 'top') {
+      return {
+        min: [x, y + 0.5, z],
+        max: [x + 1, y + 1, z + 1],
+      };
+    }
+    if (type === 'double') {
+      return {
+        min: [x, y, z],
+        max: [x + 1, y + 1, z + 1],
+      };
+    }
+    // Bottom slab (or unknown type)
+    return {
+      min: [x, y, z],
+      max: [x + 1, y + 0.5, z + 1],
+    };
   }
-  return 1;
+
+  // Approximate stairs and other solids as full blocks for stability
+  return {
+    min: [x, y, z],
+    max: [x + 1, y + 1, z + 1],
+  };
+};
+
+const getBlockTop = (block, position) => {
+  const box = getBlockCollisionBox(block, position);
+  return box?.max?.[1] ?? position[1] + 1;
+};
+
+const aabbIntersects = (playerMin, playerMax, blockBox) => {
+  return (
+    playerMin[0] < blockBox.max[0] - COLLISION_EPSILON &&
+    playerMax[0] > blockBox.min[0] + COLLISION_EPSILON &&
+    playerMin[1] < blockBox.max[1] - COLLISION_EPSILON &&
+    playerMax[1] > blockBox.min[1] + COLLISION_EPSILON &&
+    playerMin[2] < blockBox.max[2] - COLLISION_EPSILON &&
+    playerMax[2] > blockBox.min[2] + COLLISION_EPSILON
+  );
 };
 
 /**
@@ -91,6 +127,9 @@ export function checkAABBCollision(structure, resources, position) {
   const feetY = position[1] - playable.playerHeight + epsilon;
   const headY = position[1];
 
+  const playerMin = [position[0] - halfW, feetY, position[2] - halfD];
+  const playerMax = [position[0] + halfW, headY, position[2] + halfD];
+
   const minX = Math.floor(position[0] - halfW);
   const maxX = Math.floor(position[0] + halfW);
   const minY = Math.floor(feetY);
@@ -101,8 +140,12 @@ export function checkAABBCollision(structure, resources, position) {
   for (let x = minX; x <= maxX; x++) {
     for (let y = minY; y <= maxY; y++) {
       for (let z = minZ; z <= maxZ; z++) {
-        if (isBlockSolid(structure, resources, x, y, z)) {
-          return true;
+        const block = structure.getBlock([x, y, z]);
+        if (isBlockSolid(structure, resources, x, y, z, block)) {
+          const blockBox = getBlockCollisionBox(block, [x, y, z]);
+          if (aabbIntersects(playerMin, playerMax, blockBox)) {
+            return true;
+          }
         }
       }
     }
@@ -125,6 +168,9 @@ function findFirstSolidCollision(structure, resources, position) {
   const feetY = position[1] - playable.playerHeight + epsilon;
   const headY = position[1];
 
+  const playerMin = [position[0] - halfW, feetY, position[2] - halfD];
+  const playerMax = [position[0] + halfW, headY, position[2] + halfD];
+
   const minX = Math.floor(position[0] - halfW);
   const maxX = Math.floor(position[0] + halfW);
   const minY = Math.floor(feetY);
@@ -137,7 +183,10 @@ function findFirstSolidCollision(structure, resources, position) {
       for (let z = minZ; z <= maxZ; z++) {
         const block = structure.getBlock([x, y, z]);
         if (isBlockSolid(structure, resources, x, y, z, block)) {
-          return { block, position: [x, y, z] };
+          const blockBox = getBlockCollisionBox(block, [x, y, z]);
+          if (aabbIntersects(playerMin, playerMax, blockBox)) {
+            return { block, position: [x, y, z], box: blockBox };
+          }
         }
       }
     }
@@ -209,7 +258,7 @@ export function attemptMove(structure, resources, currentPos, delta, options = {
     // If we bumped into stairs or slabs while grounded, attempt to step up onto them
     const blockName = collision.block.state.getName().toString();
     if (isGrounded && (isStairBlock(blockName) || isSlabBlock(blockName))) {
-      const targetFeetY = collision.position[1] + getBlockCollisionHeight(collision.block);
+      const targetFeetY = getBlockTop(collision.block, collision.position);
       const feetY = newPos[1] - playable.playerHeight;
       const climbHeight = targetFeetY - feetY;
       // Limit climb to a single stair height to avoid walking up walls
@@ -250,7 +299,7 @@ export function attemptVerticalMove(structure, resources, currentPos, deltaY) {
       // Moving down, snap to top of block
       const collision = findFirstSolidCollision(structure, resources, newPos);
       const blockTop = collision
-        ? collision.position[1] + getBlockCollisionHeight(collision.block)
+        ? getBlockTop(collision.block, collision.position)
         : Math.floor(currentPos[1] - playable.playerHeight + deltaY) + 1;
       newPos[1] = blockTop + playable.playerHeight;
       return { position: newPos, hitGround: true, hitCeiling: false };
