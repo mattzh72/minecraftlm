@@ -31,7 +31,6 @@ https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
   - [Dynamic Lighting System](#dynamic-lighting-system)
 - [Technical Architecture](#technical-architecture)
 - [Configuration](#configuration)
-- [License](#license)
 
 ## Overview
 
