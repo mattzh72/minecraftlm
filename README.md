@@ -27,9 +27,9 @@ https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
 
 ## What is MinecraftLM?
 
-MinecraftLM lets you create 3D structures in Minecraft just by describing them. Type "build me a medieval castle with towers" and watch as an AI agent writes code, validates it, and generates your structure in real-time. Keep the conversation going to add gardens, modify interiors, or place your castle on procedural terrain—the agent maintains context across turns and ensures everything connects spatially.
+MinecraftLM lets you create 3D structures in Minecraft just by describing them. Type "build me a medieval castle with towers" and watch as an AI agent writes code, validates it, and generates your structure in real-time. Keep the conversation going to add gardens, modify interiors, or place your castle on terrain—the agent maintains context across turns and ensures everything connects spatially.
 
-**No templates, no limits**—the AI writes procedural code to understand spatial relationships, materials, and architectural concepts, giving you the freedom to build anything you can imagine.
+**No templates, no limits**—the AI writes code to understand spatial relationships, materials, and architectural concepts, giving you the freedom to build anything you can imagine.
 
 ## What You Can Build
 
@@ -71,7 +71,7 @@ Create vehicles with realistic proportions and details—aircraft with proper wi
 ### Terrain & Landscapes
 Generate natural landscapes with mountains, valleys, rivers, and vegetation. Place structures on terrain and watch them integrate seamlessly with automatic foundation filling.
 
-<!-- TODO: Add screenshot of procedurally generated terrain -->
+<!-- TODO: Add screenshot of generated terrain -->
 
 ### Creative & Abstract
 The agent can interpret artistic concepts and build abstract sculptures, pixel art, or fantastical creations.
