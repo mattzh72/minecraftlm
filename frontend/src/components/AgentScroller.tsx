@@ -73,17 +73,18 @@ export function AgentScroller({
         orientation="vertical"
         className={cn(
           "absolute bottom-3 right-3 z-50 transition-all duration-200",
+          "bg-zinc-900 rounded-lg",
           showJumpButtons
             ? "opacity-100 scale-100"
             : "opacity-0 scale-90 pointer-events-none"
         )}
       >
-        <Button variant="outline" size="icon-sm" onClick={scrollToTop}>
-          <ChevronUp size={14} />
+        <Button className="bg-zinc-900" variant="outline" size="icon-sm" onClick={scrollToTop}>
+          <ChevronUp size={14} className="text-white/60"/>
         </Button>
-        <ButtonGroupSeparator orientation="horizontal" />
-        <Button variant="outline" size="icon-sm" onClick={scrollToBottom}>
-          <ChevronDown size={14} />
+        <ButtonGroupSeparator className="bg-white/10" orientation="horizontal" />
+        <Button className="bg-zinc-900" variant="outline" size="icon-sm" onClick={scrollToBottom}>
+          <ChevronDown size={14}  className="text-white/60"/>
         </Button>
       </ButtonGroup>
     </div>
