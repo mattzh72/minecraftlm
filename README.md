@@ -1,18 +1,15 @@
-<div align="center">
-  
-# MinecraftLM
-
-</div>
-
-https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
+# MinecraftLM <span style="font-size: 75%;">An Agentic System for Generative 3D Voxel Worlds</span>
 
 <div align="center">
-<h3>An Agentic System for Generative 3D Voxel Worlds</h3>
 
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/mattzh72/minecraft-schematic-gen?style=flat&logo=github)](https://github.com/mattzh72/minecraft-schematic-gen)
 [![Discord](https://img.shields.io/discord/1451023766153855081?logo=discord&label=Discord&color=5865F2)](https://discord.gg/UNfAA4bte2)
 </div>
+
+Project Team: [Matt Zhou](https://x.com/Mattzh1314), [Johnathan Chiu](https://x.com/johnathanchewy), [Preston Bourne](https://x.com/prestonb0urne), [Avinash Jain](https://x.com/avinashj_)
+
+https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
 
 ---
 

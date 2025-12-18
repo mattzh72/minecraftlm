@@ -189,6 +189,11 @@ export const TimePresets: Record<TimeOfDay, typeof Config.renderer.sunlight> = {
         samples: 50,
       },
     },
+    emissive: {
+      range: 8.0,            // Moderate spread in daylight
+      intensity: 1.0,        // Subtle - sunlight dominates
+      tint: [1.0, 0.85, 0.6], // Warm tint
+    },
   },
   sunset: {
     // Golden hour sunset - sun low on horizon
@@ -260,6 +265,11 @@ export const TimePresets: Record<TimeOfDay, typeof Config.renderer.sunlight> = {
         density: 0.7,
         samples: 50,
       },
+    },
+    emissive: {
+      range: 10.0,           // Good spread for golden hour
+      intensity: 2.0,        // More visible as sun sets
+      tint: [1.0, 0.75, 0.5], // Warm amber glow
     },
   },
   night: {
@@ -341,7 +351,7 @@ export const TimePresets: Record<TimeOfDay, typeof Config.renderer.sunlight> = {
     // Emissive lighting - prominent warm glows at night
     emissive: {
       range: 16.0,           // Large spread for cozy atmosphere
-      intensity: 3.0,        // Much more noticeable
+      intensity: 4.0,        // Much more noticeable
       tint: [1.0, 0.75, 0.5], // Warm orange-amber glow
     },
   },
