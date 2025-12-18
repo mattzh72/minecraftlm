@@ -64,7 +64,7 @@ export function MinecraftViewer() {
   const activeCamera = viewerMode === 'orbit' ? orbitCamera : fpCamera;
 
   // Render loop - recreate renderer when canvasSize changes
-  const { render, requestRender, resize, structureRef, resourcesRef } = useRenderLoop(
+  const { render, requestRender, resize, structureRef, resourcesRef, rendererRef } = useRenderLoop(
     canvasRef,
     structureData,
     resources,
@@ -79,7 +79,8 @@ export function MinecraftViewer() {
     structureRef,
     resourcesRef,
     viewerMode === 'playable',
-    render
+    render,
+    rendererRef
   );
 
   // Exit callback for when pointer lock is lost

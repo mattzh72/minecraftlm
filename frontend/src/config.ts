@@ -4,6 +4,8 @@ export const Config = {
     gravity: -20,           // blocks/s^2
     jumpVelocity: 8,        // blocks/s
     moveSpeed: 5.5,         // blocks/s (slightly faster for snappier feel)
+    runSpeedMultiplier: 2.2, // speed multiplier when running (double-tap W)
+    runFOVMultiplier: 1.15,  // FOV increase when running (15% wider)
     terminalVelocity: -78,  // max fall speed
     // Player dimensions
     playerHeight: 1.62,     // eye level above feet
@@ -42,12 +44,12 @@ export const Config = {
       fillColor: [0.35, 0.28, 0.5],
       // Rim: hot orange edge lighting
       rimColor: [1.0, 0.55, 0.25],
-      intensity: 1.35,
-      ambientIntensity: 0.55,
+      intensity: 1.0,      // Reduced from 1.35 to prevent white block blow-out
+      ambientIntensity: 0.5, // Reduced from 0.55
       fillIntensity: 0.3,
-      rimIntensity: 0.55,
+      rimIntensity: 0.45,   // Reduced from 0.55
       horizonFalloff: 0.7,
-      exposure: 1.15,
+      exposure: 0.95,       // Reduced from 1.15 to prevent over-exposure on white blocks
       // Sky gradient colors
       sky: {
         zenithColor: [0.12, 0.28, 0.56],    // Deep blue at top
@@ -199,12 +201,12 @@ export const TimePresets: Record<TimeOfDay, typeof Config.renderer.sunlight> = {
     fillColor: [0.35, 0.28, 0.5],
     // Rim: hot orange edge lighting
     rimColor: [1.0, 0.55, 0.25],
-    intensity: 1.35,
-    ambientIntensity: 0.55,
+    intensity: 1.0,      // Reduced from 1.35 to prevent white block blow-out
+    ambientIntensity: 0.5, // Reduced from 0.55
     fillIntensity: 0.3,
-    rimIntensity: 0.55,
+    rimIntensity: 0.45,   // Reduced from 0.55
     horizonFalloff: 0.7,
-    exposure: 1.15,
+    exposure: 0.95,       // Reduced from 1.15 to prevent over-exposure on white blocks
     sky: {
       zenithColor: [0.12, 0.28, 0.56],
       horizonColor: [1.0, 0.55, 0.25],
