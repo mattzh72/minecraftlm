@@ -2,6 +2,23 @@
 
 This guide covers procedural terrain generation and structure placement in the Minecraft SDK.
 
+## Terrain Size Guidelines
+
+Terrain size is flexible - choose what fits your creative vision:
+
+- **128x128**: Small scenes, intimate builds, quick iteration
+- **256x256**: Standard scenes with room for multiple features (recommended for most builds)
+- **512x512**: Large landscapes, sprawling villages, epic mountain ranges
+- **1024x1024+**: Massive worlds for ambitious projects (may impact render performance)
+
+**Larger terrains enable:**
+- More dramatic terrain features (mountain ranges, river systems)
+- Better composition and spatial storytelling
+- Room for multiple structures with natural spacing
+- More realistic landscapes with gradual transitions
+
+Don't hesitate to go big - the terrain system handles large sizes efficiently!
+
 ## Quick Start
 
 ### Basic Plains Terrain
@@ -13,8 +30,24 @@ from app.agent.minecraft.terrain import create_terrain
 def build_structure() -> dict:
     catalog = BlockCatalog()
 
-    # Generate 128x128 plains terrain
-    terrain = create_terrain(128, 128, seed=42)
+    # Generate 256x256 plains terrain (default biome)
+    terrain = create_terrain(256, 256, seed=42)
+    terrain.generate()
+
+    scene = Scene()
+    scene.add(terrain)
+
+    return scene.to_structure()
+```
+
+### Choose a Biome
+
+```python
+from app.agent.minecraft import Scene
+from app.agent.minecraft.terrain import create_terrain
+
+def build_structure() -> dict:
+    terrain = create_terrain(256, 256, seed=42, biome='desert')
     terrain.generate()
 
     scene = Scene()
@@ -33,7 +66,7 @@ def build_structure() -> dict:
     catalog = BlockCatalog()
 
     # Generate terrain
-    terrain = create_terrain(128, 128, seed=42)
+    terrain = create_terrain(256, 256, seed=42)
     terrain.generate()
 
     # Build a house
@@ -43,8 +76,8 @@ def build_structure() -> dict:
     walls.position.set(0, 1, 0)
     house.add(floor, walls)
 
-    # Drop house onto terrain at position (64, 64)
-    dropped = drop_to_surface(house, terrain, 64, 64, fill_bottom=True)
+    # Drop house onto terrain at position (128, 128)
+    dropped = drop_to_surface(house, terrain, 128, 128, fill_bottom=True)
 
     scene = Scene()
     scene.add(terrain)
@@ -66,7 +99,9 @@ config = TerrainConfig(
     base_height=64,         # Sea level / average height
     height_range=32,        # Max deviation from base
     seed=42,                # Random seed
+    biome="plains",         # Land biome (single-biome terrain)
     generate_decorations=True,  # Add trees, flowers
+    tree_density=1.0,       # Tree multiplier (0.1 = sparse, 3.0 = dense)
     noise_config=NoiseConfig(
         octaves=4,          # Noise detail levels
         persistence=0.5,    # Amplitude decay
@@ -79,6 +114,18 @@ terrain = Terrain(config)
 terrain.generate()
 ```
 
+### Biome Options
+
+The terrain generator currently supports **one land biome per Terrain** via `TerrainConfig(biome=...)` or `create_terrain(..., biome=...)`.
+
+Available biomes:
+- `plains` (default)
+- `forest`
+- `desert`
+- `snowy_plains`
+- `taiga`
+- `badlands`
+
 ### Noise Parameters
 
 | Parameter | Effect | Typical Range |
@@ -88,27 +135,29 @@ terrain.generate()
 | `lacunarity` | Frequency multiplier per octave | 1.5-2.5 |
 | `scale` | Overall smoothness (larger = smoother) | 30-100 |
 
-## Plains Terrain Layers
+## Biome Terrain Layers
 
-The terrain generates with these layers (top to bottom):
+The land surface block stack depends on `biome`:
 
-1. **Grass Block** (1 block) - Surface layer
-2. **Dirt** (3 blocks) - Subsurface
-3. **Stone** (remaining) - Bedrock
+- `plains` / `forest`: grass block → dirt → stone
+- `desert`: sand → sandstone → stone
+- `snowy_plains`: snow layer on top of snowy grass block → dirt → stone
+- `taiga`: podzol → dirt → stone
+- `badlands`: red sand → terracotta → stone
 
 ## Terrain Methods
 
 ### Query Height
 
 ```python
-terrain = create_terrain(128, 128)
+terrain = create_terrain(256, 256)
 terrain.generate()
 
 # Get surface height at position
-height = terrain.get_height_at(64, 64)
+height = terrain.get_height_at(128, 128)
 
 # Place a block on the surface manually
-block.position.set(64, height + 1, 64)
+block.position.set(128, height + 1, 128)
 ```
 
 ### Flatten for Structure
@@ -198,7 +247,7 @@ from app.agent.minecraft.terrain import (
     generate_tall_grass,
 )
 
-# Get terrain height first
+# Get terrain surface height first
 height = terrain.get_height_at(50, 50)
 
 # Add a tree
@@ -235,13 +284,13 @@ The terrain system creates **organic, realistic mountains** using domain warping
 Creates an organic mountain with natural shape variation:
 
 ```python
-terrain = create_terrain(128, 128, seed=42)
+terrain = create_terrain(512, 512, seed=42)
 
 # Add a natural-looking mountain
 terrain.add_mountain(
-    center_x=64, center_z=64,
-    radius=35,           # Base radius (use 25+ for grand mountains)
-    height=50,           # Peak height above terrain (use 30+ for impressive peaks)
+    center_x=256, center_z=256,
+    radius=60,           # Base radius (use 25+ for grand mountains, 50+ for epic scale)
+    height=80,           # Peak height above terrain (use 30+ for impressive peaks)
     seed=123,            # Different seeds create different shapes
     snow=True,           # Add snow cap (default: True)
     snow_start_percent=0.7,  # Snow starts at 70% of peak height
@@ -255,14 +304,14 @@ terrain.generate()
 Creates an organic ridge with curved centerline and varying width:
 
 ```python
-terrain = create_terrain(128, 128, seed=42)
+terrain = create_terrain(512, 512, seed=42)
 
 # Add a natural ridge with sub-peaks
 terrain.add_ridge(
-    start_x=10, start_z=64,
-    end_x=118, end_z=64,
-    width=20,            # Base half-width (varies naturally along length)
-    height=40,           # Peak height (varies with sub-peaks)
+    start_x=50, start_z=256,
+    end_x=462, end_z=256,
+    width=30,            # Base half-width (varies naturally along length)
+    height=60,           # Peak height (varies with sub-peaks)
     seed=456,            # Different seeds create different curves
     snow=True,           # Add snow cap
 )
@@ -275,14 +324,14 @@ terrain.generate()
 Creates a flat-topped mesa with stone surface:
 
 ```python
-terrain = create_terrain(128, 128, seed=42)
+terrain = create_terrain(256, 256, seed=42)
 
 # Add a stone plateau
 terrain.add_plateau(
-    center_x=64, center_z=64,
-    radius=25,           # Total radius including slopes
-    height=25,           # Height to raise
-    flat_radius=15,      # Radius of flat top (default: radius // 2)
+    center_x=128, center_z=128,
+    radius=40,           # Total radius including slopes
+    height=30,           # Height to raise
+    flat_radius=25,      # Radius of flat top (default: radius // 2)
     snow=False,          # Plateaus don't have snow by default
 )
 
@@ -305,24 +354,24 @@ terrain.generate()
 Mountains use proper Minecraft block layers:
 - **Snow cap**: `minecraft:snow_block` at elevations above snow line
 - **Stone surface**: `minecraft:stone` for mountain surfaces
-- **Plains**: Grass/dirt/stone layers for non-mountain areas
+- **Land**: Uses the selected `biome` layer stack for non-mountain areas
 
 ### Creating a Mountain Range
 
 ```python
-terrain = create_terrain(128, 128, seed=42)
+terrain = create_terrain(512, 512, seed=42)
 
 # Create organic peaks - each with unique shape from different seeds
-terrain.add_mountain(32, 64, radius=30, height=45, seed=100)
-terrain.add_mountain(64, 64, radius=35, height=55, seed=200)  # Central peak
-terrain.add_mountain(96, 64, radius=30, height=45, seed=300)
+terrain.add_mountain(128, 256, radius=50, height=70, seed=100)
+terrain.add_mountain(256, 256, radius=60, height=85, seed=200)  # Central peak
+terrain.add_mountain(384, 256, radius=50, height=70, seed=300)
 
 # Connect peaks with an organic ridge
-terrain.add_ridge(32, 64, 96, 64, width=18, height=35, seed=400)
+terrain.add_ridge(128, 256, 384, 256, width=30, height=55, seed=400)
 
 # Add a plateau for a structure
-terrain.add_plateau(64, 20, radius=18, height=20, snow=False)
-terrain.flatten_for_structure(55, 11, width=18, depth=18)
+terrain.add_plateau(256, 100, radius=35, height=30, snow=False)
+terrain.flatten_for_structure(238, 82, width=36, depth=36)
 
 terrain.generate()
 ```
@@ -336,13 +385,13 @@ The terrain system creates natural valleys, gorges, and craters using organic sh
 Creates a broad valley with gentle slopes (inverse of mountains):
 
 ```python
-terrain = create_terrain(128, 128, seed=42)
+terrain = create_terrain(256, 256, seed=42)
 
 # Add a natural valley
 terrain.add_valley(
-    center_x=64, center_z=64,
-    radius=30,           # Valley radius (use 25+ for broad valleys)
-    depth=15,            # Depth to carve (use 10-25)
+    center_x=128, center_z=128,
+    radius=50,           # Valley radius (use 25+ for broad valleys, 50+ for grand scale)
+    depth=20,            # Depth to carve (use 10-25)
     seed=123,            # Different seeds create different shapes
     fill_water=False,    # Optionally fill with water to create a lake
 )
@@ -355,14 +404,14 @@ terrain.generate()
 Creates a narrow, steep-sided canyon:
 
 ```python
-terrain = create_terrain(128, 128, seed=42)
+terrain = create_terrain(512, 512, seed=42)
 
 # Add a dramatic canyon
 terrain.add_gorge(
-    start_x=10, start_z=64,
-    end_x=118, end_z=64,
-    width=10,            # Canyon width (use 8-15)
-    depth=25,            # Depth to carve (use 15-35 for dramatic gorges)
+    start_x=50, start_z=256,
+    end_x=462, end_z=256,
+    width=12,            # Canyon width (use 8-15)
+    depth=35,            # Depth to carve (use 15-35 for dramatic gorges)
     seed=456,            # Controls path curvature
     fill_water=False,    # Can create a river canyon
 )
@@ -375,14 +424,14 @@ terrain.generate()
 Creates a circular depression with optional raised rim:
 
 ```python
-terrain = create_terrain(128, 128, seed=42)
+terrain = create_terrain(256, 256, seed=42)
 
 # Add an impact crater
 terrain.add_crater(
-    center_x=64, center_z=64,
-    radius=20,           # Crater radius
-    depth=15,            # Bowl depth
-    rim_height=5,        # Raised rim height (0 = no rim)
+    center_x=128, center_z=128,
+    radius=35,           # Crater radius
+    depth=20,            # Bowl depth
+    rim_height=8,        # Raised rim height (0 = no rim)
     fill_water=True,     # Creates a crater lake
     water_level=68,      # Optional: override water surface level (e.g., near the rim)
 )
@@ -418,8 +467,8 @@ Set a global water level for oceans and seas:
 ```python
 # Create terrain with ocean level set
 terrain = create_terrain(
-    width=128,
-    depth=128,
+    width=512,
+    depth=512,
     base_height=64,
     water_level=65,      # All terrain below 65 will be underwater
     seed=42,
@@ -436,13 +485,13 @@ terrain.generate()
 Creates a valley filled with water:
 
 ```python
-terrain = create_terrain(128, 128, seed=42)
+terrain = create_terrain(256, 256, seed=42)
 
 # Add a natural lake
 terrain.add_lake(
-    center_x=64, center_z=64,
-    radius=25,           # Lake radius
-    depth=10,            # Depth below terrain
+    center_x=128, center_z=128,
+    radius=40,           # Lake radius
+    depth=12,            # Depth below terrain
     seed=789,            # Lake shape variation
 )
 
@@ -453,17 +502,17 @@ terrain.generate()
 
 Creates a terrain-following river between two points:
 
-Note: terrain features apply in the order you call them. For example, if you want a river to cut through a mountain, call `add_mountain(...)` first and `add_river(...)` after. If you add a mountain after a river, it can raise terrain back up and “erase” the river cut.
+Note: terrain features apply in the order you call them. For example, if you want a river to cut through a mountain, call `add_mountain(...)` first and `add_river(...)` after. If you add a mountain after a river, it can raise terrain back up and "erase" the river cut.
 
 ```python
-terrain = create_terrain(128, 128, seed=42)
+terrain = create_terrain(512, 512, seed=42)
 
 # Add a winding river
 terrain.add_river(
-    start_x=10, start_z=10,
-    end_x=118, end_z=118,
-    width=6,             # River width (use 3-8 for streams, 10-20 for rivers)
-    depth=4,             # River depth (use 2-5 for shallow, 6-12 for deep)
+    start_x=50, start_z=50,
+    end_x=462, end_z=462,
+    width=8,             # River width (use 3-8 for streams, 10-20 for rivers)
+    depth=6,             # River depth (use 2-5 for shallow, 6-12 for deep)
     seed=999,            # Path variation
 )
 
@@ -480,20 +529,20 @@ Water features automatically use appropriate blocks:
 ### Creating a Lake System
 
 ```python
-terrain = create_terrain(128, 128, seed=42)
+terrain = create_terrain(512, 512, seed=42)
 
 # Main lake in valley
-terrain.add_lake(64, 64, radius=30, depth=12)
+terrain.add_lake(256, 256, radius=60, depth=15)
 
 # Smaller connected lake
-terrain.add_lake(90, 40, radius=15, depth=8)
+terrain.add_lake(360, 200, radius=30, depth=10)
 
 # River connecting to edge
 terrain.add_river(
-    start_x=90, start_z=50,
-    end_x=128, end_z=20,
-    width=5,
-    depth=3,
+    start_x=360, start_z=230,
+    end_x=512, end_z=100,
+    width=8,
+    depth=5,
 )
 
 terrain.generate()
@@ -503,19 +552,19 @@ terrain.generate()
 
 ```python
 terrain = create_terrain(
-    width=128,
-    depth=128,
+    width=512,
+    depth=512,
     base_height=64,
-    height_range=20,
+    height_range=25,
     water_level=66,      # Ocean level
     seed=42,
 )
 
 # Add a mountain near the coast
-terrain.add_mountain(90, 64, radius=25, height=35)
+terrain.add_mountain(360, 256, radius=50, height=60)
 
 # Flatten area for a beach resort
-terrain.flatten_for_structure(20, 50, width=20, depth=20)
+terrain.flatten_for_structure(80, 200, width=40, depth=40)
 
 terrain.generate()
 
@@ -529,29 +578,29 @@ For advanced terrain manipulation (note: using `Terrain` methods is preferred as
 ```python
 from app.agent.minecraft.terrain import HeightMap, HeightMapConfig
 
-config = HeightMapConfig(width=128, depth=128, base_height=64, height_range=32)
+config = HeightMapConfig(width=256, depth=256, base_height=64, height_range=32)
 heightmap = HeightMap(config)
 heightmap.generate()
 
 # Query
-height = heightmap.get(50, 50)
-avg = heightmap.get_average_height(40, 40, 20, 20)
+height = heightmap.get(100, 100)
+avg = heightmap.get_average_height(80, 80, 40, 40)
 
 # Modify
-heightmap.flatten_area(50, 50, 10, 10, target_height=70)
+heightmap.flatten_area(100, 100, 20, 20, target_height=70)
 heightmap.smooth(radius=2, iterations=1)
-heightmap.raise_area(30, 30, 5, 5, amount=3)
-heightmap.carve_area(60, 60, 5, 5, amount=4)
+heightmap.raise_area(60, 60, 10, 10, amount=3)
+heightmap.carve_area(120, 120, 10, 10, amount=4)
 
 # Mountains (heightmap only - won't get stone/snow blocks, use Terrain methods instead)
-heightmap.add_mountain(64, 64, radius=35, height=50, seed=123)
-heightmap.add_ridge(10, 64, 118, 64, width=20, height=40, seed=456)
-heightmap.add_plateau(64, 64, radius=20, height=25)
+heightmap.add_mountain(128, 128, radius=60, height=70, seed=123)
+heightmap.add_ridge(20, 128, 236, 128, width=30, height=60, seed=456)
+heightmap.add_plateau(128, 128, radius=40, height=30)
 
 # Valleys (heightmap only - won't get water, use Terrain methods instead)
-heightmap.add_valley(64, 64, radius=30, depth=15, seed=789)
-heightmap.add_gorge(10, 64, 118, 64, width=10, depth=25, seed=321)
-heightmap.add_crater(64, 64, radius=20, depth=15, rim_height=5)
+heightmap.add_valley(128, 128, radius=50, depth=20, seed=789)
+heightmap.add_gorge(20, 128, 236, 128, width=12, depth=30, seed=321)
+heightmap.add_crater(128, 128, radius=35, depth=20, rim_height=8)
 ```
 
 ## Complete Example
@@ -563,15 +612,22 @@ from app.agent.minecraft.terrain import create_terrain, drop_to_surface
 def build_structure() -> dict:
     catalog = BlockCatalog()
 
-    # Generate terrain
+    # Generate terrain with varied features
     terrain = create_terrain(
-        width=128,
-        depth=128,
+        width=512,
+        depth=512,
         seed=42,
         base_height=64,
-        height_range=16,
+        height_range=20,
         generate_decorations=True,
     )
+
+    # Add a mountain for backdrop
+    terrain.add_mountain(384, 256, radius=60, height=70, seed=100)
+
+    # Flatten area for cottage placement
+    terrain.flatten_for_structure(236, 236, width=40, depth=40, falloff=6)
+
     terrain.generate()
 
     # Build a cottage
@@ -593,7 +649,7 @@ def build_structure() -> dict:
 
     # Drop cottage onto terrain with foundation fill
     dropped = drop_to_surface(
-        cottage, terrain, 64, 64,
+        cottage, terrain, 256, 256,
         fill_bottom=True,
         fill_material="minecraft:cobblestone",
         catalog=catalog,

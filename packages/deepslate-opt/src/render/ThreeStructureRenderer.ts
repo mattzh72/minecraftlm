@@ -492,6 +492,11 @@ export class ThreeStructureRenderer {
 		this.resizePostProcessTargets(width, height)
 	}
 
+	public setFOV(fov: number) {
+		this.camera.fov = fov
+		this.camera.updateProjectionMatrix()
+	}
+
 	public setStructure(structure: StructureProvider) {
 		this.structure = structure
 		this.targetCenter = vec3.fromValues(
