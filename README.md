@@ -47,7 +47,8 @@ Create vehicles with realistic proportions and details—aircraft with proper wi
 <table>
   <tr>
     <td><img height="300" alt="CleanShot 2025-12-18 at 01 55 18@2x" src="https://github.com/user-attachments/assets/1acf4c89-d083-4a0d-be47-7017b3e951d1" /></td>
-    <td><img height="300" alt="CleanShot 2025-12-18 at 03 27 07@2x" src="https://github.com/user-attachments/assets/74094706-7b88-4f11-a7b5-36a8ce9bb7a0" /></td>
+    <td><img height="300" alt="Screenshot 2025-12-18 at 1 23 12 PM" src="https://github.com/user-attachments/assets/222a6e40-bf83-4c42-b911-52fd02ed3544" />
+</td>
   </tr>
 </table>
 
