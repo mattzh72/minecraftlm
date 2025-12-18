@@ -5,6 +5,7 @@ import useCamera from "../hooks/useCamera";
 import useFirstPersonCamera from "../hooks/useFirstPersonCamera";
 import useRenderLoop from "../hooks/useRenderLoop";
 import useMouseControls from "../hooks/useMouseControls";
+import useKeyboardControls from "../hooks/useKeyboardControls";
 import useFirstPersonControls from "../hooks/useFirstPersonControls";
 import usePhysics from "../hooks/usePhysics";
 import useThumbnailCaptureOnComplete from "../hooks/useThumbnailCaptureOnComplete";
@@ -172,6 +173,9 @@ export function MinecraftViewer() {
 
   // Mouse controls (orbit mode only)
   useMouseControls(canvasRef, orbitCamera, requestRender, viewerMode === 'orbit');
+
+  // Keyboard controls (orbit mode only)
+  useKeyboardControls(orbitCamera, requestRender, viewerMode === 'orbit');
 
   // First-person controls (playable mode only)
   useFirstPersonControls(

@@ -39,7 +39,7 @@ export default function usePhysics(
     physicsState.current.isRunning = isRunning;
 
     // Update FOV when running state changes
-    if (isRunning !== prevRunningStateRef.current && rendererRef?.current) {
+    if (isRunning !== prevRunningStateRef.current && rendererRef?.current?.setFOV) {
       const targetFOV = isRunning ? RUN_FOV : BASE_FOV;
       rendererRef.current.setFOV(targetFOV);
       prevRunningStateRef.current = isRunning;
@@ -155,7 +155,7 @@ export default function usePhysics(
       prevRunningStateRef.current = false;
 
       // Reset FOV to base when exiting playable mode
-      if (rendererRef?.current) {
+      if (rendererRef?.current?.setFOV) {
         rendererRef.current.setFOV(BASE_FOV);
       }
       return;

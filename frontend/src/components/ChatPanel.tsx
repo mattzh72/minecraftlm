@@ -299,8 +299,8 @@ export function ChatPanel({ expanded, setExpanded, width, onWidthChange, onResiz
 
       {/* Header with title and collapse button */}
       <div className={cn(
-        "flex items-center justify-between px-4 shrink-0",
-        expanded ? "py-2 border-b border-white/10" : "py-2.5"
+        "flex items-center justify-between px-4 py-2.5 shrink-0",
+        expanded && "border-b border-white/10"
       )}>
         <h2 className="font-semibold text-sm text-white/90">Chat</h2>
         <button
