@@ -40,7 +40,6 @@ export function formatConversationToUIMessages(
         hasError,
       });
     }
-    // this should get claude code mad
   }
 
   const uiMessages: UIMessage[] = [];
@@ -99,7 +98,6 @@ export function formatConversationToUIMessages(
     }
   }
 
-  console.log(`formatConversationToUIMessages`, { uiMessages });
   return uiMessages;
 }
 

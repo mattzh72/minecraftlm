@@ -1,4 +1,4 @@
-import { useRef, useMemo, useCallback, useLayoutEffect } from "react";
+import { useRef, useMemo, useCallback, useLayoutEffect, useEffect } from "react";
 import { useStore } from "../store";
 import useDeepslateResources from "../hooks/useDeepslateResources";
 import useCamera from "../hooks/useCamera";
@@ -14,6 +14,10 @@ export function MinecraftViewer() {
   // Only subscribe to the structure data, not the entire session (avoids re-renders on conversation updates)
   const structureData = useStore((s) =>
     s.activeSessionId ? s.sessions[s.activeSessionId]?.structure : null
+  );
+  // Track if session has a cached thumbnail
+  const hasThumbnail = useStore((s) =>
+    s.activeSessionId ? s.sessions[s.activeSessionId]?.has_thumbnail : false
   );
   const thumbnailCaptureRequest = useStore((s) => s.thumbnailCaptureRequest);
   const clearThumbnailCaptureRequest = useStore(
@@ -94,6 +98,38 @@ export function MinecraftViewer() {
     captureAndUploadThumbnail,
     clearThumbnailCaptureRequest,
   });
+
+  // Capture thumbnail on initial render if session has structure but no cached thumbnail
+  // This handles cases where the page was refreshed before task completed
+  const hasCapturedRef = useRef(false);
+  useEffect(() => {
+    // Only capture once per session
+    if (hasCapturedRef.current) return;
+    // Need structure, canvas, and resources loaded
+    if (!structureData || !canvasRef.current || isLoading || error) return;
+    // Don't capture if already has thumbnail
+    if (hasThumbnail) return;
+    // Don't capture if there's a pending capture request (let it handle it)
+    if (thumbnailCaptureRequest) return;
+
+    hasCapturedRef.current = true;
+
+    // Wait a frame for render to complete, then capture
+    const rafId = requestAnimationFrame(() => {
+      requestRender();
+      // Wait another frame for the render to actually complete
+      requestAnimationFrame(() => {
+        captureAndUploadThumbnail();
+      });
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [structureData, isLoading, error, hasThumbnail, thumbnailCaptureRequest, requestRender, captureAndUploadThumbnail]);
+
+  // Reset capture flag when session changes
+  useEffect(() => {
+    hasCapturedRef.current = false;
+  }, [activeSessionId]);
 
   // Store resize in ref to avoid dependency issues
   const resizeRef = useRef(resize);

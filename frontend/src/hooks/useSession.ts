@@ -7,19 +7,14 @@ import { sessionDetailsResponseSchema } from "@/lib/schemas";
 export function useSession() {
   const setActiveSession = useStore((s) => s.setActiveSession);
   const setSelectedModelId = useStore((s) => s.setSelectedModelId);
-  const { handleSend } = useChat();
+  const { handleSend, resumeStreamIfRunning } = useChat();
 
   const [isLoading, setIsLoading] = useState(false);
 
   const createSession = useCallback(
     async (initialMessage?: string) => {
-      console.log(`creating session`, {
-        initialMessage,
-        isLoading,
-      });
       setIsLoading(true);
       try {
-        console.log(`POSTing to create session`);
         const response = await fetch("/api/sessions", {
           method: "POST",
         });
@@ -27,9 +22,7 @@ export function useSession() {
           throw new Error(`Failed to create session: ${response.status}`);
         }
         const responseData = await response.json();
-        console.log(`responseData`, { responseData });
         const session = createSessionResponseSchema.parse(responseData);
-        console.log(`setting active session`, { session });
         setActiveSession(session.session_id, {
           session_id: session.session_id,
         });
@@ -46,7 +39,7 @@ export function useSession() {
         setIsLoading(false);
       }
     },
-    [setActiveSession]
+    [setActiveSession, handleSend]
   );
 
   const restoreSession = useCallback(
@@ -59,25 +52,33 @@ export function useSession() {
         }
         const data = await response.json();
         const session = sessionDetailsResponseSchema.parse(data);
-        console.log(`restoring session`, { session });
         setActiveSession(session.session_id, {
           session_id: session.session_id,
           conversation: session.conversation,
           structure: session.structure,
+          has_thumbnail: session.has_thumbnail,
         });
         // Restore the model that was used for this session
         if (session.model) {
           setSelectedModelId(session.model);
         }
+
+        // Resume stream if task is running (using status from the same response)
+        // Frontend will subscribe with since=0 to replay all buffered events
+        await resumeStreamIfRunning(session.session_id, session.task_status);
       } catch (error) {
         console.error("Error restoring session:", error);
       } finally {
         setIsLoading(false);
       }
     },
-    [setActiveSession, setSelectedModelId]
+    [setActiveSession, setSelectedModelId, resumeStreamIfRunning]
   );
+
   const clearActiveSession = useCallback(() => {
+    // Cancel any active SSE stream before clearing the session
+    // Call store action directly to avoid dependency on cancelStream which changes reference
+    useStore.getState().abortCurrentStream();
     setActiveSession(null);
   }, [setActiveSession]);
 

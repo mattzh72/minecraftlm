@@ -72,7 +72,6 @@ export function ModelSelector({ variant = 'default' }: ModelSelectorProps) {
     if (models.length > 0) return;
 
     async function fetchModels() {
-      console.log(`[fetchModels] fetching models`);
       try {
         const response = await fetch('/api/models');
         if (!response.ok) {
@@ -80,10 +79,8 @@ export function ModelSelector({ variant = 'default' }: ModelSelectorProps) {
         }
         const data = await response.json();
         const parsed = modelsResponseSchema.parse(data);
-        console.log(`[fetchModels] parsed`, parsed);
         setModels(parsed.models);
         if (!selectedModelId && parsed.default) {
-          console.log(`[fetchModels] setting default model`, parsed.default);
           setSelectedModelId(parsed.default);
         }
       } catch (error) {
@@ -141,7 +138,6 @@ export function ModelSelector({ variant = 'default' }: ModelSelectorProps) {
       value={selectedModelId}
       onValueChange={(value) => {
         if (value) {
-          console.log(`[ModelSelector] setting selected model id`, value);
           setSelectedModelId(value);
         }
       }}

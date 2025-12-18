@@ -30,13 +30,12 @@ export function SessionPage() {
   const [chatWidth, setChatWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
 
-  // Restore session from URL param on mount
+  // Restore session from URL param on mount or when URL changes
   useEffect(() => {
-    console.log(`useEffect`, { activeSessionId });
-    if (urlSessionId) {
+    if (urlSessionId && urlSessionId !== activeSessionId) {
       restoreSession(urlSessionId);
     }
-  }, [urlSessionId, restoreSession]);
+  }, [urlSessionId, activeSessionId, restoreSession]);
 
   const handleBackToProjects = () => {
     clearActiveSession();
@@ -51,7 +50,6 @@ export function SessionPage() {
   const structureData = useMemo(() => {
     return activeSession?.structure || null;
   }, [activeSession]);
-  console.log(`[SessionPage] structureData`, structureData);
 
   return (
     <div className="h-screen w-screen relative overflow-hidden">

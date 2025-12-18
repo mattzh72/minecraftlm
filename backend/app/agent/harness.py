@@ -5,16 +5,17 @@ Agent executor - main agentic loop
 import json
 import logging
 import uuid
-from dataclasses import dataclass
-from enum import Enum
+from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
-from typing import AsyncIterator, Literal
+from typing import AsyncIterator
 
 from app.agent.llms import (
     AnthropicService,
     BaseLLMService,
     GeminiService,
     OpenAIService,
+    StreamChunk,
 )
 from app.agent.llms.base import ThinkingLevel
 from app.agent.tools.base import ToolResult
@@ -27,40 +28,30 @@ from app.models import (
     ToolCall,
     ToolCallFunction,
     ToolMessage,
-    UserMessage,
 )
-from app.services.session import SessionService
-
-# Event types emitted by the agent
-ActivityEventType = Literal[
-    "thought",
-    "text_delta",
-    "tool_call",
-    "tool_result",
-    "complete",
-    "turn_start",
-    "error",
-]
 
 logger = logging.getLogger(__name__)
 
 
-class TerminateReason(str, Enum):
+class ActivityEventType(StrEnum):
+    """Event types emitted by the agent"""
+
+    THOUGHT = "thought"
+    TEXT_DELTA = "text_delta"
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
+    COMPLETE = "complete"
+    TURN_START = "turn_start"
+    ERROR = "error"
+
+
+class TerminateReason(StrEnum):
     """Reasons for agent termination"""
 
-    GOAL = "GOAL"  # Successfully completed
-    MAX_TURNS = "MAX_TURNS"  # Hit max turns limit
-    ERROR = "ERROR"  # Unexpected error
-    NO_COMPLETE_TASK = "NO_COMPLETE_TASK"  # Protocol violation
-
-
-@dataclass
-class AgentOutput:
-    """Output from agent execution"""
-
-    success: bool
-    terminate_reason: TerminateReason
-    message: str
+    GOAL = "GOAL"
+    MAX_TURNS = "MAX_TURNS"
+    ERROR = "ERROR"
+    NO_COMPLETE_TASK = "NO_COMPLETE_TASK"
 
 
 @dataclass
@@ -71,14 +62,83 @@ class ActivityEvent:
     data: dict
 
 
+@dataclass
+class StreamResponse:
+    """Accumulated response from LLM streaming"""
+
+    text: str = ""
+    thought: str = ""
+    thinking_signature: str | None = None
+    reasoning_items: list | None = None
+    tool_calls: list[ToolCall] = field(default_factory=list)
+
+
+class ToolCallAccumulator:
+    """Accumulates streaming tool call deltas into complete ToolCalls"""
+
+    def __init__(self):
+        self._calls: dict[int, dict] = {}
+
+    def add_delta(self, delta: dict) -> None:
+        """Add a tool call delta to the accumulator"""
+        idx = delta.get("index", 0)
+
+        if idx not in self._calls:
+            self._calls[idx] = {
+                "id": delta.get("id"),
+                "type": delta.get("type", "function"),
+                "function": {"name": "", "arguments": ""},
+                "extra_content": {},
+                "thought_signature": None,
+            }
+
+        call = self._calls[idx]
+
+        # Accumulate function name
+        if delta.get("function", {}).get("name"):
+            call["function"]["name"] = delta["function"]["name"]
+
+        # Accumulate function arguments
+        if delta.get("function", {}).get("arguments"):
+            call["function"]["arguments"] += delta["function"]["arguments"]
+
+        # Merge extra content
+        if delta.get("extra_content"):
+            call["extra_content"].update(delta["extra_content"])
+
+        # Capture thought signature
+        if delta.get("thought_signature"):
+            call["thought_signature"] = delta["thought_signature"]
+
+        # Update ID if provided
+        if delta.get("id"):
+            call["id"] = delta["id"]
+
+    def build(self) -> list[ToolCall]:
+        """Build list of ToolCall objects from accumulated data"""
+        result = []
+        for tc_data in self._calls.values():
+            tool_call_id = tc_data.get("id") or f"call_{uuid.uuid4().hex}"
+            result.append(
+                ToolCall(
+                    id=tool_call_id,
+                    type="function",
+                    function=ToolCallFunction(
+                        name=tc_data.get("function", {}).get("name", ""),
+                        arguments=tc_data.get("function", {}).get("arguments", ""),
+                    ),
+                    thought_signature=tc_data.get("thought_signature"),
+                    extra_content=tc_data.get("extra_content", {}),
+                )
+            )
+        return result
+
+
 class MinecraftSchematicAgent:
     """Executes the main agentic loop"""
 
-    # Available providers based on configured API keys
-    _providers: dict[str, type[BaseLLMService]] = {}
-
-    @classmethod
-    def get_available_providers(cls) -> dict[str, type[BaseLLMService]]:
+    @staticmethod
+    def get_available_providers() -> dict[str, type[BaseLLMService]]:
         """Get providers with configured API keys"""
         providers = {}
         if settings.gemini_api_key:
@@ -104,24 +164,26 @@ class MinecraftSchematicAgent:
         self.model = model or settings.llm_model
         provider = get_provider_for_model(self.model)
 
-        # Get available providers
-        self._providers = self.get_available_providers()
-        if provider not in self._providers:
+        # Validate provider availability
+        available_providers = self.get_available_providers()
+        if provider not in available_providers:
             raise ValueError(
                 f"Provider '{provider}' for model '{self.model}' not available. "
-                f"Available: {list(self._providers.keys())}"
+                f"Available: {list(available_providers.keys())}"
             )
 
-        # Initialize LLM service with thinking level
-        self.llm = self._providers[provider](self.model, self.thinking_level)
-
-        self.session_service = SessionService()
+        # Initialize LLM service
+        llm_class = available_providers[provider]
+        self.llm = llm_class(self.model, self.thinking_level)
 
         # Initialize tools
-        tools = [ReadCodeTool(), EditCodeTool()]
-        self.tool_registry = ToolRegistry(tools)
+        self.tool_registry = ToolRegistry([ReadCodeTool(), EditCodeTool()])
 
         # Load system prompt template and SDK docs
+        self._load_prompt_template()
+
+    def _load_prompt_template(self) -> None:
+        """Load system prompt template and SDK documentation"""
         prompt_path = Path(__file__).parent / "prompts" / "system_prompt.txt"
         self.prompt_template = prompt_path.read_text()
 
@@ -136,250 +198,188 @@ class MinecraftSchematicAgent:
         }
 
     def _build_system_prompt(self) -> str:
-        """Build system prompt with SDK docs embedded."""
+        """Build system prompt with SDK docs embedded"""
         template = self.prompt_template
-
-        # Inject SDK docs
         for marker, text in self.sdk_replacements.items():
             template = template.replace(marker, text)
-
         return template
 
-    async def run(self, user_message: str) -> AsyncIterator[ActivityEvent]:
+    def _build_assistant_message(self, response: StreamResponse) -> dict:
+        """Build assistant message dict from stream response"""
+        return AssistantMessage(
+            role="assistant",
+            content=response.text,
+            thought_summary=response.thought or None,
+            thinking_signature=response.thinking_signature,
+            tool_calls=response.tool_calls if response.tool_calls else None,
+            reasoning_items=response.reasoning_items,
+        ).model_dump()
+
+    async def _execute_tool(self, tool_call: ToolCall) -> tuple[ToolResult, dict]:
+        """Execute a single tool call and return result + serialized response"""
+        func_name = tool_call.function.name
+        func_args = json.loads(tool_call.function.arguments or "{}")
+
+        # Inject session_id
+        tool_params = dict(func_args) if func_args else {}
+        tool_params["session_id"] = self.session_id
+
+        invocation = await self.tool_registry.build_invocation(func_name, tool_params)
+
+        if not invocation:
+            result = ToolResult(
+                error=f"Tool {func_name} not found", tool_call_id=tool_call.id
+            )
+        else:
+            result = await invocation.execute()
+            result.tool_call_id = tool_call.id
+
+        # Build serialized response for conversation
+        tool_response = ToolMessage(
+            role="tool",
+            tool_call_id=tool_call.id,
+            content=json.dumps(
+                {k: v for k, v in result.to_dict().items() if k != "tool_call_id"}
+            ),
+            name=func_name,
+        ).model_dump()
+
+        return result, tool_response
+
+    async def _stream_llm_response(
+        self, conversation: list[dict]
+    ) -> AsyncIterator[tuple[ActivityEvent | None, StreamResponse]]:
+        """
+        Stream LLM response and yield events.
+
+        Yields tuples of (event_to_emit, current_response_state).
+        The final yield has the complete StreamResponse.
+        """
+        response = StreamResponse()
+        tool_accumulator = ToolCallAccumulator()
+
+        async for chunk in self.llm.generate_with_tools_streaming(
+            self._build_system_prompt(),
+            conversation,
+            self.tool_registry.get_tool_schemas(),
+        ):
+            chunk: StreamChunk
+            event = None
+
+            # Handle thought delta
+            thought_delta = getattr(chunk, "thought_delta", None)
+            if thought_delta:
+                response.thought += thought_delta
+                event = ActivityEvent(
+                    type=ActivityEventType.THOUGHT, data={"delta": thought_delta}
+                )
+
+            # Capture thinking signature
+            thought_signature = getattr(chunk, "thought_signature", None)
+            if thought_signature:
+                response.thinking_signature = thought_signature
+
+            # Handle text delta
+            if chunk.text_delta:
+                response.text += chunk.text_delta
+                event = ActivityEvent(
+                    type=ActivityEventType.TEXT_DELTA,
+                    data={"delta": chunk.text_delta},
+                )
+
+            # Handle tool calls delta
+            if chunk.tool_calls_delta:
+                for tc_delta in chunk.tool_calls_delta:
+                    tool_accumulator.add_delta(tc_delta)
+
+            # Handle reasoning items (OpenAI)
+            if chunk.reasoning_items:
+                response.reasoning_items = chunk.reasoning_items
+
+            if event:
+                yield event, response
+
+        # Build final tool calls
+        response.tool_calls = tool_accumulator.build()
+        yield None, response
+
+    async def run(self, conversation: list[dict]) -> AsyncIterator[ActivityEvent]:
         """
         Run the agent loop.
 
         Args:
-            user_message: Initial user message
+            conversation: Full conversation history including the new user message
 
         Yields:
             ActivityEvent for streaming to UI
         """
-        turn_count = 0
+        for turn in range(1, self.max_turns + 1):
+            logger.debug("Starting turn %d", turn)
+            yield ActivityEvent(type=ActivityEventType.TURN_START, data={"turn": turn})
 
-        # Lock the model to this session on first use
-        self.session_service.set_model(self.session_id, self.model)
+            # Stream LLM response
+            response = StreamResponse()
+            async for event, response in self._stream_llm_response(conversation):
+                if event:
+                    yield event
 
-        # Load conversation history
-        conversation = self.session_service.load_conversation(self.session_id)
-
-        # Add user message
-        conversation.append(UserMessage(role="user", content=user_message).model_dump())
-        self.session_service.save_conversation(self.session_id, conversation)
-
-        # Conversation is already in OpenAI format
-        messages = list(conversation)
-
-        # Main loop
-        while True:
-            if turn_count >= self.max_turns:
-                yield ActivityEvent(
-                    type="complete",
-                    data={
-                        "success": False,
-                        "reason": TerminateReason.MAX_TURNS,
-                        "message": "Agent hit max turns limit",
-                    },
-                )
-                return
-
-            turn_count += 1
-
-            # Call model with tools (streaming)
-            logger.info(f"yielding event type=turn_start, turn={turn_count}")
-            yield ActivityEvent(type="turn_start", data={"turn": turn_count})
-
-            # Accumulators for streaming response
-            accumulated_text = ""
-            accumulated_thought = ""
-            accumulated_thinking_signature = None
-            accumulated_tool_calls = {}  # index -> tool call dict
-            accumulated_reasoning_items = None  # For OpenAI ZDR passback
-
-            # Stream response chunks (rebuild system prompt to include latest code)
-            async for chunk in self.llm.generate_with_tools_streaming(
-                self._build_system_prompt(),
-                messages,
-                self.tool_registry.get_tool_schemas(),
-            ):
-                logger.info(f"handling chunk, chunk={chunk}")
-
-                # Stream thought summaries separately when available (Gemini/Anthropic)
-                thought_delta = getattr(chunk, "thought_delta", None)
-                if thought_delta:
-                    accumulated_thought += thought_delta
-                    yield ActivityEvent(type="thought", data={"delta": thought_delta})
-
-                # Capture thinking signature (Anthropic)
-                thought_signature = getattr(chunk, "thought_signature", None)
-                if thought_signature:
-                    accumulated_thinking_signature = thought_signature
-
-                # Handle text delta
-                if chunk.text_delta:
-                    accumulated_text += chunk.text_delta
-                    logger.info(
-                        f"yielding event type=text_delta, delta={chunk.text_delta}"
-                    )
-                    yield ActivityEvent(
-                        type="text_delta", data={"delta": chunk.text_delta}
-                    )
-
-                # Handle tool calls delta
-                if chunk.tool_calls_delta:
-                    logger.info(
-                        f"yielding event type=tool_calls_delta, delta={chunk.tool_calls_delta}"
-                    )
-                    for tc_delta in chunk.tool_calls_delta:
-                        idx = tc_delta.get("index", 0)
-                        if idx not in accumulated_tool_calls:
-                            accumulated_tool_calls[idx] = {
-                                "id": tc_delta.get("id"),
-                                "type": tc_delta.get("type", "function"),
-                                "function": {"name": "", "arguments": ""},
-                                "extra_content": {},
-                            }
-
-                        # Accumulate function name
-                        if tc_delta.get("function", {}).get("name"):
-                            accumulated_tool_calls[idx]["function"]["name"] = tc_delta[
-                                "function"
-                            ]["name"]
-
-                        # Accumulate function arguments
-                        if tc_delta.get("function", {}).get("arguments"):
-                            accumulated_tool_calls[idx]["function"]["arguments"] += (
-                                tc_delta["function"]["arguments"]
-                            )
-
-                        # Capture provider-specific metadata such as thought signatures
-                        extra_content = tc_delta.get("extra_content") or {}
-                        if extra_content:
-                            # Merge dictionaries shallowly; we only expect google.thought_signature for now
-                            merged_extra = accumulated_tool_calls[idx].get(
-                                "extra_content", {}
-                            )
-                            merged_extra.update(extra_content)
-                            accumulated_tool_calls[idx]["extra_content"] = merged_extra
-                        if tc_delta.get("thought_signature"):
-                            accumulated_tool_calls[idx]["thought_signature"] = tc_delta[
-                                "thought_signature"
-                            ]
-
-                        # Update ID if provided and truthy
-                        if tc_delta.get("id"):
-                            accumulated_tool_calls[idx]["id"] = tc_delta["id"]
-
-                # Handle reasoning items (OpenAI ZDR passback)
-                if chunk.reasoning_items:
-                    accumulated_reasoning_items = chunk.reasoning_items
-
-            # Build tool calls from accumulated data
-            tool_calls_list: list[ToolCall] = []
-            for tc_data in accumulated_tool_calls.values():
-                # Generate ID if provider didn't provide one (ensures tool results can be matched)
-                tool_call_id = tc_data.get("id") or f"call_{uuid.uuid4().hex}"
-                tool_calls_list.append(
-                    ToolCall(
-                        id=tool_call_id,
-                        type="function",
-                        function=ToolCallFunction(
-                            name=tc_data.get("function", {}).get("name", ""),
-                            arguments=tc_data.get("function", {}).get("arguments", ""),
-                        ),
-                        thought_signature=tc_data.get("thought_signature"),
-                        extra_content=tc_data.get("extra_content", {}),
-                    )
-                )
-
-            # Build assistant message
-            assistant_message = AssistantMessage(
-                role="assistant",
-                content=accumulated_text,
-                thought_summary=accumulated_thought or None,
-                thinking_signature=accumulated_thinking_signature,
-                tool_calls=tool_calls_list if tool_calls_list else None,
-                reasoning_items=accumulated_reasoning_items,
-            ).model_dump()
-
-            # Save assistant message
+            # Build and save assistant message
+            assistant_message = self._build_assistant_message(response)
             conversation.append(assistant_message)
-            self.session_service.save_conversation(self.session_id, conversation)
-            messages.append(assistant_message)
 
-            # No function calls - agent responded with content only
-            if not tool_calls_list:
-                # If agent responds with content only (no tool calls), treat this as
-                # a conversational response and end the loop successfully
-                if accumulated_text.strip():
+            # Check for completion (no tool calls)
+            if not response.tool_calls:
+                if response.text.strip():
                     yield ActivityEvent(
-                        type="complete",
+                        type=ActivityEventType.COMPLETE,
                         data={
                             "success": True,
                             "reason": TerminateReason.GOAL,
                             "message": "Agent responded with message",
+                            "conversation": conversation,
                         },
                     )
-                    return
                 else:
-                    # No content and no tool calls - protocol violation
                     yield ActivityEvent(
-                        type="complete",
+                        type=ActivityEventType.COMPLETE,
                         data={
                             "success": False,
                             "reason": TerminateReason.NO_COMPLETE_TASK,
                             "message": "Agent stopped without content or tool calls",
+                            "conversation": conversation,
                         },
                     )
-                    return
+                return
 
-            # Process function calls
-            serialized_responses = []
-
-            for tool_call in tool_calls_list:
+            # Execute tool calls
+            tool_responses = []
+            for tool_call in response.tool_calls:
                 func_name = tool_call.function.name
                 func_args = json.loads(tool_call.function.arguments or "{}")
 
                 yield ActivityEvent(
-                    type="tool_call",
+                    type=ActivityEventType.TOOL_CALL,
                     data={"id": tool_call.id, "name": func_name, "args": func_args},
                 )
 
-                # Execute tool - inject session_id automatically
-                tool_params = dict(func_args) if func_args else {}
-                tool_params["session_id"] = self.session_id
+                result, tool_response = await self._execute_tool(tool_call)
 
-                invocation = await self.tool_registry.build_invocation(
-                    func_name, tool_params
+                yield ActivityEvent(
+                    type=ActivityEventType.TOOL_RESULT, data=result.to_dict()
                 )
 
-                if not invocation:
-                    result = ToolResult(
-                        error=f"Tool {func_name} not found", tool_call_id=tool_call.id
-                    )
-                else:
-                    result = await invocation.execute()
-                    result.tool_call_id = tool_call.id
+                tool_responses.append(tool_response)
 
-                yield ActivityEvent(type="tool_result", data=result.to_dict())
+            # Save tool responses to conversation
+            conversation.extend(tool_responses)
 
-                # Build tool response (without tool_call_id in content, it's in the message itself)
-                tool_response = ToolMessage(
-                    role="tool",
-                    tool_call_id=tool_call.id,
-                    content=json.dumps(
-                        {
-                            k: v
-                            for k, v in result.to_dict().items()
-                            if k != "tool_call_id"
-                        }
-                    ),
-                    name=func_name,
-                ).model_dump()
-                serialized_responses.append(tool_response)
-
-            if serialized_responses:
-                # Save tool responses
-                conversation.extend(serialized_responses)
-                self.session_service.save_conversation(self.session_id, conversation)
-                messages.extend(serialized_responses)
+        # Max turns reached
+        yield ActivityEvent(
+            type=ActivityEventType.COMPLETE,
+            data={
+                "success": False,
+                "reason": TerminateReason.MAX_TURNS,
+                "message": "Agent hit max turns limit",
+                "conversation": conversation,
+            },
+        )

@@ -21,6 +21,15 @@ export function ProjectsPage() {
   const [isCreating, setIsCreating] = useState(false);
   const hasSessions = useStore((s) => Object.keys(s.sessions).length > 0);
 
+  // Clear active session ID when landing on projects page
+  // This handles browser back button and direct URL navigation
+  // NOTE: We intentionally DON'T abort streams here - createSession may have
+  // just started a stream that's still running. Streams are aborted only when
+  // user explicitly clicks "Back to Projects" from SessionPage.
+  useEffect(() => {
+    useStore.getState().setActiveSession(null);
+  }, []);
+
   // Fetch all sessions on mount
   useEffect(() => {
     fetch("/api/sessions")
@@ -65,7 +74,6 @@ export function ProjectsPage() {
     if (!message.trim() || isCreating) return;
     setIsCreating(true);
     const newSessionId = await createSession(message.trim());
-    console.log(`newSessionId`, newSessionId);
     setIsCreating(false);
 
     if (newSessionId) {
