@@ -3,7 +3,12 @@ Code validator for SDK scripts
 """
 
 import ast
+import json
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -14,6 +19,8 @@ class ValidationResult:
     error: str | None = None
     error_line: int | None = None
     structure: dict | None = None  # The generated structure if valid
+    warnings: list[dict] | None = None
+    captured_output: str | None = None
 
 
 class CodeValidator:
@@ -42,34 +49,62 @@ class CodeValidator:
         except Exception as e:
             return ValidationResult(is_valid=False, error=f"Compilation error: {str(e)}")
 
-        # Try to execute and capture the structure
+        # Try to execute in an isolated subprocess and capture the structure
         try:
-            # Create a minimal execution environment
-            exec_globals = {}
-            exec(code, exec_globals)
+            repo_root = Path(__file__).resolve().parents[3]
+            backend_root = repo_root / "backend"
 
-            # Get the structure variable from the executed code
-            structure = exec_globals.get("structure")
-            if structure is None:
+            # Write code to a temp file so tracebacks have stable filenames/line numbers.
+            import tempfile
+
+            with tempfile.TemporaryDirectory(prefix="sdk_run_") as tmp_dir:
+                code_path = Path(tmp_dir) / "code.py"
+                code_path.write_text(code)
+
+                env = dict(os.environ)
+                env["PYTHONPATH"] = str(backend_root)
+
+                timeout_s = float(env.get("SDK_RUNNER_TIMEOUT_S", "60"))
+                proc = subprocess.run(
+                    [sys.executable, "-m", "app.services.code_runner", str(code_path)],
+                    cwd=str(repo_root),
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_s,
+                )
+
+                # Runner prints exactly one JSON object to stdout.
+                try:
+                    payload = json.loads(proc.stdout.strip() or "{}")
+                except Exception:
+                    return ValidationResult(
+                        is_valid=False,
+                        error=f"Execution error: Failed to parse runner output. stderr: {proc.stderr.strip()}",
+                    )
+
+                if payload.get("ok"):
+                    return ValidationResult(
+                        is_valid=True,
+                        structure=payload.get("structure"),
+                        warnings=payload.get("warnings"),
+                        captured_output=payload.get("captured_output"),
+                    )
+
                 return ValidationResult(
                     is_valid=False,
-                    error="Code must define a 'structure' variable at module level",
+                    error=f"Execution error: {payload.get('error')}",
+                    error_line=payload.get("error_line"),
+                    warnings=payload.get("warnings"),
+                    captured_output=payload.get("captured_output"),
                 )
-            if not isinstance(structure, dict):
-                return ValidationResult(
-                    is_valid=False,
-                    error=f"'structure' must be a dict, got {type(structure).__name__}",
-                )
-
-            return ValidationResult(is_valid=True, structure=structure)
+        except subprocess.TimeoutExpired as e:
+            return ValidationResult(
+                is_valid=False,
+                error=f"Execution error: Timeout after {e.timeout} seconds",
+            )
         except Exception as e:
-            # Get line number if available
-            import traceback
-            tb = traceback.extract_tb(e.__traceback__)
-            error_line = tb[-1].lineno if tb else None
-
             return ValidationResult(
                 is_valid=False,
                 error=f"Execution error: {type(e).__name__}: {str(e)}",
-                error_line=error_line,
             )
