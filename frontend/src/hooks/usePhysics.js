@@ -14,23 +14,37 @@ export default function usePhysics(
   structureRef,
   resourcesRef,
   enabled,
-  render // Direct render function (called from within animation frame)
+  render, // Direct render function (called from within animation frame)
+  rendererRef // Renderer reference for setting FOV
 ) {
   const physicsState = useRef({
     velocity: vec3.fromValues(0, 0, 0),
     isGrounded: false,
     movementIntent: { forward: 0, right: 0 },
+    isRunning: false,
   });
 
   const animationFrameRef = useRef(null);
   const lastTimeRef = useRef(null);
   const accumulatorRef = useRef(0);
+  const prevRunningStateRef = useRef(false);
+
+  const BASE_FOV = 70;
+  const RUN_FOV = BASE_FOV * (playable.runFOVMultiplier ?? 1.15);
 
   // Set movement intent (called by controls)
-  const setMovementIntent = useCallback((forward, right) => {
+  const setMovementIntent = useCallback((forward, right, isRunning = false) => {
     physicsState.current.movementIntent.forward = forward;
     physicsState.current.movementIntent.right = right;
-  }, []);
+    physicsState.current.isRunning = isRunning;
+
+    // Update FOV when running state changes
+    if (isRunning !== prevRunningStateRef.current && rendererRef?.current) {
+      const targetFOV = isRunning ? RUN_FOV : BASE_FOV;
+      rendererRef.current.setFOV(targetFOV);
+      prevRunningStateRef.current = isRunning;
+    }
+  }, [rendererRef, RUN_FOV]);
 
   // Jump (called by controls)
   const jump = useCallback(() => {
@@ -60,12 +74,17 @@ export default function usePhysics(
 
     // 2. Calculate horizontal movement from intent
     const { forward, right } = physicsState.current.movementIntent;
+    const isRunning = physicsState.current.isRunning;
     const yaw = cameraState.current.yaw;
+
+    // Apply run speed multiplier if running
+    const speedMultiplier = isRunning ? (playable.runSpeedMultiplier ?? 1.6) : 1.0;
+    const effectiveSpeed = playable.moveSpeed * speedMultiplier;
 
     // Forward/right directions based on yaw
     // Right is flipped to align with pointer lock look direction
-    const moveX = (Math.sin(yaw) * forward - Math.cos(yaw) * right) * playable.moveSpeed * dt;
-    const moveZ = (Math.cos(yaw) * forward + Math.sin(yaw) * right) * playable.moveSpeed * dt;
+    const moveX = (Math.sin(yaw) * forward - Math.cos(yaw) * right) * effectiveSpeed * dt;
+    const moveZ = (Math.cos(yaw) * forward + Math.sin(yaw) * right) * effectiveSpeed * dt;
 
     const horizontalDelta = vec3.fromValues(moveX, 0, moveZ);
 
@@ -130,6 +149,13 @@ export default function usePhysics(
       accumulatorRef.current = 0;
       physicsState.current.velocity = vec3.fromValues(0, 0, 0);
       physicsState.current.movementIntent = { forward: 0, right: 0 };
+      physicsState.current.isRunning = false;
+      prevRunningStateRef.current = false;
+
+      // Reset FOV to base when exiting playable mode
+      if (rendererRef?.current) {
+        rendererRef.current.setFOV(BASE_FOV);
+      }
       return;
     }
 
@@ -164,7 +190,7 @@ export default function usePhysics(
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [enabled, updatePhysics, render]);
+  }, [enabled, updatePhysics, render, rendererRef]);
 
   return {
     physicsState,

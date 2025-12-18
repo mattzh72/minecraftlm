@@ -13,8 +13,24 @@ from app.agent.minecraft.terrain import create_terrain
 def build_structure() -> dict:
     catalog = BlockCatalog()
 
-    # Generate 128x128 plains terrain
+    # Generate 128x128 plains terrain (default biome)
     terrain = create_terrain(128, 128, seed=42)
+    terrain.generate()
+
+    scene = Scene()
+    scene.add(terrain)
+
+    return scene.to_structure()
+```
+
+### Choose a Biome
+
+```python
+from app.agent.minecraft import Scene
+from app.agent.minecraft.terrain import create_terrain
+
+def build_structure() -> dict:
+    terrain = create_terrain(128, 128, seed=42, biome='desert')
     terrain.generate()
 
     scene = Scene()
@@ -66,7 +82,9 @@ config = TerrainConfig(
     base_height=64,         # Sea level / average height
     height_range=32,        # Max deviation from base
     seed=42,                # Random seed
+    biome="plains",         # Land biome (single-biome terrain)
     generate_decorations=True,  # Add trees, flowers
+    tree_density=1.0,       # Tree multiplier (0.1 = sparse, 3.0 = dense)
     noise_config=NoiseConfig(
         octaves=4,          # Noise detail levels
         persistence=0.5,    # Amplitude decay
@@ -79,6 +97,18 @@ terrain = Terrain(config)
 terrain.generate()
 ```
 
+### Biome Options
+
+The terrain generator currently supports **one land biome per Terrain** via `TerrainConfig(biome=...)` or `create_terrain(..., biome=...)`.
+
+Available biomes:
+- `plains` (default)
+- `forest`
+- `desert`
+- `snowy_plains`
+- `taiga`
+- `badlands`
+
 ### Noise Parameters
 
 | Parameter | Effect | Typical Range |
@@ -88,13 +118,15 @@ terrain.generate()
 | `lacunarity` | Frequency multiplier per octave | 1.5-2.5 |
 | `scale` | Overall smoothness (larger = smoother) | 30-100 |
 
-## Plains Terrain Layers
+## Biome Terrain Layers
 
-The terrain generates with these layers (top to bottom):
+The land surface block stack depends on `biome`:
 
-1. **Grass Block** (1 block) - Surface layer
-2. **Dirt** (3 blocks) - Subsurface
-3. **Stone** (remaining) - Bedrock
+- `plains` / `forest`: grass block → dirt → stone
+- `desert`: sand → sandstone → stone
+- `snowy_plains`: snow layer on top of snowy grass block → dirt → stone
+- `taiga`: podzol → dirt → stone
+- `badlands`: red sand → terracotta → stone
 
 ## Terrain Methods
 
@@ -198,7 +230,7 @@ from app.agent.minecraft.terrain import (
     generate_tall_grass,
 )
 
-# Get terrain height first
+# Get terrain surface height first
 height = terrain.get_height_at(50, 50)
 
 # Add a tree
@@ -305,7 +337,7 @@ terrain.generate()
 Mountains use proper Minecraft block layers:
 - **Snow cap**: `minecraft:snow_block` at elevations above snow line
 - **Stone surface**: `minecraft:stone` for mountain surfaces
-- **Plains**: Grass/dirt/stone layers for non-mountain areas
+- **Land**: Uses the selected `biome` layer stack for non-mountain areas
 
 ### Creating a Mountain Range
 

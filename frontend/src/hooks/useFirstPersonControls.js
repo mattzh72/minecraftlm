@@ -13,6 +13,8 @@ export default function useFirstPersonControls(
 ) {
   const pressedKeysRef = useRef(new Set());
   const isLockedRef = useRef(false);
+  const lastWPressTimeRef = useRef(0);
+  const isRunningRef = useRef(false);
 
   // Update movement intent based on pressed keys
   const updateMovementIntent = useCallback(() => {
@@ -25,7 +27,7 @@ export default function useFirstPersonControls(
     if (keys.has('a') || keys.has('arrowleft')) right -= 1;
     if (keys.has('d') || keys.has('arrowright')) right += 1;
 
-    physics?.setMovementIntent(forward, right);
+    physics?.setMovementIntent(forward, right, isRunningRef.current);
   }, [physics]);
 
   // Request pointer lock
@@ -43,8 +45,10 @@ export default function useFirstPersonControls(
         document.exitPointerLock?.();
       }
       pressedKeysRef.current.clear();
-      physics?.setMovementIntent(0, 0);
+      physics?.setMovementIntent(0, 0, false);
       isLockedRef.current = false;
+      isRunningRef.current = false;
+      lastWPressTimeRef.current = 0;
       return;
     }
 
@@ -59,7 +63,9 @@ export default function useFirstPersonControls(
       if (!locked && enabled) {
         // Pointer lock was lost, exit playable mode
         pressedKeysRef.current.clear();
-        physics?.setMovementIntent(0, 0);
+        physics?.setMovementIntent(0, 0, false);
+        isRunningRef.current = false;
+        lastWPressTimeRef.current = 0;
         onExit?.();
       }
     };
@@ -93,6 +99,17 @@ export default function useFirstPersonControls(
       // Movement keys
       if (['w', 's', 'a', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         e.preventDefault();
+
+        // Double-tap W detection for running
+        const DOUBLE_TAP_WINDOW = 300; // milliseconds
+        if (key === 'w' || key === 'arrowup') {
+          const now = Date.now();
+          if (now - lastWPressTimeRef.current < DOUBLE_TAP_WINDOW) {
+            isRunningRef.current = true;
+          }
+          lastWPressTimeRef.current = now;
+        }
+
         pressedKeysRef.current.add(key);
         updateMovementIntent();
       }
@@ -110,6 +127,11 @@ export default function useFirstPersonControls(
       const key = e.key.toLowerCase();
 
       if (['w', 's', 'a', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+        // Stop running when W is released
+        if (key === 'w' || key === 'arrowup') {
+          isRunningRef.current = false;
+        }
+
         pressedKeysRef.current.delete(key);
         updateMovementIntent();
       }
