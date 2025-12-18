@@ -28,7 +28,6 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
 
     const view = cameraRef.current.getViewMatrix();
     rendererRef.current.drawStructure(view);
-    rendererRef.current.drawGrid(view);
   }, []);
 
   // Request a render frame
