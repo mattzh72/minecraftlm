@@ -168,12 +168,11 @@ Choose any provider and get an API key:
 The app will automatically detect which providers you've configured and show only those models in the selector:
 
 | Provider | Available Models |
-|----------|-----------------|
-| **Anthropic** | Claude Sonnet 4.5, Claude Opus 4.5 |
-| **OpenAI** | GPT-4.1, GPT-5 |
-| **Google** | Gemini 3 Pro |
+|----------|------------------|
+| **Anthropic** | Claude Opus 4.5  |
+| **OpenAI** | GPT-5.2          |
+| **Google** | Gemini 3 Pro     |
 
-**Note**: Different models have different strengths. Claude models tend to be good at detailed architectural work, while GPT models may excel at creative interpretations. Experiment to find what works best for your use case.
 
 ---
 

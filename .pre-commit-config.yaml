@@ -5,14 +5,17 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
+        files: ^backend/
       - id: ruff-format
+        files: ^backend/
 
-  # Trufflehog - Secret detection
-  - repo: https://github.com/trufflesecurity/trufflehog
-    rev: v3.63.0
+  # detect-secrets - Secret detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
     hooks:
-      - id: trufflehog
-        args: [filesystem, --debug, --only-verified]
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: ^(\.git|node_modules|\.storage|\.venv|__pycache__|\.pytest_cache|\.ruff_cache|package-lock\.json|uv\.lock)/
 
   # Basic file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -32,8 +35,7 @@ repos:
     rev: v9.0.0
     hooks:
       - id: eslint
-        files: frontend/src
-        types: [javascript, typescript, jsx, tsx]
+        files: ^frontend/src/.*\.(js|jsx|ts|tsx)$
         additional_dependencies:
           - eslint
           - eslint-plugin-react
