@@ -22,8 +22,8 @@ export const Config = {
     maxDistance: 200,
     defaultRotationX: 0.7,
     defaultRotationY: 0.8,
-    distanceMultiplier: 1.8,
-    minDistanceFloor: 8,
+    distanceMultiplier: 1.0,
+    minDistanceFloor: 5,
     panSensitivity: 200,
   },
   controls: {
