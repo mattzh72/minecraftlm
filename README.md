@@ -61,40 +61,20 @@ MinecraftLM can create a wide range of structures—from realistic landmarks to 
 ### Buildings & Architecture
 Build anything from a cozy cottage to a Gothic cathedral. The agent understands architectural concepts like walls, roofs, windows, doors, and can create multi-story structures with furnished interiors.
 
-**Try prompts like:**
-- "A medieval castle with four corner towers and a courtyard"
-- "A modern glass skyscraper with a rooftop garden"
-- "A Japanese temple with cherry blossom trees"
-
 <!-- TODO: Add screenshot of architectural structure with interior view -->
 
 ### Vehicles & Objects
 Create vehicles with realistic proportions and details—aircraft with proper wing geometry, ships with deck structures, or cars with wheels and windows.
-
-**Try prompts like:**
-- "A pirate ship with sails and cannons"
-- "A steam locomotive on railroad tracks"
-- "A rocket ship on a launch pad"
 
 <!-- TODO: Add screenshot showcasing vehicle generation -->
 
 ### Terrain & Landscapes
 Generate natural landscapes with mountains, valleys, rivers, and vegetation. Place structures on terrain and watch them integrate seamlessly with automatic foundation filling.
 
-**Try prompts like:**
-- "A mountain range with snow-capped peaks and a lake"
-- "A desert oasis with palm trees and a water hole"
-- "A floating island with waterfalls cascading off the edges"
-
 <!-- TODO: Add screenshot of procedurally generated terrain -->
 
 ### Creative & Abstract
 The agent can interpret artistic concepts and build abstract sculptures, pixel art, or fantastical creations.
-
-**Try prompts like:**
-- "A giant chess set on a checkered plaza"
-- "A dragon wrapped around a tower"
-- "A spiral staircase ascending into the clouds"
 
 <!-- TODO: Add screenshot of creative/abstract build -->
 
