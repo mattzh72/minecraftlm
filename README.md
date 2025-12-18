@@ -4,7 +4,7 @@
 
 Project Team: [Matt Zhou](https://x.com/Mattzh1314), [Johnathan Chiu](https://x.com/johnathanchewy), [Preston Bourne](https://x.com/prestonb0urne), [Avinash Jain](https://x.com/avinashj_)
 
-[![BSD4 License](https://img.shields.io/badge/License-BSD4-blue.svg)](LICENSE)
+[![GPLv3 License](https://img.shields.io/badge/License-gplv3-blue.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/mattzh72/minecraft-schematic-gen?style=flat&logo=github)](https://github.com/mattzh72/minecraft-schematic-gen)
 [![Discord](https://img.shields.io/discord/1451023766153855081?logo=discord&label=Discord&color=5865F2)](https://discord.gg/UNfAA4bte2)
 
@@ -36,8 +36,10 @@ Build anything from a cozy cottage to a Gothic cathedral. The agent understands 
 
 <table>
   <tr>
-    <td><img height="300" alt="CleanShot 2025-12-18 at 03 33 58@2x" src="https://github.com/user-attachments/assets/326d991f-6f53-4dfc-9f44-5b8aa2d429a6" /></td>
-    <td><img height="300" alt="CleanShot 2025-12-18 at 01 56 50@2x" src="https://github.com/user-attachments/assets/6ce2da49-f9e5-48fa-afa0-465fe48ff0fb" /></td>
+    <td><img height="300" alt="PNG image" src="https://github.com/user-attachments/assets/f31ba390-1819-44d9-a19a-9b75e909de6a" />
+</td>
+    <td><img height="300" alt="Screenshot 2025-12-18 at 1 46 24 PM" src="https://github.com/user-attachments/assets/a9ed58fe-ad08-447f-8eaa-91a0e2c00797" />
+</td>
   </tr>
 </table>
 
@@ -47,7 +49,8 @@ Create vehicles with realistic proportions and details—aircraft with proper wi
 <table>
   <tr>
     <td><img height="300" alt="CleanShot 2025-12-18 at 01 55 18@2x" src="https://github.com/user-attachments/assets/1acf4c89-d083-4a0d-be47-7017b3e951d1" /></td>
-    <td><img height="300" alt="CleanShot 2025-12-18 at 03 27 07@2x" src="https://github.com/user-attachments/assets/74094706-7b88-4f11-a7b5-36a8ce9bb7a0" /></td>
+    <td><img height="300" alt="Screenshot 2025-12-18 at 1 23 12 PM" src="https://github.com/user-attachments/assets/222a6e40-bf83-4c42-b911-52fd02ed3544" />
+</td>
   </tr>
 </table>
 
@@ -56,7 +59,7 @@ Generate natural landscapes with mountains, valleys, rivers, and vegetation. Pla
 
 <table>
   <tr>
-    <td><img height="300" alt="CleanShot 2025-12-18 at 03 48 57@2x" src="https://github.com/user-attachments/assets/62d40912-b6b0-4bbe-acc5-41ba083019f1" /></td>
+    <td><img height="300" alt="Screenshot 2025-12-18 at 1 51 47 PM" src="https://github.com/user-attachments/assets/5b86c1fb-c946-42ba-b4fa-b0bde193115f" /></td>
     <td><img height="300" alt="CleanShot 2025-12-18 at 03 30 31@2x" src="https://github.com/user-attachments/assets/e594e537-f49a-440c-ab68-aef093b598e3" /></td>
   </tr>
 </table>
@@ -67,8 +70,9 @@ The agent can interpret artistic concepts and build abstract sculptures, pixel a
 
 <table>
   <tr>
-    <td><img height="300" alt="CleanShot 2025-12-18 at 03 24 26@2x" src="https://github.com/user-attachments/assets/c11acf7e-b89d-4169-8cc2-823c3e326e3f" /></td>
-    <td><img height="300" alt="CleanShot 2025-12-18 at 03 51 39@2x" src="https://github.com/user-attachments/assets/0440298d-284a-496a-b911-d59fc805c2ac" /></td>
+    <td><img height="300" alt="Screenshot 2025-12-18 at 12 54 16 PM" src="https://github.com/user-attachments/assets/cbc3c09b-64c5-47f6-ad32-53d9283c9637" /></td>
+    <td><img height="300" alt="Screenshot 2025-12-18 at 1 33 40 PM" src="https://github.com/user-attachments/assets/d47654ba-86f0-4bf6-9139-df855096d2dd" />
+</td>
   </tr>
 </table>
 
