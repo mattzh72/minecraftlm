@@ -4,8 +4,7 @@ import { useStore } from "@/store";
 import { ArrowUp } from "lucide-react";
 import { forwardRef } from "react";
 import TextareaAutosize from "react-textarea-autosize";
-import { ModelSelector } from "./ModelSelector.tsx";
-import { ThinkingLevelSelector } from "./ThinkingLevelSelector.tsx";
+import { GenerationSettingsPopover } from "./GenerationSettingsPopover";
 
 type PromptBoxProps = {
   onSubmit: (value: string) => void;
@@ -93,25 +92,22 @@ export const PromptBox = forwardRef<HTMLTextAreaElement, PromptBoxProps>(
           )}
         />
 
-        {/* Bottom row: thinking selector on left, model + submit on right */}
+        {/* Bottom row: settings on left, submit on right */}
         <div className="flex items-center justify-between gap-2 min-w-0">
-          <ThinkingLevelSelector variant={variant} />
-          <div className="flex items-center gap-2 shrink-0">
-            <ModelSelector variant={variant} />
-            <Button
-              type="submit"
-              disabled={!isActive}
-              size="icon"
-              className={cn(
-                "shrink-0",
-                "transition-all duration-200 transition-spring",
-                "hover:scale-105",
-                "active:scale-95"
-              )}
-            >
-              <ArrowUp size={18} strokeWidth={2.5} />
-            </Button>
-          </div>
+          <GenerationSettingsPopover variant={variant} />
+          <Button
+            type="submit"
+            disabled={!isActive}
+            size="icon"
+            className={cn(
+              "shrink-0",
+              "transition-all duration-200 transition-spring",
+              "hover:scale-105",
+              "active:scale-95"
+            )}
+          >
+            <ArrowUp size={18} strokeWidth={2.5} />
+          </Button>
         </div>
       </form>
     );
