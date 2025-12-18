@@ -101,7 +101,7 @@ export default function useFirstPersonControls(
         e.preventDefault();
 
         // Double-tap W detection for running
-        const DOUBLE_TAP_WINDOW = 300; // milliseconds
+        const DOUBLE_TAP_WINDOW = 150; // milliseconds (shorter = harder to trigger)
         if (key === 'w' || key === 'arrowup') {
           const now = Date.now();
           if (now - lastWPressTimeRef.current < DOUBLE_TAP_WINDOW) {
