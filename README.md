@@ -34,27 +34,43 @@ MinecraftLM can create a wide range of structures—from realistic landmarks to 
 ### Buildings & Architecture
 Build anything from a cozy cottage to a Gothic cathedral. The agent understands architectural concepts like walls, roofs, windows, doors, and can create multi-story structures with furnished interiors.
 
-<img height="300" alt="CleanShot 2025-12-18 at 03 33 58@2x" src="https://github.com/user-attachments/assets/326d991f-6f53-4dfc-9f44-5b8aa2d429a6" />
-<img height="300" alt="CleanShot 2025-12-18 at 01 56 50@2x" src="https://github.com/user-attachments/assets/6ce2da49-f9e5-48fa-afa0-465fe48ff0fb" />
+<table>
+  <tr>
+    <td><img height="300" alt="CleanShot 2025-12-18 at 03 33 58@2x" src="https://github.com/user-attachments/assets/326d991f-6f53-4dfc-9f44-5b8aa2d429a6" /></td>
+    <td><img height="300" alt="CleanShot 2025-12-18 at 01 56 50@2x" src="https://github.com/user-attachments/assets/6ce2da49-f9e5-48fa-afa0-465fe48ff0fb" /></td>
+  </tr>
+</table>
 
 ### Vehicles & Objects
 Create vehicles with realistic proportions and details—aircraft with proper wing geometry, ships with deck structures, or cars with wheels and windows.
 
-<img height="300" alt="CleanShot 2025-12-18 at 01 55 18@2x" src="https://github.com/user-attachments/assets/1acf4c89-d083-4a0d-be47-7017b3e951d1" />
-<img height="300" alt="CleanShot 2025-12-18 at 03 27 07@2x" src="https://github.com/user-attachments/assets/74094706-7b88-4f11-a7b5-36a8ce9bb7a0" />
+<table>
+  <tr>
+    <td><img height="300" alt="CleanShot 2025-12-18 at 01 55 18@2x" src="https://github.com/user-attachments/assets/1acf4c89-d083-4a0d-be47-7017b3e951d1" /></td>
+    <td><img height="300" alt="CleanShot 2025-12-18 at 03 27 07@2x" src="https://github.com/user-attachments/assets/74094706-7b88-4f11-a7b5-36a8ce9bb7a0" /></td>
+  </tr>
+</table>
 
 ### Terrain & Landscapes
 Generate natural landscapes with mountains, valleys, rivers, and vegetation. Place structures on terrain and watch them integrate seamlessly with automatic foundation filling.
 
-<img height="300" alt="CleanShot 2025-12-18 at 03 48 57@2x" src="https://github.com/user-attachments/assets/62d40912-b6b0-4bbe-acc5-41ba083019f1" />
-<img height="300" alt="CleanShot 2025-12-18 at 03 30 31@2x" src="https://github.com/user-attachments/assets/e594e537-f49a-440c-ab68-aef093b598e3" />
+<table>
+  <tr>
+    <td><img height="300" alt="CleanShot 2025-12-18 at 03 48 57@2x" src="https://github.com/user-attachments/assets/62d40912-b6b0-4bbe-acc5-41ba083019f1" /></td>
+    <td><img height="300" alt="CleanShot 2025-12-18 at 03 30 31@2x" src="https://github.com/user-attachments/assets/e594e537-f49a-440c-ab68-aef093b598e3" /></td>
+  </tr>
+</table>
 
 
 ### Creative & Abstract
 The agent can interpret artistic concepts and build abstract sculptures, pixel art, or fantastical creations.
 
-<img height="300" alt="CleanShot 2025-12-18 at 03 24 26@2x" src="https://github.com/user-attachments/assets/c11acf7e-b89d-4169-8cc2-823c3e326e3f" />
-<img height="300" alt="CleanShot 2025-12-18 at 03 51 39@2x" src="https://github.com/user-attachments/assets/0440298d-284a-496a-b911-d59fc805c2ac" />
+<table>
+  <tr>
+    <td><img height="300" alt="CleanShot 2025-12-18 at 03 24 26@2x" src="https://github.com/user-attachments/assets/c11acf7e-b89d-4169-8cc2-823c3e326e3f" /></td>
+    <td><img height="300" alt="CleanShot 2025-12-18 at 03 51 39@2x" src="https://github.com/user-attachments/assets/0440298d-284a-496a-b911-d59fc805c2ac" /></td>
+  </tr>
+</table>
 
 ## Quick Start
 
