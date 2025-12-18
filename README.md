@@ -1,4 +1,4 @@
-# MinecraftLM <small>An Agentic System for Generative 3D Voxel Worlds</small>
+# MinecraftLM <span style="font-size: 75%;">An Agentic System for Generative 3D Voxel Worlds</span>
 
 <div align="center">
 
