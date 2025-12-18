@@ -6,8 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { BlockAnimation } from "./BlockAnimation";
 import { ChatPanel } from "./ChatPanel";
 import { MinecraftViewer } from "./MinecraftViewer";
-import { TimeOfDayToggle } from "./TimeOfDayToggle";
-import { ViewerModeToggle } from "./ViewerModeToggle";
+import { ViewerToolbar } from "./ViewerToolbar";
 /**
  * Session page - displays chat panel and 3D viewer for a specific session
  */
@@ -54,10 +53,7 @@ export function SessionPage() {
   return (
     <div className="h-screen w-screen relative overflow-hidden">
       {/* 3D Viewer - Full screen background, extended left to center content accounting for chat panel */}
-      <div
-        className="absolute inset-y-0 right-0"
-        style={{ left: "-320px" }}
-      >
+      <div className="absolute inset-y-0 right-0" style={{ left: "-320px" }}>
         {structureData ? (
           <MinecraftViewer />
         ) : (
@@ -73,13 +69,11 @@ export function SessionPage() {
                 {isLoading
                   ? "Loading session..."
                   : activeSessionId
-                    ? "Rendering your structure..."
-                    : "Initializing..."}
+                  ? "Rendering your structure..."
+                  : "Initializing..."}
               </p>
               <div className="bg-white/10 rounded-xl text-xs leading-relaxed p-4 text-white/70">
-                <p className="font-medium text-white/80 mb-2">
-                  Controls
-                </p>
+                <p className="font-medium text-white/80 mb-2">Controls</p>
                 <div className="flex flex-col items gap-1 text-center">
                   <p>Mouse drag: Rotate view</p>
                   <p>Scroll: Zoom in/out</p>
@@ -103,22 +97,21 @@ export function SessionPage() {
         </Button>
       </div>
 
-      {/* Time of day toggle */}
-      <div className="absolute top-16 left-4 z-20">
-        <TimeOfDayToggle />
-      </div>
-
-      {/* Viewer mode toggle */}
-      <div className="absolute top-28 left-4 z-20">
-        <ViewerModeToggle />
-      </div>
+      {/* Centered viewer toolbar - only show when structure exists */}
+      {structureData && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
+          <ViewerToolbar />
+        </div>
+      )}
 
       {/* Floating Chat Panel - glass overlay, collapses vertically */}
       <div
-        className={`absolute top-4 right-4 z-10 ${!isResizing ? 'transition-all duration-300 ease-in-out' : ''}`}
+        className={`absolute top-4 right-4 z-10 ${
+          !isResizing ? "transition-all duration-300 ease-in-out" : ""
+        }`}
         style={{
           width: chatWidth,
-          height: chatExpanded ? 'calc(100% - 32px)' : 48
+          height: chatExpanded ? "calc(100% - 32px)" : 48,
         }}
       >
         <ChatPanel

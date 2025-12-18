@@ -291,7 +291,7 @@ export function ChatPanel({ expanded, setExpanded, width, onWidthChange, onResiz
       {expanded && (
         <div
           onMouseDown={handleResizeStart}
-          className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 group"
+          className="absolute left-0 top-4 bottom-4 w-2 cursor-ew-resize z-10 group"
         >
           <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-white/0 group-hover:bg-white/30 transition-colors" />
         </div>
