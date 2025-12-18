@@ -1,87 +1,107 @@
 import { useEffect, useRef } from 'react';
 import { vec3 } from '../utils/deepslate';
 
-// Movement distance per key press
-const MOVE_DIST = 0.2;
-
-// Key to movement direction mapping
-const KEY_MOVES = {
-  w: [0, 0, MOVE_DIST],
-  s: [0, 0, -MOVE_DIST],
-  a: [MOVE_DIST, 0, 0],
-  d: [-MOVE_DIST, 0, 0],
-  arrowup: [0, 0, MOVE_DIST],
-  arrowdown: [0, 0, -MOVE_DIST],
-  arrowleft: [MOVE_DIST, 0, 0],
-  arrowright: [-MOVE_DIST, 0, 0],
-  shift: [0, MOVE_DIST, 0],
-  ' ': [0, -MOVE_DIST, 0],
-};
+const MOVE_SPEED = 0.3;
 
 /**
- * Hook to handle keyboard controls for camera movement
- * Handles WASD/arrow keys and vertical movement
+ * Hook to handle keyboard controls for orbit camera movement
+ * WASD moves relative to camera view, Shift/Space for vertical
  */
-export default function useKeyboardControls(camera, render) {
+export default function useKeyboardControls(camera, render, enabled = true) {
   const pressedKeysRef = useRef(new Set());
   const animationFrameRef = useRef(null);
 
   useEffect(() => {
-    if (!camera || !render) return;
+    if (!camera || !render || !enabled) {
+      pressedKeysRef.current.clear();
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      return;
+    }
 
-    // Continuous movement update
     const updatePosition = () => {
-      if (pressedKeysRef.current.size === 0) {
+      const keys = pressedKeysRef.current;
+      if (keys.size === 0) {
         animationFrameRef.current = null;
         return;
       }
 
+      // Get camera yaw to compute view-relative directions
+      const { yaw } = camera.cameraState.current;
+
+      // Forward direction (where camera looks) in world space
+      // Camera looks toward: [-sin(yaw), 0, -cos(yaw)]
+      const forwardX = -Math.sin(yaw);
+      const forwardZ = -Math.cos(yaw);
+
+      // Right direction (perpendicular to forward)
+      const rightX = -forwardZ; // cos(yaw)
+      const rightZ = forwardX;  // -sin(yaw)
+
       const direction = vec3.create();
-      for (const key of pressedKeysRef.current) {
-        if (KEY_MOVES[key]) {
-          vec3.add(direction, direction, KEY_MOVES[key]);
-        }
+
+      // W/S: forward/backward
+      if (keys.has('w') || keys.has('arrowup')) {
+        direction[0] += forwardX * MOVE_SPEED;
+        direction[2] += forwardZ * MOVE_SPEED;
+      }
+      if (keys.has('s') || keys.has('arrowdown')) {
+        direction[0] -= forwardX * MOVE_SPEED;
+        direction[2] -= forwardZ * MOVE_SPEED;
       }
 
-      camera.move3d(direction, false);
+      // A/D: strafe left/right
+      if (keys.has('a') || keys.has('arrowleft')) {
+        direction[0] -= rightX * MOVE_SPEED;
+        direction[2] -= rightZ * MOVE_SPEED;
+      }
+      if (keys.has('d') || keys.has('arrowright')) {
+        direction[0] += rightX * MOVE_SPEED;
+        direction[2] += rightZ * MOVE_SPEED;
+      }
+
+      // Shift/Space: up/down (world Y)
+      if (keys.has('shift')) direction[1] = MOVE_SPEED;
+      if (keys.has(' ')) direction[1] = -MOVE_SPEED;
+
+      // Move target directly (don't use move3d rotation)
+      const { target } = camera.cameraState.current;
+      if (target) {
+        vec3.add(target, target, direction);
+      }
+
       render();
       animationFrameRef.current = requestAnimationFrame(updatePosition);
     };
 
-    const handleKeyDown = (evt) => {
-      // Ignore if typing in an input field
-      if (evt.target.tagName === 'INPUT' || evt.target.tagName === 'TEXTAREA') {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         return;
       }
 
-      const key = evt.key.toLowerCase();
-      if (KEY_MOVES[key] || evt.key === 'Shift') {
-        evt.preventDefault();
+      const key = e.key.toLowerCase();
+      const movementKeys = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '];
+
+      if (movementKeys.includes(key) || e.key === 'Shift') {
+        e.preventDefault();
         pressedKeysRef.current.add(key);
+
         if (!animationFrameRef.current) {
           animationFrameRef.current = requestAnimationFrame(updatePosition);
         }
       }
     };
 
-    const handleKeyUp = (evt) => {
-      // Ignore if typing in an input field
-      if (evt.target.tagName === 'INPUT' || evt.target.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      const key = evt.key.toLowerCase();
-      if (KEY_MOVES[key] || evt.key === 'Shift') {
-        evt.preventDefault();
-        pressedKeysRef.current.delete(key);
-      }
+    const handleKeyUp = (e) => {
+      const key = e.key.toLowerCase();
+      pressedKeysRef.current.delete(key);
     };
 
-    // Add global keyboard listeners
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
 
-    // Cleanup
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
@@ -91,5 +111,5 @@ export default function useKeyboardControls(camera, render) {
       }
       pressedKeysRef.current.clear();
     };
-  }, [camera, render]);
+  }, [camera, render, enabled]);
 }
