@@ -59,7 +59,8 @@ Generate natural landscapes with mountains, valleys, rivers, and vegetation. Pla
 
 <table>
   <tr>
-    <td><img height="300" alt="CleanShot 2025-12-18 at 03 48 57@2x" src="https://github.com/user-attachments/assets/62d40912-b6b0-4bbe-acc5-41ba083019f1" /></td>
+    <td><img height="300" alt="Screenshot 2025-12-18 at 1 50 33 PM" src="https://github.com/user-attachments/assets/8e95eb20-0fa2-429b-90a8-508fc98f2178" />
+</td>
     <td><img height="300" alt="CleanShot 2025-12-18 at 03 30 31@2x" src="https://github.com/user-attachments/assets/e594e537-f49a-440c-ab68-aef093b598e3" /></td>
   </tr>
 </table>
