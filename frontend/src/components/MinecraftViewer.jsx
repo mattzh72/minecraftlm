@@ -87,6 +87,11 @@ export function MinecraftViewer() {
     setViewerMode('orbit');
   }, [setViewerMode]);
 
+  // Re-render when viewer mode changes so camera snaps immediately
+  useEffect(() => {
+    requestRender();
+  }, [viewerMode, requestRender]);
+
   useThumbnailCaptureOnComplete({
     thumbnailCaptureRequest,
     activeSessionId,
