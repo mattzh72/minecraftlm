@@ -1,6 +1,6 @@
 # MinecraftLM
 
-### Build 3D Worlds from Text — No Code Required
+### Build 3D Minecraft Worlds from Text
 
 Project Team: [Matt Zhou](https://x.com/Mattzh1314), [Johnathan Chiu](https://x.com/johnathanchewy), [Preston Bourne](https://x.com/prestonb0urne), [Avinash Jain](https://x.com/avinashj_)
 
