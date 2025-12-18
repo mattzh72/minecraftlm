@@ -36,7 +36,8 @@ Build anything from a cozy cottage to a Gothic cathedral. The agent understands 
 
 <table>
   <tr>
-    <td><img height="300" alt="CleanShot 2025-12-18 at 03 33 58@2x" src="https://github.com/user-attachments/assets/326d991f-6f53-4dfc-9f44-5b8aa2d429a6" /></td>
+    <td><<img height="300" alt="PNG image" src="https://github.com/user-attachments/assets/f31ba390-1819-44d9-a19a-9b75e909de6a" />
+/td>
     <td><img height="300" alt="CleanShot 2025-12-18 at 01 56 50@2x" src="https://github.com/user-attachments/assets/6ce2da49-f9e5-48fa-afa0-465fe48ff0fb" /></td>
   </tr>
 </table>
