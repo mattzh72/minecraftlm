@@ -1,7 +1,14 @@
 #!/bin/bash
-# Run the Minecraft Schematic Generator in development mode with hot reload
+# Run the Minecraft Schematic Generator
 
 set -e
+
+# Parse arguments
+RELOAD_ARGS=""
+if [[ "$1" == "--reload" ]]; then
+    RELOAD_ARGS="--reload --reload-exclude 'storage/*'"
+    echo "Hot reload enabled"
+fi
 
 # Cleanup function to kill background processes
 cleanup() {
@@ -20,4 +27,4 @@ cd ..
 
 echo "Starting backend dev server..."
 cd backend
-uv run uvicorn app.main:app --reload --reload-exclude 'storage/*' --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app $RELOAD_ARGS --host 0.0.0.0 --port 8000

@@ -87,22 +87,18 @@ You'll need these installed on your machine:
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/mattzh72/minecraft-schematic-gen
-cd minecraft-schematic-gen
+git clone https://github.com/mattzh72/minecraftlm.git
+cd minecraftlm
 ```
 
 **2. Install backend dependencies**
 ```bash
-cd backend
-uv sync
-cd ..
+cd backend && uv sync && cd ..
 ```
 
 **3. Install frontend dependencies** (this also builds the 3D renderer)
 ```bash
-cd frontend
-npm install
-cd ..
+cd frontend && npm install && cd ..
 ```
 
 **4. Configure your API key**
@@ -116,6 +112,7 @@ Edit `backend/.env` and add your API key (see [Configuration](#configuration) be
 ```bash
 ./run.sh
 ```
+(OR in development mode `./run.sh --reload`)
 
 This starts both the backend server (port 8000) and frontend (port 5173) with hot reload enabled.
 
