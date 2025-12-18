@@ -240,6 +240,37 @@ trapdoor = Block(
 )
 ```
 
+## Buttons and pressure plates (`powered`, `face`)
+
+Buttons and pressure plates have required properties that must be set explicitly.
+
+- Example ids:
+  - `minecraft:stone_button`, `minecraft:oak_button`, `minecraft:polished_blackstone_button`, …
+  - `minecraft:stone_pressure_plate`, `minecraft:oak_pressure_plate`, `minecraft:heavy_weighted_pressure_plate`, …
+
+- Properties:
+  - `powered`: `"true"` | `"false"` (required for both)
+  - `face`: `"floor"` | `"wall"` | `"ceiling"` (buttons only)
+  - `facing`: `"north"` | `"south"` | `"east"` | `"west"` (buttons only, when on wall)
+
+**Important:** Property values are strings, not Python booleans. Use `"false"` not `False`.
+
+```python
+# Button on a wall
+button = Block(
+    "minecraft:stone_button",
+    catalog=catalog,
+    properties={"face": "wall", "facing": "north", "powered": "false"},
+)
+
+# Pressure plate on floor
+plate = Block(
+    "minecraft:stone_pressure_plate",
+    catalog=catalog,
+    properties={"powered": "false"},
+)
+```
+
 ## Connecting blocks (`north/east/south/west` booleans)
 
 Many blocks have directional connection properties that control how they render. **You must set these properties explicitly for correct rendering** - the renderer does not auto-connect based on neighbors.
@@ -255,22 +286,35 @@ These blocks **require** directional properties to render correctly:
 - Properties:
   - `north`, `south`, `east`, `west`: `"true"` | `"false"`
 
-**Important:** Without these properties, connecting blocks may render as a small cross/post shape instead of extending to connect. Always specify which directions should connect:
+**Important:** Without these properties, connecting blocks may render as a small cross/post shape instead of extending to connect. Always specify which directions should connect.
+
+**CRITICAL - Glass Pane Orientation:** The connection properties define which direction the pane **extends**, NOT which wall it's on. Common mistake: confusing wall **position** (North/South/East/West) with wall **direction** (which axis it runs along).
+
+**Rule:** Match connections to the wall's **run direction**, not its position name:
+- **North or South wall** (at Z=0 or Z=max) **runs East-West** → use `{"east": "true", "west": "true", "north": "false", "south": "false"}`
+- **East or West wall** (at X=0 or X=max) **runs North-South** → use `{"north": "true", "south": "true", "east": "false", "west": "false"}`
 
 ```python
-# A wall of iron bars (portcullis) - connects horizontally
+# WRONG - North wall but using north/south connections (panes stick OUT)
+Block(
+    "minecraft:glass_pane",
+    catalog=catalog,
+    properties={"north": "true", "south": "true", "east": "false", "west": "false"},  # ❌ Perpendicular!
+).at(5, 2, 0)  # Z=0 is North wall which RUNS East-West
+
+# CORRECT - North wall with east/west connections (panes run ALONG wall)
+Block(
+    "minecraft:glass_pane",
+    catalog=catalog,
+    properties={"east": "true", "west": "true", "north": "false", "south": "false"},  # ✓ Parallel!
+).at(5, 2, 0)  # Z=0 is North wall which RUNS East-West
+
+# Iron bars portcullis example
 Block(
     "minecraft:iron_bars",
     catalog=catalog,
     properties={"east": "true", "west": "true", "north": "false", "south": "false"},
 ).with_size(4, 5, 1).at(10, 1, 5)
-
-# A glass pane window connecting north-south
-Block(
-    "minecraft:glass_pane",
-    catalog=catalog,
-    properties={"north": "true", "south": "true", "east": "false", "west": "false"},
-).with_size(1, 3, 5).at(5, 2, 0)
 ```
 
 ### Fences and walls

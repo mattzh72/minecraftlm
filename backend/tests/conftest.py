@@ -32,9 +32,9 @@ def temp_storage(monkeypatch):
 
 
 @pytest.fixture
-def session_with_code(temp_storage):
+async def session_with_code(temp_storage):
     """Create a session with some initial code"""
-    session_id = SessionService.create_session()
+    session_id = await SessionService.create_session()
 
     initial_code = '''# Simple test structure
 def build_house():
@@ -59,6 +59,6 @@ def build_house():
 build_house()
 '''
 
-    SessionService.save_code(session_id, initial_code)
+    await SessionService.save_code(session_id, initial_code)
 
     return session_id

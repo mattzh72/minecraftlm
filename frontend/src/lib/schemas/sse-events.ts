@@ -48,14 +48,7 @@ export const completeEvent = z.object({
   type: z.literal("complete"),
   data: z.object({
     success: z.boolean(),
-    reason: z.string().optional(),
-  }),
-});
-
-export const errorEvent = z.object({
-  type: z.literal("error"),
-  data: z.object({
-    message: z.string(),
+    error: z.string().optional(),
   }),
 });
 
@@ -66,7 +59,6 @@ export const sseEvent = z.discriminatedUnion("type", [
   toolCallEvent,
   toolResultEvent,
   completeEvent,
-  errorEvent,
 ]);
 
 export type SSEEvent = z.infer<typeof sseEvent>;
@@ -76,5 +68,4 @@ export type TextDeltaEvent = z.infer<typeof textDeltaEvent>;
 export type ToolCallEvent = z.infer<typeof toolCallEvent>;
 export type ToolResultEvent = z.infer<typeof toolResultEvent>;
 export type CompleteEvent = z.infer<typeof completeEvent>;
-export type ErrorEvent = z.infer<typeof errorEvent>;
 export type CompilationStatus = z.infer<typeof compilationStatus>;

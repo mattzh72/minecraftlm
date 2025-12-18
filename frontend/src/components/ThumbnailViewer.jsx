@@ -21,12 +21,6 @@ export default function ThumbnailViewer({ structureData, size = thumb.defaultSiz
     if (!structureData || !resources || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const gl = canvas.getContext('webgl');
-    if (!gl) {
-      console.error('WebGL not supported');
-      return;
-    }
-
     let renderer = null;
 
     try {

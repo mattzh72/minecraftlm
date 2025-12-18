@@ -2,14 +2,16 @@
 Session API endpoints
 """
 
+import asyncio
 import base64
-import json
 from pathlib import Path
 
 from app.api.models import SessionResponse
+from app.services.event_buffer import get_buffer
+from app.services.file_ops import get_file_service
 from app.services.session import SessionService
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 router = APIRouter()
 
@@ -26,51 +28,18 @@ async def list_sessions():
     """
     List all available sessions with metadata.
     """
-    sessions = []
-    if LOCAL_STORAGE_FOLDER.exists():
-        for session_dir in LOCAL_STORAGE_FOLDER.iterdir():
-            if session_dir.is_dir():
-                session_id = session_dir.name
-                # Get basic info
-                has_structure = (session_dir / CODE_FNAME).exists()
-                has_thumbnail = (session_dir / THUMBNAIL_FNAME).exists()
-                conversation_path = session_dir / "conversation.json"
-                message_count = 0
-                if conversation_path.exists():
-                    try:
-                        with open(conversation_path, "r") as f:
-                            conv = json.load(f)
-                            message_count = len(conv)
-                    except (json.JSONDecodeError, IOError):
-                        pass
+    session_dirs = await SessionService.list_session_dirs()
+    if not session_dirs:
+        return JSONResponse(content={"sessions": []})
 
-                # Load metadata for timestamps
-                metadata_path = session_dir / "metadata.json"
-                created_at = None
-                updated_at = None
-                if metadata_path.exists():
-                    try:
-                        with open(metadata_path, "r") as f:
-                            metadata = json.load(f)
-                            created_at = metadata.get("created_at")
-                            updated_at = metadata.get("updated_at")
-                    except (json.JSONDecodeError, IOError):
-                        pass
-
-                sessions.append(
-                    {
-                        "session_id": session_id,
-                        "has_structure": has_structure,
-                        "has_thumbnail": has_thumbnail,
-                        "message_count": message_count,
-                        "created_at": created_at,
-                        "updated_at": updated_at,
-                    }
-                )
+    # Process all sessions concurrently
+    results = await asyncio.gather(
+        *[SessionService.get_session_info(d) for d in session_dirs]
+    )
+    sessions = [s for s in results if s is not None]
 
     # Sort by updated_at (most recent first)
     sessions.sort(key=lambda s: s.get("updated_at") or "", reverse=True)
-
     return JSONResponse(content={"sessions": sessions})
 
 
@@ -80,48 +49,73 @@ async def create_session():
     Create a new chat session.
     Returns the session_id which maps to storage/sessions/{session_id}/
     """
-    session_id = SessionService.create_session()
+    session_id = await SessionService.create_session()
     return SessionResponse(session_id=session_id)
 
 
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str):
     """
-    Get session data including conversation history and structure (if exists).
+    Get session data including conversation history, structure, and task status.
     Used to restore sessions on page reload.
+
+    Returns:
+    - session_id: The session ID
+    - conversation: Persisted conversation history (complete messages only)
+    - structure: The structure data (if exists)
+    - has_thumbnail: Whether a cached thumbnail exists
+    - model: The model used for this session
+    - task_status: "idle" | "running" | "completed" | "error"
+
+    If task_status == "running", frontend should subscribe to /stream?since=0
+    to replay all buffered events and build the in-progress message.
     """
+    fs = get_file_service()
     session_dir = Path(LOCAL_STORAGE_FOLDER) / session_id
-    if not session_dir.exists():
+    if not await fs.exists(session_dir):
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
     try:
-        # Load conversation
-        conversation_path = session_dir / "conversation.json"
+        conversation = await SessionService.load_conversation(session_id)
+    except FileNotFoundError:
         conversation = []
-        if conversation_path.exists():
-            with open(conversation_path, "r") as f:
-                conversation = json.load(f)
 
-        # Load structure if exists
+    # Determine task status from buffer
+    buffer = get_buffer(session_id)
+    if buffer is None:
+        task_status = "idle"
+    elif buffer.is_complete:
+        task_status = "error" if buffer.error else "completed"
+    elif buffer.is_started:
+        task_status = "running"
+    else:
+        task_status = "idle"
+
+    try:
         structure_path = session_dir / CODE_FNAME
+        if await fs.exists(structure_path):
+            structure = await fs.read_json(structure_path)
+        else:
+            structure = None
+    except Exception:
         structure = None
-        if structure_path.exists():
-            with open(structure_path, "r") as f:
-                structure = json.load(f)
 
-        # Load model from metadata
-        model = SessionService.get_model(session_id)
+    # Check if thumbnail exists
+    thumbnail_path = session_dir / THUMBNAIL_FNAME
+    has_thumbnail = await fs.exists(thumbnail_path)
 
-        return JSONResponse(
-            content={
-                "session_id": session_id,
-                "conversation": conversation,
-                "structure": structure,
-                "model": model,
-            }
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error loading session: {str(e)}")
+    model = await SessionService.get_model(session_id)
+
+    return JSONResponse(
+        content={
+            "session_id": session_id,
+            "conversation": conversation,
+            "structure": structure,
+            "has_thumbnail": has_thumbnail,
+            "model": model,
+            "task_status": task_status,
+        }
+    )
 
 
 @router.delete("/sessions/{session_id}")
@@ -130,7 +124,7 @@ async def delete_session(session_id: str):
     Delete a session and all its associated data.
     """
     try:
-        SessionService.delete_session(session_id)
+        await SessionService.delete_session(session_id)
         return JSONResponse(content={"message": f"Session {session_id} deleted"})
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
@@ -144,15 +138,15 @@ async def get_structure(session_id: str):
     Get the generated Minecraft structure JSON for visualization.
     Returns the code.json file which contains the structure data.
     """
+    fs = get_file_service()
     code_path = Path(LOCAL_STORAGE_FOLDER) / session_id / CODE_FNAME
-    if not code_path.exists():
+    if not await fs.exists(code_path):
         raise HTTPException(
             status_code=404, detail=f"Structure not found for session {session_id}"
         )
 
     try:
-        with open(code_path, "r") as f:
-            structure_data = json.load(f)
+        structure_data = await fs.read_json(code_path)
         return JSONResponse(content=structure_data)
     except Exception as e:
         raise HTTPException(
@@ -166,8 +160,9 @@ async def get_thumbnail(session_id: str):
     Get the cached thumbnail image for a session.
     Returns the thumbnail.png file if it exists.
     """
+    fs = get_file_service()
     thumbnail_path = Path(LOCAL_STORAGE_FOLDER) / session_id / THUMBNAIL_FNAME
-    if not thumbnail_path.exists():
+    if not await fs.exists(thumbnail_path):
         raise HTTPException(
             status_code=404, detail=f"Thumbnail not found for session {session_id}"
         )
@@ -185,12 +180,13 @@ async def upload_thumbnail(session_id: str, request: Request):
     Upload and save a thumbnail image for a session.
     Accepts base64-encoded PNG image data.
     """
+    fs = get_file_service()
     session_dir = Path(LOCAL_STORAGE_FOLDER) / session_id
-    if not session_dir.exists():
+    if not await fs.exists(session_dir):
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
     try:
-        body = await request.json()
+        body: dict[str, str] = await request.json()
         image_data = body.get("image")
         if not image_data:
             raise HTTPException(status_code=400, detail="Missing 'image' field")
@@ -203,11 +199,42 @@ async def upload_thumbnail(session_id: str, request: Request):
         # Decode base64 and save
         image_bytes = base64.b64decode(image_data)
         thumbnail_path = session_dir / THUMBNAIL_FNAME
-        with open(thumbnail_path, "wb") as f:
-            f.write(image_bytes)
+        await fs.write_bytes(thumbnail_path, image_bytes)
 
         return JSONResponse(content={"message": "Thumbnail saved successfully"})
     except base64.binascii.Error:
         raise HTTPException(status_code=400, detail="Invalid base64 image data")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error saving thumbnail: {str(e)}")
+
+
+@router.get("/sessions/{session_id}/stream")
+async def stream_session_events(session_id: str, since: int = 0):
+    """
+    SSE endpoint to subscribe to session events.
+
+    Args:
+        since: Skip first N events (use event_count from GET /sessions/{id})
+
+    Streams events starting from index `since` until task completes.
+    Returns 404 if no active buffer exists.
+    """
+    buffer = get_buffer(session_id)
+
+    # No buffer = no active task, don't create one and poll forever
+    if buffer is None:
+        raise HTTPException(status_code=404, detail="No active task for this session")
+
+    async def event_generator():
+        async for sse_string in buffer.subscribe(since=since):
+            yield sse_string
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

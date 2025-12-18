@@ -15,7 +15,7 @@ export function TimeOfDayToggle() {
           setTimeOfDay(value[0] as TimeOfDay);
         }
       }}
-      className="bg-black/40 backdrop-blur-xl border border-white/15 rounded-lg p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]"
+      className="bg-black/40 backdrop-blur-xl border border-white/15 rounded-lg p-1 gap-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]"
     >
       <Toggle
         value="day"

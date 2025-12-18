@@ -44,4 +44,4 @@ Symmetry and real-world accuracy. Courts have specific proportions, markings, an
 
 | Date | Model | Result | Notes |
 |------|-------|--------|-------|
-| | | | |
+| 2025-12-17 | gemini-3-pro-preview | Pass | Both hoops with backboards/poles, court markings (3-point lines, key areas, center circle), boundaries, wood floor, terrain with trees |

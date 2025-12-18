@@ -39,7 +39,7 @@ async def test_agent_e2e_simple_structure():
         )
 
     # Create session (uses real storage)
-    session_id = SessionService.create_session()
+    session_id = await SessionService.create_session()
     print(f"\nCreated session: {session_id}")
 
     # Verify session files were created
@@ -63,11 +63,18 @@ async def test_agent_e2e_simple_structure():
     # Track events
     events = []
     tool_calls = []
+    # Build conversation with user message (as chat.py would do)
+    conversation = [{"role": "user", "content": user_message}]
 
     # Run agent
-    async for event in agent.run(user_message):
+    async for event in agent.run(conversation):
+        # Skip internal events (handled by chat.py in production)
+        if event.type == "full_message":
+            print(f"[Internal] Event: {event.type} (skipped)")
+            continue
+
         events.append(event)
-        print(f"Event: {event.type} - {event.data}")
+        print(f"Event: {event.type}")
 
         if event.type == "tool_call":
             tool_calls.append(event.data["name"])
@@ -89,11 +96,11 @@ async def test_agent_e2e_simple_structure():
     assert "edit_code" in tool_calls, "Agent should have edited code"
 
     # Verify code was written
-    final_code = SessionService.load_code(session_id)
+    final_code = await SessionService.load_code(session_id)
     print(f"\nFinal code:\n{final_code}")
 
     # Verify conversation was saved
-    conversation = SessionService.load_conversation(session_id)
+    conversation = await SessionService.load_conversation(session_id)
     assert len(conversation) >= 2
     assert conversation[0]["role"] == "user"
 

@@ -30,10 +30,10 @@ Block(
 | Pattern | Example Blocks | Properties |
 |---------|---------------|------------|
 | Directional connections | iron_bars, glass_pane, fences, vines | `east/north/south/west`: `"true"` or `"false"` |
-| Facing | furnace, chest, stairs | `facing`: `"north"`, `"south"`, `"east"`, `"west"` |
+| Facing | furnace, stairs | `facing`: `"north"`, `"south"`, `"east"`, `"west"` |
 | Axis (logs, pillars) | oak_log, chain, bone_block | `axis`: `"x"`, `"y"`, `"z"` |
 | Slab type | stone_slab, oak_slab | `type`: `"bottom"`, `"top"`, `"double"` |
-| Lit state | torch, furnace, candle | `lit`: `"true"` or `"false"` |
+| Lit state | furnace, redstone_lamp, campfire | `lit`: `"true"` or `"false"` |
 
 ---
 

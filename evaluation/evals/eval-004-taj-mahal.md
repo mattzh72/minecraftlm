@@ -44,4 +44,4 @@ Iconic landmark with specific architecture. Tests dome geometry, symmetry, and m
 
 | Date | Model | Result | Notes |
 |------|-------|--------|-------|
-| | | | |
+| 2025-12-17 | gemini-3-pro-preview | Pass | Onion dome, 4 minarets, arched entrance, white marble, charbagh gardens with water channels, pathways, trees, flowers—all connected to platform |

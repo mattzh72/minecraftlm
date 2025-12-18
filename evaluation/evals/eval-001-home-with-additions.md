@@ -37,3 +37,4 @@ Multi-turn spatial coherence. When adding elements to an existing scene, they mu
 | Date | Model | Result | Notes |
 |------|-------|--------|-------|
 | 2025-12-15 | gemini-3-pro-preview | Fail | Additions floated as disconnected islands |
+| 2025-12-17 | gemini-3-pro-preview | Pass | Continuous terrain, house with chimney, road with lane markings, car with wheels/taillights, driveway connects all elements |
