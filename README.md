@@ -201,12 +201,6 @@ The app will automatically detect which providers you've configured and show onl
 
 **Note**: Different models have different strengths. Claude models tend to be good at detailed architectural work, while GPT models may excel at creative interpretations. Experiment to find what works best for your use case.
 
-## Star History
+---
 
-<a href="https://star-history.com/#mattzh72/minecraft-schematic-gen">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=mattzh72/minecraft-schematic-gen&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=mattzh72/minecraft-schematic-gen&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=mattzh72/minecraft-schematic-gen&type=Date" width="100%" />
-  </picture>
-</a>
+Made with 💜 in San Francisco and New York City
