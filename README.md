@@ -9,7 +9,9 @@ Project Team: [Matt Zhou](https://x.com/Mattzh1314), [Johnathan Chiu](https://x.
 [![Discord](https://img.shields.io/discord/1451023766153855081?logo=discord&label=Discord&color=5865F2)](https://discord.gg/UNfAA4bte2)
 
 
-https://github.com/user-attachments/assets/cdeb2167-1383-44ba-887e-fa3545ea08cf
+
+https://github.com/user-attachments/assets/cbb5d430-2e33-4704-89e9-fba45e2197e5
+
 
 
 ## Table of Contents
@@ -27,50 +29,31 @@ MinecraftLM lets you create 3D structures in Minecraft just by describing them. 
 
 ## What You Can Build
 
-MinecraftLM can create a wide range of structures—from realistic landmarks to fantasy worlds to functional objects. Here are some examples:
-
-<table>
-  <tr>
-    <td align="center">
-      <img src="evaluation/screenshots/eval-002/2025-12-17-02.41.36.png" width="400"/><br/>
-      <sub><b>"Build me a 747 airplane"</b></sub>
-    </td>
-    <td align="center">
-      <img src="evaluation/screenshots/eval-004/2025-12-17-02.55.01.png" width="400"/><br/>
-      <sub><b>"Build the Taj Mahal with gardens"</b></sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="evaluation/screenshots/eval-015/2025-12-17-03.20.43.png" width="400"/><br/>
-      <sub><b>"A windmill on a hill"</b></sub>
-    </td>
-    <td align="center">
-      <img src="evaluation/screenshots/eval-003/2025-12-17-03.02.41.png" width="400"/><br/>
-      <sub><b>"The Golden Gate Bridge"</b></sub>
-    </td>
-  </tr>
-</table>
+MinecraftLM can create a wide range of structures—from realistic landmarks to fantasy worlds to functional objects.
 
 ### Buildings & Architecture
 Build anything from a cozy cottage to a Gothic cathedral. The agent understands architectural concepts like walls, roofs, windows, doors, and can create multi-story structures with furnished interiors.
 
-<!-- TODO: Add screenshot of architectural structure with interior view -->
+<img height="300" alt="CleanShot 2025-12-18 at 03 33 58@2x" src="https://github.com/user-attachments/assets/326d991f-6f53-4dfc-9f44-5b8aa2d429a6" />
+<img height="300" alt="CleanShot 2025-12-18 at 01 56 50@2x" src="https://github.com/user-attachments/assets/6ce2da49-f9e5-48fa-afa0-465fe48ff0fb" />
 
 ### Vehicles & Objects
 Create vehicles with realistic proportions and details—aircraft with proper wing geometry, ships with deck structures, or cars with wheels and windows.
 
-<!-- TODO: Add screenshot showcasing vehicle generation -->
+<img height="300" alt="CleanShot 2025-12-18 at 01 55 18@2x" src="https://github.com/user-attachments/assets/1acf4c89-d083-4a0d-be47-7017b3e951d1" />
+<img height="300" alt="CleanShot 2025-12-18 at 03 27 07@2x" src="https://github.com/user-attachments/assets/74094706-7b88-4f11-a7b5-36a8ce9bb7a0" />
 
 ### Terrain & Landscapes
 Generate natural landscapes with mountains, valleys, rivers, and vegetation. Place structures on terrain and watch them integrate seamlessly with automatic foundation filling.
 
-<!-- TODO: Add screenshot of generated terrain -->
+<img height="300" alt="CleanShot 2025-12-18 at 02 40 42@2x" src="https://github.com/user-attachments/assets/e11ec85f-203d-465a-ad35-cc0bcf2f8f7d" />
+<img height="300" alt="CleanShot 2025-12-18 at 03 30 31@2x" src="https://github.com/user-attachments/assets/e594e537-f49a-440c-ab68-aef093b598e3" />
+
 
 ### Creative & Abstract
 The agent can interpret artistic concepts and build abstract sculptures, pixel art, or fantastical creations.
 
-<!-- TODO: Add screenshot of creative/abstract build -->
+<img height="300" alt="CleanShot 2025-12-18 at 03 24 26@2x" src="https://github.com/user-attachments/assets/c11acf7e-b89d-4169-8cc2-823c3e326e3f" />
 
 ## Quick Start
 
