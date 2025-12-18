@@ -69,7 +69,8 @@ The agent can interpret artistic concepts and build abstract sculptures, pixel a
 <table>
   <tr>
     <td><img height="300" alt="Screenshot 2025-12-18 at 12 54 16 PM" src="https://github.com/user-attachments/assets/cbc3c09b-64c5-47f6-ad32-53d9283c9637" /></td>
-    <td><img height="300" alt="CleanShot 2025-12-18 at 03 51 39@2x" src="https://github.com/user-attachments/assets/0440298d-284a-496a-b911-d59fc805c2ac" /></td>
+    <td><img height="300" alt="Screenshot 2025-12-18 at 1 33 40 PM" src="https://github.com/user-attachments/assets/d47654ba-86f0-4bf6-9139-df855096d2dd" />
+</td>
   </tr>
 </table>
 
