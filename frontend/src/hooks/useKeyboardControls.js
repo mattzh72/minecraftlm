@@ -13,6 +13,7 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
   const pressedKeysRef = useRef(new Set());
   const animationFrameRef = useRef(null);
   const isRunningRef = useRef(false);
+  const metaKeyRef = useRef(false); // Track Cmd key to ignore Shift during screenshots
 
   // Movement update function - updates camera position and schedules next frame
   const tick = useCallback(() => {
@@ -60,8 +61,9 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
     }
 
     // Space/Shift: up/down (world Y)
+    // Ignore shift when Cmd is held (for Cmd+Shift+4 screenshots)
     if (keys.has(' ')) direction[1] = moveSpeed;
-    if (keys.has('shift')) direction[1] = -moveSpeed;
+    if (keys.has('shift') && !metaKeyRef.current) direction[1] = -moveSpeed;
 
     // Move camera position directly
     vec3.add(position, position, direction);
@@ -93,6 +95,12 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
     }
 
     const handleKeyDown = (e) => {
+      // Track meta key for Cmd+Shift+4 screenshot handling
+      if (e.key === 'Meta') {
+        metaKeyRef.current = true;
+        return;
+      }
+
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
         return;
       }
@@ -101,6 +109,10 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
       const movementKeys = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '];
 
       if (movementKeys.includes(key) || e.key === 'Shift') {
+        // Don't preventDefault or add shift when Cmd is held (screenshot)
+        if (e.key === 'Shift' && metaKeyRef.current) {
+          return;
+        }
         e.preventDefault();
         pressedKeysRef.current.add(key);
         startLoop();
@@ -108,6 +120,12 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
     };
 
     const handleKeyUp = (e) => {
+      // Track meta key release
+      if (e.key === 'Meta') {
+        metaKeyRef.current = false;
+        return;
+      }
+
       const key = e.key.toLowerCase();
       pressedKeysRef.current.delete(key);
       // Loop will stop itself when no keys are pressed
