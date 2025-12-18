@@ -98,6 +98,7 @@ def build_structure() -> dict:
 
 
 # The runtime reads this top-level variable as the final result.
+# IMPORTANT: The code below is necessary to make your code compilable. Please ensure that it exists in the final script.
 structure = build_structure()
 
 

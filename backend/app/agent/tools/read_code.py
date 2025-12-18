@@ -4,13 +4,13 @@ ReadCode tool - Return the current SDK code for this session.
 
 from pydantic import BaseModel
 
-from app.services.session import SessionService
 from app.agent.tools.base import (
     BaseDeclarativeTool,
     BaseToolInvocation,
     ToolResult,
     make_tool_schema,
 )
+from app.services.session import SessionService
 
 
 class ReadCodeParams(BaseModel):
@@ -43,13 +43,13 @@ class ReadCodeTool(BaseDeclarativeTool):
             name="read_code",
             description=(
                 "Read the current Python SDK code.\n\n"
-                "Returns the full Python code as a string with line numbers prefixed to each line. "
+                "Returns the full Python code as a plain string. "
                 "The code uses the minecraft_sdk module to define 3D structures.\n\n"
                 "Use this when you need to:\n"
                 "- See the current state of the code before editing\n"
                 "- Find the exact string to use in edit_code's old_string parameter\n"
                 "- Check variable names, imports, or code structure\n\n"
-                "Returns: The complete Python code with line numbers (e.g., '  1: from minecraft_sdk import ...')."
+                "Returns: The complete Python code as a string."
             ),
         )
         super().__init__("read_code", schema)
@@ -57,4 +57,3 @@ class ReadCodeTool(BaseDeclarativeTool):
     async def build(self, params: dict) -> ReadCodeInvocation:
         validated = ReadCodeParams(**params)
         return ReadCodeInvocation(validated)
-
