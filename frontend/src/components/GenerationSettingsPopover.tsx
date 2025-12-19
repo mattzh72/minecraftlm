@@ -43,17 +43,19 @@ const PROVIDER_LABELS: Record<ModelProvider, string> = {
 const PROVIDER_ORDER: ModelProvider[] = ["anthropic", "openai", "gemini"];
 
 function getModelDisplayName(modelId: string) {
-  const name = modelId.replace(/^[^/]+\//, "");
+  // Remove provider prefix (e.g., "gemini/")
+  let name = modelId.replace(/^[^/]+\//, "");
+  // Remove -preview suffix for cleaner display
+  name = name.replace(/-preview$/, "");
   return name;
 }
 
 function getModelShortName(modelId: string) {
-  const name = modelId.replace(/^[^/]+\//, "");
-  const parts = name.split("-");
-  if (parts.length >= 2) {
-    return parts.slice(0, 2).join("-");
-  }
-  return name.slice(0, 12);
+  // Remove provider prefix (e.g., "gemini/")
+  let name = modelId.replace(/^[^/]+\//, "");
+  // Remove -preview suffix for cleaner display
+  name = name.replace(/-preview$/, "");
+  return name;
 }
 
 type GenerationSettingsPopoverProps = {

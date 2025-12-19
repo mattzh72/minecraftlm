@@ -33,7 +33,9 @@ const PROVIDER_LABELS = {
 // Extract display name from model ID
 function getModelDisplayName(modelId: string) {
   // Remove provider prefix (e.g., "gemini/" or nothing for others)
-  const name = modelId.replace(/^[^/]+\//, '');
+  let name = modelId.replace(/^[^/]+\//, '');
+  // Remove -preview suffix for cleaner display
+  name = name.replace(/-preview$/, '');
   return name;
 }
 
