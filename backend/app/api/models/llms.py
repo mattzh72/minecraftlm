@@ -4,6 +4,7 @@ from pydantic import BaseModel
 AVAILABLE_MODELS = {
     "gemini": [
         "gemini/gemini-3-pro-preview",
+        "gemini/gemini-3-flash-preview",
     ],
     "openai": [
         "gpt-5.2",
