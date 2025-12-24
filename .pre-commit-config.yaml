@@ -36,7 +36,9 @@ repos:
     hooks:
       - id: eslint
         files: ^frontend/src/.*\.(js|jsx|ts|tsx)$
+        args: [--config, frontend/eslint.config.js]
         additional_dependencies:
           - eslint
           - eslint-plugin-react
           - eslint-plugin-react-hooks
+          - eslint-plugin-react-refresh

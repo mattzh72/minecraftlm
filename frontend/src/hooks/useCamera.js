@@ -106,11 +106,33 @@ export default function useCamera(structureSize) {
     vec3.add(position, position, offset);
   }, []);
 
-  // Rotate view (change yaw/pitch - camera rotates in place)
-  // Drag right → look right, drag up → look up
+  // Orbit around center point (classical orbit camera)
+  // Drag right → orbit right, drag up → orbit up
   const pan = useCallback((direction, sensitivity = 1) => {
+    const { target, position } = cameraState.current;
+    if (!target || !position) return;
+
+    // Update rotation angles
     cameraState.current.yaw -= (direction[0] / cam.panSensitivity) * sensitivity;
     cameraState.current.pitch += (direction[1] / cam.panSensitivity) * sensitivity;
+
+    // Clamp pitch to avoid gimbal lock
+    cameraState.current.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, cameraState.current.pitch));
+
+    // Calculate current radius (distance from target)
+    const radius = vec3.distance(position, target);
+    cameraState.current.radius = radius;
+
+    // Recalculate camera position to orbit around target
+    const cosPitch = Math.cos(cameraState.current.pitch);
+    const sinPitch = Math.sin(cameraState.current.pitch);
+    const sinYaw = Math.sin(cameraState.current.yaw);
+    const cosYaw = Math.cos(cameraState.current.yaw);
+
+    // Position camera at radius distance from target
+    position[0] = target[0] + radius * cosPitch * sinYaw;
+    position[1] = target[1] + radius * sinPitch;
+    position[2] = target[2] + radius * cosPitch * cosYaw;
   }, []);
 
   // Pan camera position (strafe left/right, move up/down)
@@ -123,24 +145,25 @@ export default function useCamera(structureSize) {
     vec3.add(position, position, offset);
   }, []);
 
-  // Zoom camera (move forward/backward in look direction)
+  // Zoom camera (change radius from center point)
   const zoom = useCallback((delta) => {
-    const { position, pitch, yaw } = cameraState.current;
-    if (!position) return;
+    const { position, pitch, yaw, target, radius } = cameraState.current;
+    if (!position || !target) return;
 
-    // Move in look direction
-    const zoomFactor = Math.max(0.1, cameraState.current.radius * 0.05);
-    const zoomAmount = delta * zoomFactor * 0.01;
+    // Adjust radius
+    const zoomFactor = Math.max(0.1, radius * 0.05);
+    const newRadius = Math.max(cam.minDistance, Math.min(cam.maxDistance, radius + delta * zoomFactor * 0.01));
+    cameraState.current.radius = newRadius;
 
+    // Recalculate position at new radius
     const cosPitch = Math.cos(pitch);
     const sinPitch = Math.sin(pitch);
     const sinYaw = Math.sin(yaw);
     const cosYaw = Math.cos(yaw);
 
-    // Move in the direction camera is looking
-    position[0] += -sinYaw * cosPitch * zoomAmount;
-    position[1] += -sinPitch * zoomAmount;
-    position[2] += -cosYaw * cosPitch * zoomAmount;
+    position[0] = target[0] + newRadius * cosPitch * sinYaw;
+    position[1] = target[1] + newRadius * sinPitch;
+    position[2] = target[2] + newRadius * cosPitch * cosYaw;
   }, []);
 
   const reset = useCallback(() => {

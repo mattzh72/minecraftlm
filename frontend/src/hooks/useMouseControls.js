@@ -8,7 +8,6 @@ import { Config } from '../config';
  */
 export default function useMouseControls(canvasRef, camera, requestRender, enabled = true) {
   const clickPosRef = useRef(null);
-  const modeRef = useRef('rotate'); // 'rotate' or 'pan'
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -17,18 +16,14 @@ export default function useMouseControls(canvasRef, camera, requestRender, enabl
     const handleMouseDown = (evt) => {
       evt.preventDefault();
       clickPosRef.current = [evt.clientX, evt.clientY];
-      modeRef.current = (evt.button === 2 || evt.shiftKey) ? 'pan' : 'rotate';
     };
 
     const handleMouseMove = (evt) => {
       if (clickPosRef.current) {
         const deltaX = evt.clientX - clickPosRef.current[0];
         const deltaY = evt.clientY - clickPosRef.current[1];
-        if (modeRef.current === 'pan' && camera.panTarget) {
-          camera.panTarget([deltaX, deltaY]);
-        } else {
-          camera.pan([deltaX, deltaY]);
-        }
+        // Always orbit around center
+        camera.pan([deltaX, deltaY]);
         clickPosRef.current = [evt.clientX, evt.clientY];
         requestRender();
       }

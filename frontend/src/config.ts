@@ -31,7 +31,7 @@ export const Config = {
   },
   renderer: {
     chunkSize: 16,
-    drawDistance: 256,
+    drawDistance: 384,
     useInvisibleBlockBuffer: false,
     sunlight: {
       // Golden hour sunset - sun low on horizon
