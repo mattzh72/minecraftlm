@@ -100,18 +100,20 @@ export default function useFirstPersonControls(
       if (['w', 's', 'a', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         e.preventDefault();
 
-        // Double-tap W detection for running
-        const DOUBLE_TAP_WINDOW = 150; // milliseconds (shorter = harder to trigger)
-        if (key === 'w' || key === 'arrowup') {
-          const now = Date.now();
-          if (now - lastWPressTimeRef.current < DOUBLE_TAP_WINDOW) {
-            isRunningRef.current = true;
+        if (!e.repeat) {
+          // Double-tap W detection for running
+          const DOUBLE_TAP_WINDOW = 150; // milliseconds (shorter = harder to trigger)
+          if (key === 'w' || key === 'arrowup') {
+            const now = Date.now();
+            if (now - lastWPressTimeRef.current < DOUBLE_TAP_WINDOW) {
+              isRunningRef.current = true;
+            }
+            lastWPressTimeRef.current = now;
           }
-          lastWPressTimeRef.current = now;
-        }
 
-        pressedKeysRef.current.add(key);
-        updateMovementIntent();
+          pressedKeysRef.current.add(key);
+          updateMovementIntent();
+        }
       }
 
       // Jump
