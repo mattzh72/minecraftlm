@@ -3,12 +3,6 @@
 import { HeadlessRenderer } from './src/HeadlessRenderer.js';
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const STORAGE_DIR = '/Users/johnathanchiu/Projects/minecraftlm/.storage/sessions';
 
 /**
  * Generate screenshots for Minecraft structures using HeadlessRenderer
@@ -19,40 +13,57 @@ class ScreenshotGenerator {
   }
 
   /**
-   * Generate screenshot for a single session
+   * Load structure data from a session directory
    */
-  async generateForSession(sessionId, options = {}) {
-    const { angle = 'overview', outputDir = './output' } = options;
+  async loadSessionData(sessionDir) {
+    const structureFile = path.join(sessionDir, 'code.json');
+    const content = await fs.readFile(structureFile, 'utf8');
+    return JSON.parse(content);
+  }
 
-    console.log(`\n🎮 Processing session: ${sessionId}`);
-
+  /**
+   * Load metadata from a session directory
+   */
+  async loadMetadata(sessionDir) {
     try {
-      const buffer = await this.renderer.generateScreenshot(sessionId, { angle });
-
-      // Get metadata for filename
-      const metadata = await this.renderer.getSessionMetadata(sessionId);
-      const modelName = this.cleanModelName(metadata.model || 'unknown');
-      const sessionShort = sessionId.substring(0, 8);
-
-      // Create output path
-      await fs.mkdir(outputDir, { recursive: true });
-      const filename = `${modelName}_${sessionShort}_${angle}.png`;
-      const outputPath = path.join(outputDir, filename);
-
-      await fs.writeFile(outputPath, buffer);
-      console.log(`✅ Saved: ${outputPath} (${Math.round(buffer.length / 1024)}KB)`);
-
-      return outputPath;
-    } catch (error) {
-      console.error(`❌ Failed: ${error.message}`);
-      throw error;
+      const metadataFile = path.join(sessionDir, 'metadata.json');
+      const content = await fs.readFile(metadataFile, 'utf8');
+      return JSON.parse(content);
+    } catch {
+      return { model: 'unknown' };
     }
   }
 
   /**
-   * Generate screenshots for multiple sessions from a results JSON file
+   * Generate screenshot for a session directory
    */
-  async generateFromResults(resultsFile, options = {}) {
+  async generateForSession(sessionDir, options = {}) {
+    const { angle = 'overview', outputDir = './output' } = options;
+
+    console.log(`\n🎮 Processing: ${sessionDir}`);
+
+    const structureData = await this.loadSessionData(sessionDir);
+    const metadata = await this.loadMetadata(sessionDir);
+    const buffer = await this.renderer.generateScreenshot(structureData, { angle });
+
+    // Create filename from metadata
+    const modelName = this.cleanName(metadata.model || 'unknown');
+    const sessionName = path.basename(sessionDir).substring(0, 8);
+
+    await fs.mkdir(outputDir, { recursive: true });
+    const filename = `${modelName}_${sessionName}_${angle}.png`;
+    const outputPath = path.join(outputDir, filename);
+
+    await fs.writeFile(outputPath, buffer);
+    console.log(`✅ Saved: ${outputPath} (${Math.round(buffer.length / 1024)}KB)`);
+
+    return outputPath;
+  }
+
+  /**
+   * Generate screenshots from a comparison results JSON file
+   */
+  async generateFromResults(resultsFile, storageDir, options = {}) {
     const { angle = 'overview', outputDir = './output' } = options;
 
     console.log(`📂 Loading results from: ${resultsFile}`);
@@ -71,9 +82,11 @@ class ScreenshotGenerator {
 
     for (const session of sessions) {
       try {
-        const buffer = await this.renderer.generateScreenshot(session.session_id, { angle });
+        const sessionDir = path.join(storageDir, session.session_id);
+        const structureData = await this.loadSessionData(sessionDir);
+        const buffer = await this.renderer.generateScreenshot(structureData, { angle });
 
-        const modelName = this.cleanModelName(session.model_display_name || session.model || 'unknown');
+        const modelName = this.cleanName(session.model_display_name || session.model || 'unknown');
         const promptName = session.prompt_name || 'unknown';
         const filename = `${modelName}_${promptName}_${angle}.png`;
         const outputPath = path.join(outputDir, filename);
@@ -91,27 +104,7 @@ class ScreenshotGenerator {
     return { successCount, errorCount };
   }
 
-  /**
-   * Find all sessions with structures
-   */
-  async findSessions() {
-    const entries = await fs.readdir(STORAGE_DIR);
-    const sessions = [];
-
-    for (const entry of entries) {
-      const codeFile = path.join(STORAGE_DIR, entry, 'code.json');
-      try {
-        await fs.access(codeFile);
-        sessions.push(entry);
-      } catch {
-        // Skip sessions without code.json
-      }
-    }
-
-    return sessions;
-  }
-
-  cleanModelName(name) {
+  cleanName(name) {
     return name
       .replace(/[/\\?%*:|"<>]/g, '_')
       .replace(/-/g, '_')
@@ -123,45 +116,49 @@ class ScreenshotGenerator {
 // CLI
 const args = process.argv.slice(2);
 
-if (args.length === 0) {
+if (args.length === 0 || args.includes('--help')) {
   console.log(`
 Usage:
-  node generate-screenshots.js <session-id>              Generate for single session
-  node generate-screenshots.js --results <file.json>    Generate from comparison results
-  node generate-screenshots.js --all                    Generate for all sessions
+  node generate-screenshots.js --session <dir>                    Generate for a session directory
+  node generate-screenshots.js --results <file> --storage <dir>   Generate from comparison results
 
 Options:
   --angle <name>      Camera angle: overview, isometric, high, low, side (default: overview)
   --output <dir>      Output directory (default: ./output)
   --width <px>        Width in pixels (default: 3840)
   --height <px>       Height in pixels (default: 2160)
+
+Examples:
+  node generate-screenshots.js --session ./.storage/sessions/abc123
+  node generate-screenshots.js --results ./comparison.json --storage ./.storage/sessions
 `);
   process.exit(0);
 }
 
+function getArg(name, defaultValue = null) {
+  const idx = args.indexOf(name);
+  return idx !== -1 && args[idx + 1] ? args[idx + 1] : defaultValue;
+}
+
 async function main() {
-  const angle = args.includes('--angle') ? args[args.indexOf('--angle') + 1] : 'overview';
-  const outputDir = args.includes('--output') ? args[args.indexOf('--output') + 1] : './output';
-  const width = args.includes('--width') ? parseInt(args[args.indexOf('--width') + 1]) : 3840;
-  const height = args.includes('--height') ? parseInt(args[args.indexOf('--height') + 1]) : 2160;
+  const angle = getArg('--angle', 'overview');
+  const outputDir = getArg('--output', './output');
+  const width = parseInt(getArg('--width', '3840'));
+  const height = parseInt(getArg('--height', '2160'));
 
   const generator = new ScreenshotGenerator(width, height, { timePreset: 'sunset' });
 
-  if (args.includes('--results')) {
-    const resultsFile = args[args.indexOf('--results') + 1];
-    await generator.generateFromResults(resultsFile, { angle, outputDir });
-  } else if (args.includes('--all')) {
-    const sessions = await generator.findSessions();
-    console.log(`Found ${sessions.length} sessions`);
-    for (const sessionId of sessions) {
-      await generator.generateForSession(sessionId, { angle, outputDir });
-    }
+  const sessionDir = getArg('--session');
+  const resultsFile = getArg('--results');
+  const storageDir = getArg('--storage');
+
+  if (sessionDir) {
+    await generator.generateForSession(sessionDir, { angle, outputDir });
+  } else if (resultsFile && storageDir) {
+    await generator.generateFromResults(resultsFile, storageDir, { angle, outputDir });
   } else {
-    // Single session ID
-    const sessionId = args.find(a => !a.startsWith('--'));
-    if (sessionId) {
-      await generator.generateForSession(sessionId, { angle, outputDir });
-    }
+    console.error('Error: Provide --session <dir> or both --results <file> and --storage <dir>');
+    process.exit(1);
   }
 }
 

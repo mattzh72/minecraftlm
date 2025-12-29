@@ -585,20 +585,25 @@ export class HeadlessRenderer {
 
   /**
    * Calculate camera view matrix for given structure bounds and angle
+   * @param {Array} structureBounds - [minX, minY, minZ, maxX, maxY, maxZ]
+   * @param {string|Object} angle - Preset name or custom {pitch, yaw, distance}
    */
   calculateCameraMatrix(structureBounds, angle = 'isometric') {
     const [minX, minY, minZ, maxX, maxY, maxZ] = structureBounds;
-    // Focus camera at center of structure
-    const center = vec3.fromValues(
-      (minX + maxX) / 2,
-      (minY + maxY) / 2, // Look at actual center
-      (minZ + maxZ) / 2
-    );
 
     const width = maxX - minX;
     const height = maxY - minY;
     const depth = maxZ - minZ;
     const maxDim = Math.max(width, height, depth);
+
+    // Focus camera at center of structure
+    let centerY = (minY + maxY) / 2;
+
+    const center = vec3.fromValues(
+      (minX + maxX) / 2,
+      centerY,
+      (minZ + maxZ) / 2
+    );
 
     // Camera angle presets (match frontend distance multipliers)
     const angles = {
@@ -607,10 +612,34 @@ export class HeadlessRenderer {
       high: { pitch: 1.4, yaw: 0.8, distance: 1.0 }, // High angle to see from directly above
       side: { pitch: 0.0, yaw: 1.57, distance: 1.0 },
       overview: { pitch: 0.6, yaw: 0.8, distance: 1.2 }, // Slightly down from above midpoint
+      dramatic: { pitch: 0.2, yaw: 1.3, distance: 1.1 }, // Low angle, rotated for dramatic effect
+      hero: { pitch: 0.25, yaw: 0.5, distance: 1.0 }, // Low hero shot angle
     };
 
-    const preset = angles[angle] || angles.isometric;
-    const distance = Math.max(5, maxDim * preset.distance);
+    // Support custom angle object or preset name
+    const preset = typeof angle === 'object'
+      ? { pitch: angle.pitch ?? 0.25, yaw: angle.yaw ?? 0.5, distance: angle.distance ?? 1.0 }
+      : (angles[angle] || angles.isometric);
+
+    // Auto-adjust for low angle shots
+    const horizontalExtent = Math.max(width, depth);
+    const heightRatio = height / horizontalExtent;
+
+    // Low angle shots: shift look-at point DOWN so structure appears higher in frame (less sky)
+    if (preset.pitch < 0.5) {
+      center[1] -= height * 0.15; // Look lower to push structure up in frame
+    }
+
+    // Low angle shots need more distance to see the full structure
+    let distanceMultiplier = 1.0;
+    if (preset.pitch < 0.5) {
+      distanceMultiplier = 1.2;
+      if (heightRatio > 1.0) {
+        distanceMultiplier = Math.min(1.4, 1.0 + heightRatio * 0.3);
+      }
+    }
+
+    const distance = Math.max(5, maxDim * preset.distance * distanceMultiplier);
 
     console.log('🎯 Camera calculation:', {
       center: center,
@@ -663,66 +692,27 @@ export class HeadlessRenderer {
   }
 
   /**
-   * Load session metadata
+   * Generate screenshot from structure data
+   * @param {Object} structureData - Structure data with blocks array
+   * @param {Object} options - Render options (angle, etc.)
    */
-  async getSessionMetadata(sessionId) {
-    try {
-      const sessionDir = path.join(
-        '/Users/johnathanchiu/Projects/minecraftlm/.storage/sessions',
-        sessionId
-      );
-      const metadataFile = path.join(sessionDir, 'metadata.json');
-      const metadataContent = await fs.readFile(metadataFile, 'utf8');
-      return JSON.parse(metadataContent);
-    } catch (error) {
-      console.warn(`⚠️ Could not load metadata for session ${sessionId}:`, error.message);
-      return { model: 'Unknown' };
-    }
-  }
-
-  /**
-   * Load structure data for a session
-   */
-  async loadSessionStructure(sessionId) {
-    try {
-      const sessionDir = path.join(
-        '/Users/johnathanchiu/Projects/minecraftlm/.storage/sessions',
-        sessionId
-      );
-      const structureFile = path.join(sessionDir, 'code.json');
-      const structureContent = await fs.readFile(structureFile, 'utf8');
-      return JSON.parse(structureContent);
-    } catch (error) {
-      throw new Error(`Could not load structure for session ${sessionId}: ${error.message}`);
-    }
-  }
-
-  /**
-   * Generate screenshot (accepts both structure data and session ID)
-   */
-  async generateScreenshot(input, options = {}) {
+  async generateScreenshot(structureData, options = {}) {
     await this.initialize();
 
-    let structureData;
+    if (!structureData || !structureData.blocks) {
+      throw new Error('Invalid structure data: must have blocks array');
+    }
 
-    // Check if input is a session ID (string) or structure data (object)
-    if (typeof input === 'string') {
-      // Load session data
-      const metadata = await this.getSessionMetadata(input);
-      structureData = await this.loadSessionStructure(input);
+    console.log(`🏗️ Blocks: ${structureData.blocks?.length || 0}`);
 
-      console.log(`🎮 Processing session: ${input}`);
-      console.log(`🤖 Model: ${metadata.model}`);
-      console.log(`🏗️ Blocks: ${structureData.blocks?.length || 0}`);
+    // Debug: Analyze structure composition
+    if (structureData.blocks.length > 0) {
+      console.log('\n🔍 STRUCTURE ANALYSIS:');
 
-      // Debug: Analyze structure composition
-      if (structureData.blocks && structureData.blocks.length > 0) {
-        console.log('\n🔍 STRUCTURE ANALYSIS:');
-
-        // Calculate dimensions
-        const bounds = this.calculateStructureBounds(structureData);
-        const [minX, minY, minZ, maxX, maxY, maxZ] = bounds;
-        console.log(`   📏 Structure bounds: (${minX}, ${minY}, ${minZ}) to (${maxX}, ${maxY}, ${maxZ})`);
+      // Calculate dimensions
+      const bounds = this.calculateStructureBounds(structureData);
+      const [minX, minY, minZ, maxX, maxY, maxZ] = bounds;
+      console.log(`   📏 Structure bounds: (${minX}, ${minY}, ${minZ}) to (${maxX}, ${maxY}, ${maxZ})`);
         console.log(`   📐 Dimensions: ${maxX - minX + 1} x ${maxY - minY + 1} x ${maxZ - minZ + 1}`);
 
         // Analyze block types
@@ -789,10 +779,6 @@ export class HeadlessRenderer {
         }
 
         console.log(''); // Add spacing
-      }
-    } else {
-      // Use structure data directly
-      structureData = input;
     }
 
     const buffer = await this.renderToPNG(structureData, options);

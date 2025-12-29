@@ -21,7 +21,7 @@ BASE_URL = "http://localhost:8000/api"
 RESULTS_DIR = Path("comparison_results")
 THINKING_LEVEL = "med"
 
-# Test prompts with detailed descriptions
+# Test prompts with detailed descriptions (3 prompts × 4 models = 12 total)
 COMPARISON_PROMPTS = [
     {
         "name": "cyberpunk_tokyo",
@@ -32,11 +32,7 @@ COMPARISON_PROMPTS = [
         "prompt": "Construct an enormous, highly detailed space station complex with multiple rotating sections, massive solar panel arrays, detailed docking bays with ships, observation decks, communication arrays, and intricate structural details. Make it really grand and impressive with lots of technical details."
     },
     {
-        "name": "dragon_lair",
-        "prompt": "Create a massive, highly detailed ancient dragon's lair deep inside a volcanic mountain with vast treasure chambers filled with gold, intricate cave systems, lava flows, detailed stalactites and stalagmites, ancient ruins, and dramatic lighting. Make it really grand and atmospheric with lots of environmental details."
-    },
-    {
-        "name": "pirate_ship_storm",
+        "name": "pirate_ship",
         "prompt": "Build a large, highly detailed pirate ship sailing through a dramatic storm with massive waves, detailed rigging and sails, cannon ports, crow's nest, dramatic lightning effects, churning water, and atmospheric storm clouds. Make it really grand and dynamic with lots of nautical details."
     }
 ]

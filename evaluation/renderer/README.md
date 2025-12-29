@@ -25,28 +25,40 @@ npm rebuild gl
 
 ## Usage
 
-### Generate screenshots from session IDs
+### CLI Tool
+
+```bash
+# Generate screenshot for a single session directory
+node generate-screenshots.js --session /path/to/.storage/sessions/abc123
+
+# Generate screenshots from comparison results
+node generate-screenshots.js --results ./comparison.json --storage /path/to/.storage/sessions
+
+# Options
+node generate-screenshots.js --session <dir> \
+  --angle overview \      # overview, isometric, high, low, side
+  --output ./output \     # output directory
+  --width 3840 \          # width in pixels
+  --height 2160           # height in pixels
+```
+
+### Programmatic API
 
 ```javascript
 import { HeadlessRenderer } from './src/HeadlessRenderer.js';
+import fs from 'fs/promises';
 
 const renderer = new HeadlessRenderer(3840, 2160, { timePreset: 'sunset' });
 
-// Generate screenshot from session ID
-const buffer = await renderer.generateScreenshot('session-uuid-here', {
+// Load structure data yourself
+const structureData = JSON.parse(await fs.readFile('code.json', 'utf8'));
+
+// Generate screenshot
+const buffer = await renderer.generateScreenshot(structureData, {
   angle: 'overview'  // or 'isometric', 'high', 'low', 'side'
 });
 
-// Save to file
-import fs from 'fs/promises';
 await fs.writeFile('output.png', buffer);
-```
-
-### Using generate-screenshots.js
-
-```bash
-# Edit generate-screenshots.js to add your session IDs, then:
-node generate-screenshots.js
 ```
 
 ## Options
