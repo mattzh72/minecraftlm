@@ -1,0 +1,11 @@
+[project]
+name = "evaluation-scripts"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "playwright>=1.57.0",
+    "psutil>=7.2.0",
+    "requests>=2.32.5",
+]

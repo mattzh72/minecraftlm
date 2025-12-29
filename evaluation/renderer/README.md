@@ -1,0 +1,96 @@
+# Headless Minecraft Structure Renderer
+
+Generates high-quality screenshots of Minecraft structures without a browser using native WebGL.
+
+## Requirements
+
+- **Node.js 20.x** (headless-gl is compiled against Node 20)
+- macOS or Linux (headless-gl native bindings)
+
+## Setup
+
+```bash
+# Switch to Node 20 (if using nvm)
+nvm use 20
+
+# Install dependencies
+npm install
+
+# If gl module fails, rebuild it
+npm rebuild gl
+```
+
+## Usage
+
+### Generate screenshots from session IDs
+
+```javascript
+import { HeadlessRenderer } from './src/HeadlessRenderer.js';
+
+const renderer = new HeadlessRenderer(3840, 2160, { timePreset: 'sunset' });
+
+// Generate screenshot from session ID
+const buffer = await renderer.generateScreenshot('session-uuid-here', {
+  angle: 'overview'  // or 'isometric', 'high', 'low', 'side'
+});
+
+// Save to file
+import fs from 'fs/promises';
+await fs.writeFile('output.png', buffer);
+```
+
+### Using generate-screenshots.js
+
+```bash
+# Edit generate-screenshots.js to add your session IDs, then:
+node generate-screenshots.js
+```
+
+## Options
+
+### Resolution
+```javascript
+new HeadlessRenderer(width, height, options)
+
+// Examples:
+new HeadlessRenderer(1920, 1080)  // Full HD
+new HeadlessRenderer(3840, 2160)  // 4K
+```
+
+### Time Presets
+```javascript
+{ timePreset: 'sunset' }  // Warm orange lighting (default)
+{ timePreset: 'day' }     // Bright daylight
+{ timePreset: 'night' }   // Dark blue lighting
+```
+
+### Camera Angles
+```javascript
+{ angle: 'overview' }   // Slightly above, good for most structures
+{ angle: 'isometric' }  // Classic isometric view
+{ angle: 'high' }       // Looking down from above
+{ angle: 'low' }        // Low angle looking up
+{ angle: 'side' }       // Side view
+```
+
+## Performance
+
+- 1080p: ~200ms render time
+- 4K: ~300ms render time
+
+## Troubleshooting
+
+### "NODE_MODULE_VERSION" error
+You're using the wrong Node version. Switch to Node 20:
+```bash
+nvm use 20
+```
+
+### "headless-gl not available"
+Rebuild the gl module:
+```bash
+npm rebuild gl
+```
+
+### Black or empty screenshots
+Check that the session has structure data in `.storage/sessions/<id>/code.json`
