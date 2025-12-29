@@ -13,10 +13,13 @@ Generates high-quality screenshots of Minecraft structures without a browser usi
 # Switch to Node 20 (if using nvm)
 nvm use 20
 
-# Install dependencies
+# Install dependencies (may need Python 3 for native module compilation)
 npm install
 
-# If gl module fails, rebuild it
+# If install fails with Python errors, specify Python 3 explicitly:
+PYTHON=/opt/homebrew/bin/python3 npm install
+
+# If gl module fails after Node version switch, rebuild it:
 npm rebuild gl
 ```
 
