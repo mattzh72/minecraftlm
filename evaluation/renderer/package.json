@@ -1,0 +1,12 @@
+{
+  "name": "minecraftlm-renderer",
+  "type": "module",
+  "dependencies": {
+    "canvas": "^3.2.0",
+    "deepslate-opt": "file:../../packages/deepslate-opt",
+    "gl": "^8.1.6",
+    "gl-matrix": "^3.4.4",
+    "sharp": "^0.34.5",
+    "three": "^0.182.0"
+  }
+}

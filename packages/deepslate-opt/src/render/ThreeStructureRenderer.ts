@@ -439,7 +439,7 @@ export class ThreeStructureRenderer {
 		this.skyScene = new THREE.Scene()
 		this.overlayScene = new THREE.Scene()
 
-		this.camera = new THREE.PerspectiveCamera(70, (canvas.clientWidth || 1) / (canvas.clientHeight || 1), 0.1, 500)
+		this.camera = new THREE.PerspectiveCamera(70, (canvas.clientWidth || 1) / (canvas.clientHeight || 1), 0.1, 2000)
 		// Orthographic camera for fullscreen sky quad
 		this.skyCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
 		// Orthographic camera for directional light shadow mapping
