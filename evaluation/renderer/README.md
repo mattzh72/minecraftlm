@@ -81,12 +81,19 @@ new HeadlessRenderer(3840, 2160)  // 4K
 
 ### Camera Angles
 ```javascript
+{ angle: 'hero' }       // Low hero shot angle (recommended)
 { angle: 'overview' }   // Slightly above, good for most structures
 { angle: 'isometric' }  // Classic isometric view
+{ angle: 'dramatic' }   // Low angle, rotated for dramatic effect
 { angle: 'high' }       // Looking down from above
 { angle: 'low' }        // Low angle looking up
 { angle: 'side' }       // Side view
+
+// Custom angle (pitch/yaw in radians, distance multiplier)
+{ angle: { pitch: 0.25, yaw: 0.5, distance: 1.0 } }
 ```
+
+**Auto-framing**: Low angle shots automatically adjust camera distance and framing to ensure structures fit in frame without cutoff.
 
 ## Performance
 
