@@ -168,11 +168,11 @@ Choose any provider and get an API key:
 
 The app will automatically detect which providers you've configured and show only those models in the selector:
 
-| Provider | Available Models |
-|----------|------------------|
-| **Anthropic** | Claude Opus 4.5  |
-| **OpenAI** | GPT-5.2          |
-| **Google** | Gemini 3 Pro     |
+| Provider     | Available Models                  |
+|--------------|-----------------------------------|
+| **Anthropic**| Claude Opus 4.5, Claude Sonnet 4.5 |
+| **OpenAI**   | GPT-5.2                           |
+| **Google**   | Gemini 3 Pro, Gemini Flash        |
 
 
 ---
