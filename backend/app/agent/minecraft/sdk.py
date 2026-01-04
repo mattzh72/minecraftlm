@@ -316,6 +316,171 @@ class Block(Object3D):
         return self
 
 
+# --- Eraser classes for carving holes ---
+
+
+class BaseEraser(Object3D):
+    """
+    Base class for eraser shapes that carve holes in blocks.
+
+    Erasers are added to a scene like blocks, but instead of placing voxels,
+    they remove voxels from overlapping blocks during export.
+    """
+
+    def contains(self, x: float, y: float, z: float) -> bool:
+        """Return True if the point (x, y, z) is inside this eraser volume."""
+        raise NotImplementedError("Subclasses must implement contains()")
+
+    def get_bounding_box(self) -> Tuple[Vector3, Vector3]:
+        """Return (min_corner, max_corner) of this eraser's axis-aligned bounding box."""
+        raise NotImplementedError("Subclasses must implement get_bounding_box()")
+
+
+class SphereEraser(BaseEraser):
+    """
+    Spherical eraser that carves a sphere out of blocks.
+
+    Usage:
+        scene.add(SphereEraser(radius=5).at(10, 10, 10))
+    """
+
+    def __init__(self, radius: float):
+        super().__init__()
+        self.radius = radius
+
+    def contains(self, x: float, y: float, z: float) -> bool:
+        """Check if point is inside the sphere."""
+        cx, cy, cz = self.position.to_tuple()
+        # Check center of the voxel (offset by 0.5)
+        dx = (x + 0.5) - cx
+        dy = (y + 0.5) - cy
+        dz = (z + 0.5) - cz
+        return dx * dx + dy * dy + dz * dz <= self.radius * self.radius
+
+    def get_bounding_box(self) -> Tuple[Vector3, Vector3]:
+        cx, cy, cz = self.position.to_tuple()
+        return (
+            Vector3(cx - self.radius, cy - self.radius, cz - self.radius),
+            Vector3(cx + self.radius, cy + self.radius, cz + self.radius),
+        )
+
+    def with_radius(self, radius: float) -> "SphereEraser":
+        """Set radius and return self for chaining."""
+        self.radius = radius
+        return self
+
+
+class BoxEraser(BaseEraser):
+    """
+    Box-shaped eraser that carves a rectangular hole in blocks.
+
+    Usage:
+        scene.add(BoxEraser(size=(3, 4, 2)).at(5, 1, 5))
+    """
+
+    def __init__(self, size: Tuple[int, int, int] = (1, 1, 1)):
+        super().__init__()
+        self.size = (int(size[0]), int(size[1]), int(size[2]))
+
+    def contains(self, x: float, y: float, z: float) -> bool:
+        """Check if point is inside the box."""
+        px, py, pz = self.position.to_tuple()
+        sx, sy, sz = self.size
+        return px <= x < px + sx and py <= y < py + sy and pz <= z < pz + sz
+
+    def get_bounding_box(self) -> Tuple[Vector3, Vector3]:
+        px, py, pz = self.position.to_tuple()
+        sx, sy, sz = self.size
+        return (
+            Vector3(px, py, pz),
+            Vector3(px + sx, py + sy, pz + sz),
+        )
+
+    def with_size(self, width: int, height: int, depth: int) -> "BoxEraser":
+        """Set size and return self for chaining."""
+        self.size = (int(width), int(height), int(depth))
+        return self
+
+
+class CylinderEraser(BaseEraser):
+    """
+    Cylindrical eraser that carves a cylinder (tunnel) out of blocks.
+
+    The cylinder extends along the specified axis from the position.
+
+    Usage:
+        # Vertical cylinder (well/shaft)
+        scene.add(CylinderEraser(radius=3, height=10, axis="y").at(5, 0, 5))
+
+        # Horizontal tunnel along X axis
+        scene.add(CylinderEraser(radius=2, height=20, axis="x").at(0, 5, 5))
+    """
+
+    def __init__(self, radius: float, height: int, axis: str = "y"):
+        super().__init__()
+        self.radius = radius
+        self.height = int(height)
+        if axis not in ("x", "y", "z"):
+            raise ValueError(f'Invalid axis "{axis}", must be "x", "y", or "z"')
+        self.axis = axis
+
+    def contains(self, x: float, y: float, z: float) -> bool:
+        """Check if point is inside the cylinder."""
+        px, py, pz = self.position.to_tuple()
+
+        # Check center of voxel
+        vx, vy, vz = x + 0.5, y + 0.5, z + 0.5
+
+        if self.axis == "y":
+            # Vertical cylinder: check XZ distance and Y height
+            if not (py <= vy < py + self.height):
+                return False
+            dx, dz = vx - px, vz - pz
+            return dx * dx + dz * dz <= self.radius * self.radius
+        elif self.axis == "x":
+            # Horizontal along X: check YZ distance and X length
+            if not (px <= vx < px + self.height):
+                return False
+            dy, dz = vy - py, vz - pz
+            return dy * dy + dz * dz <= self.radius * self.radius
+        else:  # axis == "z"
+            # Horizontal along Z: check XY distance and Z length
+            if not (pz <= vz < pz + self.height):
+                return False
+            dx, dy = vx - px, vy - py
+            return dx * dx + dy * dy <= self.radius * self.radius
+
+    def get_bounding_box(self) -> Tuple[Vector3, Vector3]:
+        px, py, pz = self.position.to_tuple()
+        r = self.radius
+
+        if self.axis == "y":
+            return (
+                Vector3(px - r, py, pz - r),
+                Vector3(px + r, py + self.height, pz + r),
+            )
+        elif self.axis == "x":
+            return (
+                Vector3(px, py - r, pz - r),
+                Vector3(px + self.height, py + r, pz + r),
+            )
+        else:  # axis == "z"
+            return (
+                Vector3(px - r, py - r, pz),
+                Vector3(px + r, py + r, pz + self.height),
+            )
+
+    def with_radius(self, radius: float) -> "CylinderEraser":
+        """Set radius and return self for chaining."""
+        self.radius = radius
+        return self
+
+    def with_height(self, height: int) -> "CylinderEraser":
+        """Set height and return self for chaining."""
+        self.height = int(height)
+        return self
+
+
 class Scene(Object3D):
     """
     Root node holding a graph of ``Object3D`` and ``Block`` instances.
@@ -325,6 +490,115 @@ class Scene(Object3D):
 
     def __init__(self) -> None:
         super().__init__()
+
+    def _flatten_erasers(
+        self,
+        parent_offset: Optional[Vector3] = None,
+    ) -> List[Tuple[BaseEraser, Vector3]]:
+        """
+        Recursively collect all ``BaseEraser`` instances under this node,
+        applying hierarchical positions as world offsets.
+        """
+        world_offset = (parent_offset or Vector3()).clone().add(self.position)
+        erasers: List[Tuple[BaseEraser, Vector3]] = []
+
+        for child in self.children:
+            if isinstance(child, BaseEraser):
+                erasers.append((child, world_offset.added(child.position)))
+            elif isinstance(child, Object3D) and not isinstance(child, Block):
+                # Recurse into Object3D containers (but not Blocks)
+                if hasattr(child, "_flatten_erasers"):
+                    erasers.extend(child._flatten_erasers(world_offset))
+                else:
+                    # For plain Object3D, manually check children
+                    for grandchild in child.children:
+                        if isinstance(grandchild, BaseEraser):
+                            erasers.append(
+                                (grandchild, world_offset.added(child.position).added(grandchild.position))
+                            )
+
+        return erasers
+
+    @staticmethod
+    def _aabb_overlap(
+        block_min: Tuple[float, float, float],
+        block_max: Tuple[float, float, float],
+        eraser_min: Vector3,
+        eraser_max: Vector3,
+    ) -> bool:
+        """Check if two axis-aligned bounding boxes overlap."""
+        return (
+            block_min[0] < eraser_max.x
+            and block_max[0] > eraser_min.x
+            and block_min[1] < eraser_max.y
+            and block_max[1] > eraser_min.y
+            and block_min[2] < eraser_max.z
+            and block_max[2] > eraser_min.z
+        )
+
+    def _voxelize_block_with_erasers(
+        self,
+        block: Block,
+        position: Vector3,
+        erasers: List[Tuple[BaseEraser, Vector3]],
+        offset: Vector3,
+    ) -> List[Dict[str, Any]]:
+        """
+        Convert a block to individual 1x1x1 voxels, excluding those inside erasers.
+
+        Only called for blocks that overlap at least one eraser.
+        """
+        sx, sy, sz = position.to_tuple()
+        dx, dy, dz = block.size
+
+        # Apply the structure offset
+        ox, oy, oz = offset.to_tuple()
+
+        voxels: List[Dict[str, Any]] = []
+        for x in range(int(sx), int(sx + dx)):
+            for y in range(int(sy), int(sy + dy)):
+                for z in range(int(sz), int(sz + dz)):
+                    # Skip if inside any eraser
+                    erased = False
+                    for eraser, eraser_world_pos in erasers:
+                        # Temporarily set eraser position to world position for contains() check
+                        original_pos = eraser.position
+                        eraser.position = eraser_world_pos
+                        if eraser.contains(x, y, z):
+                            erased = True
+                            eraser.position = original_pos
+                            break
+                        eraser.position = original_pos
+
+                    if erased:
+                        continue
+
+                    # Skip interior voxels if hollow
+                    if not block.fill:
+                        is_surface = (
+                            x == int(sx)
+                            or x == int(sx + dx) - 1
+                            or y == int(sy)
+                            or y == int(sy + dy) - 1
+                            or z == int(sz)
+                            or z == int(sz + dz) - 1
+                        )
+                        if not is_surface:
+                            continue
+
+                    # Add the voxel with offset applied
+                    start = [int(x + ox), int(y + oy), int(z + oz)]
+                    entry: Dict[str, Any] = {
+                        "start": start,
+                        "end": [start[0] + 1, start[1] + 1, start[2] + 1],
+                        "type": block.block_id,
+                        "fill": True,
+                    }
+                    if block.properties:
+                        entry["properties"] = dict(block.properties)
+                    voxels.append(entry)
+
+        return voxels
 
     def to_structure(
         self,
@@ -347,6 +621,19 @@ class Scene(Object3D):
         placements = self._flatten_blocks()
         if not placements:
             raise ValueError("Scene has no blocks to export.")
+
+        # Collect erasers
+        erasers = self._flatten_erasers()
+
+        # Precompute eraser bounding boxes for fast overlap checks
+        eraser_bounds: List[Tuple[BaseEraser, Vector3, Vector3, Vector3]] = []
+        for eraser, world_pos in erasers:
+            # Temporarily set position for bounding box calculation
+            original_pos = eraser.position
+            eraser.position = world_pos
+            bb_min, bb_max = eraser.get_bounding_box()
+            eraser.position = original_pos
+            eraser_bounds.append((eraser, world_pos, bb_min, bb_max))
 
         min_x = float("inf")
         min_y = float("inf")
@@ -395,23 +682,42 @@ class Scene(Object3D):
 
         blocks: List[Dict[str, Any]] = []
         for block, position in placements:
-            sx, sy, sz = position.added(offset).to_tuple()
+            sx, sy, sz = position.to_tuple()
             dx, dy, dz = block.size
-            start = [int(round(sx)), int(round(sy)), int(round(sz))]
-            end = [
-                start[0] + int(dx),
-                start[1] + int(dy),
-                start[2] + int(dz),
+            block_min = (sx, sy, sz)
+            block_max = (sx + dx, sy + dy, sz + dz)
+
+            # Check if this block overlaps any eraser
+            overlapping_erasers = [
+                (e, wp)
+                for e, wp, bb_min, bb_max in eraser_bounds
+                if self._aabb_overlap(block_min, block_max, bb_min, bb_max)
             ]
-            entry: Dict[str, Any] = {
-                "start": start,
-                "end": end,
-                "type": block.block_id,
-                "fill": block.fill,
-            }
-            if block.properties:
-                entry["properties"] = dict(block.properties)
-            blocks.append(entry)
+
+            if overlapping_erasers:
+                # Voxelize and filter
+                voxels = self._voxelize_block_with_erasers(
+                    block, position, overlapping_erasers, offset
+                )
+                blocks.extend(voxels)
+            else:
+                # No erasers affect this block - keep as single entry
+                sx, sy, sz = position.added(offset).to_tuple()
+                start = [int(round(sx)), int(round(sy)), int(round(sz))]
+                end = [
+                    start[0] + int(dx),
+                    start[1] + int(dy),
+                    start[2] + int(dz),
+                ]
+                entry: Dict[str, Any] = {
+                    "start": start,
+                    "end": end,
+                    "type": block.block_id,
+                    "fill": block.fill,
+                }
+                if block.properties:
+                    entry["properties"] = dict(block.properties)
+                blocks.append(entry)
 
         return {
             "width": int(width),

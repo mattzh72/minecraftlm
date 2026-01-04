@@ -337,3 +337,66 @@ scene.add(
         .tap(lambda b: blocks_added.append(b.block_id))
 )
 ```
+
+---
+
+## Erasers (Carving Holes)
+
+Erasers are negative shapes that carve holes in blocks during export. Add them to the scene like blocks - they remove voxels from any overlapping blocks.
+
+### Available Erasers
+
+| Class | Description |
+|-------|-------------|
+| `SphereEraser(radius)` | Carves a spherical hole |
+| `BoxEraser(size=(w,h,d))` | Carves a rectangular hole |
+| `CylinderEraser(radius, height, axis)` | Carves a cylindrical tunnel (axis: "x", "y", or "z") |
+
+### Eraser Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `.at(x, y, z)` | self | Set position (center for sphere/cylinder, corner for box) |
+| `.with_radius(r)` | self | Set radius (SphereEraser, CylinderEraser) |
+| `.with_size(w, h, d)` | self | Set size (BoxEraser) |
+| `.with_height(h)` | self | Set height (CylinderEraser) |
+
+### Eraser Examples
+
+```python
+# Create a solid stone cube
+scene.add(
+    Block("minecraft:stone", catalog=catalog)
+        .with_size(20, 20, 20)
+        .at(0, 0, 0)
+)
+
+# Carve a spherical cave in the center
+scene.add(
+    SphereEraser(radius=5).at(10, 10, 10)
+)
+
+# Carve a doorway (box eraser)
+scene.add(
+    BoxEraser(size=(2, 3, 1)).at(9, 0, 0)
+)
+
+# Carve a vertical shaft (cylinder along Y axis)
+scene.add(
+    CylinderEraser(radius=2, height=20, axis="y").at(15, 0, 15)
+)
+
+# Carve a horizontal tunnel (cylinder along X axis)
+scene.add(
+    CylinderEraser(radius=3, height=20, axis="x").at(0, 10, 10)
+)
+```
+
+### How Erasers Work
+
+1. Erasers only affect blocks they overlap with (AABB intersection check)
+2. Overlapping blocks are voxelized to 1x1x1 blocks
+3. Voxels inside an eraser are removed
+4. Non-overlapping blocks stay as single entries (optimization)
+
+Note: Erasers work with both solid (`fill=True`) and hollow (`fill=False`) blocks.

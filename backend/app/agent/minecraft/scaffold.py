@@ -18,6 +18,14 @@ from app.agent.minecraft import (
     Object3D,
     Vector3,
     BlockCatalog,
+    SphereEraser,
+    BoxEraser,
+    CylinderEraser,
+    stair_properties,
+    axis_properties,
+    slab_properties,
+    make_stair,
+    facing_from_vector,
 )
 from app.agent.minecraft.terrain import (
     create_terrain,

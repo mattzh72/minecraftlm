@@ -14,17 +14,25 @@ modules.
 """
 
 from app.agent.minecraft.sdk import (
+    BaseEraser,
     Block,
     BlockCatalog,
+    BoxEraser,
+    CylinderEraser,
     Object3D,
     Scene,
+    SphereEraser,
     Vector3,
 )
 
 __all__ = [
+    "BaseEraser",
     "Block",
     "BlockCatalog",
+    "BoxEraser",
+    "CylinderEraser",
     "Object3D",
     "Scene",
+    "SphereEraser",
     "Vector3",
 ]
