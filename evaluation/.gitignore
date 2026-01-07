@@ -1,0 +1,4 @@
+.venv/
+comparison_results/
+__pycache__/
+*.pyc

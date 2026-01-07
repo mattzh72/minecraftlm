@@ -1,0 +1,8 @@
+[project]
+name = "evaluation"
+version = "0.1.0"
+description = "MinecraftLM evaluation and comparison tools"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp>=3.9.0",
+]
