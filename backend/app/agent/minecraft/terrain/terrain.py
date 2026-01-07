@@ -17,15 +17,13 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import math
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
-from app.agent.minecraft.sdk import Block, BlockCatalog, Object3D, Vector3
+from app.agent.minecraft.sdk import Block, BlockCatalog, Object3D
 from app.agent.minecraft.terrain.heightmap import HeightMap, HeightMapConfig
 from app.agent.minecraft.terrain.noise import NoiseConfig
-
 
 FILL_TO_BOTTOM_DEPTH = 999
 
@@ -45,7 +43,7 @@ def _normalize_biome(biome: str) -> str:
 
 # Land biome layer definitions (top to bottom).
 # (block_id, depth, properties)
-LAND_LAYERS_BY_BIOME: Dict[str, List[Tuple[str, int, Dict[str, str]]]] = {
+LAND_LAYERS_BY_BIOME: dict[str, list[tuple[str, int, dict[str, str]]]] = {
     "plains": [
         ("minecraft:grass_block", 1, {"snowy": "false"}),
         ("minecraft:dirt", 3, {}),
@@ -79,10 +77,10 @@ SUPPORTED_BIOMES = tuple(sorted(LAND_LAYERS_BY_BIOME.keys()))
 
 
 def _iter_layers_with_offsets(
-    layers: List[Tuple[str, int, Dict[str, str]]],
-) -> List[Tuple[str, int, Dict[str, str], int]]:
+    layers: list[tuple[str, int, dict[str, str]]],
+) -> list[tuple[str, int, dict[str, str], int]]:
     offset = 0
-    with_offsets: List[Tuple[str, int, Dict[str, str], int]] = []
+    with_offsets: list[tuple[str, int, dict[str, str], int]] = []
     for block_id, depth, properties in layers:
         with_offsets.append((block_id, depth, properties, offset))
         if depth < FILL_TO_BOTTOM_DEPTH:
@@ -93,19 +91,21 @@ def _iter_layers_with_offsets(
 @dataclass
 class MountainInfo:
     """Information about a mountain for block generation."""
+
     center_x: int
     center_z: int
     radius: int
     peak_height: int  # Absolute Y of peak
     surface_block_id: str = "minecraft:stone"
-    snow_cap_line: Optional[int] = None  # Y level where snow-block cap starts (None = no cap)
+    snow_cap_line: int | None = None  # Y level where snow-block cap starts (None = no cap)
     snow_layer_mode: int = 0  # 0=none, 1=top, 2=all
-    snow_layer_line: Optional[int] = None  # Y level where snow layer starts (for mode=top)
+    snow_layer_line: int | None = None  # Y level where snow layer starts (for mode=top)
 
 
 @dataclass
 class ValleyInfo:
     """Information about a valley for tracking."""
+
     center_x: int
     center_z: int
     radius: int
@@ -116,6 +116,7 @@ class ValleyInfo:
 @dataclass
 class LakeInfo:
     """Information about a lake for water generation."""
+
     center_x: int
     center_z: int
     radius: int
@@ -126,7 +127,8 @@ class LakeInfo:
 @dataclass
 class RiverInfo:
     """Information about a river for water generation."""
-    points: List[Tuple[int, int, int]]  # Path (x, z, water_level) - water level varies along path
+
+    points: list[tuple[int, int, int]]  # Path (x, z, water_level) - water level varies along path
     width: int
     liquid_block_id: str = "minecraft:water"
 
@@ -156,7 +158,7 @@ class TerrainConfig:
     biome: str = "plains"
     generate_decorations: bool = True
     tree_density: float = 1.0  # 1.0 = default density, >1 more trees, <1 fewer
-    water_level: Optional[int] = None  # None = no water, set to e.g. 65 for ocean
+    water_level: int | None = None  # None = no water, set to e.g. 65 for ocean
     liquid_block_id: str = "minecraft:water"
     noise_config: NoiseConfig = field(default_factory=NoiseConfig)
 
@@ -173,16 +175,16 @@ MOUNTAIN_LAYERS_STONE = [
 
 # Underwater terrain layers (sand/gravel bottom)
 UNDERWATER_LAYERS = [
-    ("minecraft:sand", 3, {}),      # Sandy bottom
-    ("minecraft:gravel", 2, {}),    # Gravel layer
-    ("minecraft:stone", FILL_TO_BOTTOM_DEPTH, {}),   # Stone bedrock
+    ("minecraft:sand", 3, {}),  # Sandy bottom
+    ("minecraft:gravel", 2, {}),  # Gravel layer
+    ("minecraft:stone", FILL_TO_BOTTOM_DEPTH, {}),  # Stone bedrock
 ]
 
 # Beach transition layers
 BEACH_LAYERS = [
-    ("minecraft:sand", 3, {}),      # Sandy surface
-    ("minecraft:sandstone", 2, {}), # Sandstone subsurface
-    ("minecraft:stone", FILL_TO_BOTTOM_DEPTH, {}),   # Stone bedrock
+    ("minecraft:sand", 3, {}),  # Sandy surface
+    ("minecraft:sandstone", 2, {}),  # Sandstone subsurface
+    ("minecraft:stone", FILL_TO_BOTTOM_DEPTH, {}),  # Stone bedrock
 ]
 
 
@@ -208,7 +210,7 @@ class Terrain(Object3D):
     def __init__(
         self,
         config: TerrainConfig,
-        catalog: Optional[BlockCatalog] = None,
+        catalog: BlockCatalog | None = None,
     ) -> None:
         """Initialize terrain generator.
 
@@ -240,30 +242,30 @@ class Terrain(Object3D):
         self._generated = False
 
         # Track mountain zones for proper block generation
-        self._mountains: List[MountainInfo] = []
+        self._mountains: list[MountainInfo] = []
         # 2D array tracking terrain type: 0=plains, 1=mountain_stone, 2=mountain_snow
-        self._terrain_type: Optional[np.ndarray] = None
-        self._mountain_material: Optional[np.ndarray] = None  # dtype=object, block id per column
-        self._mountain_snow_layer_mode: Optional[np.ndarray] = None  # int8, 0/1/2
-        self._mountain_snow_layer_line: Optional[np.ndarray] = None  # int32, -1 means unset
+        self._terrain_type: np.ndarray | None = None
+        self._mountain_material: np.ndarray | None = None  # dtype=object, block id per column
+        self._mountain_snow_layer_mode: np.ndarray | None = None  # int8, 0/1/2
+        self._mountain_snow_layer_line: np.ndarray | None = None  # int32, -1 means unset
 
         # Track valley features
-        self._valleys: List[ValleyInfo] = []
+        self._valleys: list[ValleyInfo] = []
 
         # Track water features
-        self._lakes: List[LakeInfo] = []
-        self._rivers: List[RiverInfo] = []
+        self._lakes: list[LakeInfo] = []
+        self._rivers: list[RiverInfo] = []
 
         # Water and beach masks (computed during generation)
-        self._water_mask: Optional[np.ndarray] = None  # Boolean: True = has water
-        self._water_levels: Optional[np.ndarray] = None  # Int: water level per column
-        self._water_block_ids: Optional[np.ndarray] = None  # dtype=object: block id per column
-        self._beach_mask: Optional[np.ndarray] = None  # Boolean: True = beach zone
+        self._water_mask: np.ndarray | None = None  # Boolean: True = has water
+        self._water_levels: np.ndarray | None = None  # Int: water level per column
+        self._water_block_ids: np.ndarray | None = None  # dtype=object: block id per column
+        self._beach_mask: np.ndarray | None = None  # Boolean: True = beach zone
 
         # Flattened areas mask (set by flatten_for_structure)
-        self._flattened_mask: Optional[np.ndarray] = None  # Boolean: True = flattened for structure
+        self._flattened_mask: np.ndarray | None = None  # Boolean: True = flattened for structure
 
-    def generate(self) -> "Terrain":
+    def generate(self) -> Terrain:
         """Generate complete terrain.
 
         Creates heightmap, generates terrain blocks, and optionally adds decorations.
@@ -334,7 +336,10 @@ class Terrain(Object3D):
                             continue
                         priority[z, x] = influence
 
-                        if mountain.snow_cap_line is not None and surface_height >= mountain.snow_cap_line:
+                        if (
+                            mountain.snow_cap_line is not None
+                            and surface_height >= mountain.snow_cap_line
+                        ):
                             self._terrain_type[z, x] = 2  # Snow-capped mountain
                         else:
                             self._terrain_type[z, x] = 1  # Mountain
@@ -361,9 +366,7 @@ class Terrain(Object3D):
         self._water_block_ids = np.full((depth, width), None, dtype=object)
 
         has_water = (
-            self.config.water_level is not None or
-            len(self._lakes) > 0 or
-            len(self._rivers) > 0
+            self.config.water_level is not None or len(self._lakes) > 0 or len(self._rivers) > 0
         )
 
         if not has_water:
@@ -456,8 +459,7 @@ class Terrain(Object3D):
                             if self._water_mask[nz, nx]:
                                 has_nearby_water = True
                                 nearby_water_level = max(
-                                    nearby_water_level,
-                                    self._water_levels[nz, nx]
+                                    nearby_water_level, self._water_levels[nz, nx]
                                 )
                     if has_nearby_water:
                         break
@@ -481,32 +483,60 @@ class Terrain(Object3D):
         # Generate blocks for each terrain type separately
         # Land areas (type 0) - exclude beaches and underwater
         land_layers = LAND_LAYERS_BY_BIOME[self.config.biome]
-        for block_id, layer_depth, properties, surface_offset in _iter_layers_with_offsets(land_layers):
+        for block_id, layer_depth, properties, surface_offset in _iter_layers_with_offsets(
+            land_layers
+        ):
             self._generate_layer_blocks(
-                block_id, layer_depth, properties, surface_offset, heights, min_height,
+                block_id,
+                layer_depth,
+                properties,
+                surface_offset,
+                heights,
+                min_height,
                 terrain_type_filter=0,
                 exclude_beach=True,
                 exclude_underwater=True,
             )
 
         # Beach areas (plains terrain near water)
-        for block_id, layer_depth, properties, surface_offset in _iter_layers_with_offsets(BEACH_LAYERS):
+        for block_id, layer_depth, properties, surface_offset in _iter_layers_with_offsets(
+            BEACH_LAYERS
+        ):
             self._generate_layer_blocks(
-                block_id, layer_depth, properties, surface_offset, heights, min_height,
+                block_id,
+                layer_depth,
+                properties,
+                surface_offset,
+                heights,
+                min_height,
                 beach_only=True,
             )
 
         # Underwater areas
-        for block_id, layer_depth, properties, surface_offset in _iter_layers_with_offsets(UNDERWATER_LAYERS):
+        for block_id, layer_depth, properties, surface_offset in _iter_layers_with_offsets(
+            UNDERWATER_LAYERS
+        ):
             self._generate_layer_blocks(
-                block_id, layer_depth, properties, surface_offset, heights, min_height,
+                block_id,
+                layer_depth,
+                properties,
+                surface_offset,
+                heights,
+                min_height,
                 underwater_only=True,
             )
 
         # Mountain snow caps (type 2) - full snow blocks at the surface.
-        for block_id, layer_depth, properties, surface_offset in _iter_layers_with_offsets([("minecraft:snow_block", 1, {})]):
+        for block_id, layer_depth, properties, surface_offset in _iter_layers_with_offsets(
+            [("minecraft:snow_block", 1, {})]
+        ):
             self._generate_layer_blocks(
-                block_id, layer_depth, properties, surface_offset, heights, min_height,
+                block_id,
+                layer_depth,
+                properties,
+                surface_offset,
+                heights,
+                min_height,
                 terrain_type_filter=2,
             )
 
@@ -517,11 +547,11 @@ class Terrain(Object3D):
         self,
         block_id: str,
         layer_depth: int,
-        properties: Dict[str, str],
+        properties: dict[str, str],
         surface_offset: int,
         heights: np.ndarray,
         min_height: int,
-        terrain_type_filter: Optional[int] = None,
+        terrain_type_filter: int | None = None,
         exclude_beach: bool = False,
         exclude_underwater: bool = False,
         beach_only: bool = False,
@@ -606,7 +636,11 @@ class Terrain(Object3D):
                             break
                     if exclude_beach and self._beach_mask is not None and self._beach_mask[z, nx]:
                         break
-                    if exclude_underwater and self._water_mask is not None and self._water_mask[z, nx]:
+                    if (
+                        exclude_underwater
+                        and self._water_mask is not None
+                        and self._water_mask[z, nx]
+                    ):
                         break
 
                     next_surface = heights[z, nx]
@@ -642,10 +676,18 @@ class Terrain(Object3D):
                             if self._water_mask is None or not self._water_mask[nz, nx]:
                                 can_extend = False
                                 break
-                        if exclude_beach and self._beach_mask is not None and self._beach_mask[nz, nx]:
+                        if (
+                            exclude_beach
+                            and self._beach_mask is not None
+                            and self._beach_mask[nz, nx]
+                        ):
                             can_extend = False
                             break
-                        if exclude_underwater and self._water_mask is not None and self._water_mask[nz, nx]:
+                        if (
+                            exclude_underwater
+                            and self._water_mask is not None
+                            and self._water_mask[nz, nx]
+                        ):
                             can_extend = False
                             break
                         row_surface = heights[nz, nx]
@@ -683,7 +725,7 @@ class Terrain(Object3D):
         surface_offset: int,
         layer_depth: int,
         min_height: int,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """Calculate top and bottom Y for a stack-defined layer.
 
         Returns:
@@ -840,7 +882,11 @@ class Terrain(Object3D):
                     next_liquid = self._water_block_ids[z, nx] or self.config.liquid_block_id
                     next_height = next_water - next_terrain
 
-                    if next_height == water_height and next_water == water_level and next_liquid == liquid_block_id:
+                    if (
+                        next_height == water_height
+                        and next_water == water_level
+                        and next_liquid == liquid_block_id
+                    ):
                         run_length += 1
                     else:
                         break
@@ -862,7 +908,11 @@ class Terrain(Object3D):
                         row_liquid = self._water_block_ids[nz, nx] or self.config.liquid_block_id
                         row_height = row_water - row_terrain
 
-                        if row_height != water_height or row_water != water_level or row_liquid != liquid_block_id:
+                        if (
+                            row_height != water_height
+                            or row_water != water_level
+                            or row_liquid != liquid_block_id
+                        ):
                             can_extend = False
                             break
 
@@ -894,12 +944,11 @@ class Terrain(Object3D):
         for z in range(depth):
             x = 0
             while x < width:
-                # Skip non-land, water, beach, or flattened columns
+                # Skip non-land, water, or beach columns (but include flattened areas)
                 if (
                     (self._terrain_type is not None and self._terrain_type[z, x] != 0)
                     or (self._water_mask is not None and self._water_mask[z, x])
                     or (self._beach_mask is not None and self._beach_mask[z, x])
-                    or (self._flattened_mask is not None and self._flattened_mask[z, x])
                 ):
                     x += 1
                     continue
@@ -914,7 +963,6 @@ class Terrain(Object3D):
                         (self._terrain_type is not None and self._terrain_type[z, nx] != 0)
                         or (self._water_mask is not None and self._water_mask[z, nx])
                         or (self._beach_mask is not None and self._beach_mask[z, nx])
-                        or (self._flattened_mask is not None and self._flattened_mask[z, nx])
                     ):
                         break
                     next_height = int(self.heightmap.get(nx, z))
@@ -1011,21 +1059,21 @@ class Terrain(Object3D):
         """
         # Import here to avoid circular dependency
         from app.agent.minecraft.terrain.decorations import (
-            generate_oak_tree,
+            generate_acacia_tree,
             generate_big_oak,
-            generate_stumpy_oak,
             generate_birch_tree,
-            generate_tall_birch,
-            generate_spruce_tree,
-            generate_tall_spruce,
-            generate_layered_spruce,
-            generate_pine,
-            generate_flowers,
-            generate_tall_grass,
             generate_cactus,
             generate_dead_bush,
-            generate_acacia_tree,
             generate_dead_tree,
+            generate_flowers,
+            generate_layered_spruce,
+            generate_oak_tree,
+            generate_pine,
+            generate_spruce_tree,
+            generate_stumpy_oak,
+            generate_tall_birch,
+            generate_tall_grass,
+            generate_tall_spruce,
         )
 
         # Use separate noise for decoration placement
@@ -1049,7 +1097,7 @@ class Terrain(Object3D):
         def add_tree(tree_x: int, tree_z: int, noise_val: float) -> None:
             height = self.heightmap.get(tree_x, tree_z)
             seed = self.config.seed + tree_x * 1000 + tree_z
-            tree_kwargs: Dict[str, Any] = {}
+            tree_kwargs: dict[str, Any] = {}
             if biome == "forest":
                 # Mix oak and birch variants
                 if noise_val > 0.55:
@@ -1205,9 +1253,9 @@ class Terrain(Object3D):
         z: int,
         width: int,
         depth: int,
-        target_height: Optional[int] = None,
+        target_height: int | None = None,
         falloff: int = 4,
-    ) -> "Terrain":
+    ) -> Terrain:
         """Flatten terrain area for structure placement.
 
         Can be called before or after generate(). If called before,
@@ -1230,9 +1278,7 @@ class Terrain(Object3D):
 
         # Mark the flattened area (no decorations should spawn here)
         if self._flattened_mask is None:
-            self._flattened_mask = np.zeros(
-                (self.config.depth, self.config.width), dtype=bool
-            )
+            self._flattened_mask = np.zeros((self.config.depth, self.config.width), dtype=bool)
 
         # Mark the core flattened area (excluding falloff which blends with terrain)
         x_start = max(0, x)
@@ -1250,12 +1296,12 @@ class Terrain(Object3D):
         radius: int,
         height: int,
         falloff: float = 1.8,
-        seed: Optional[int] = None,
+        seed: int | None = None,
         snow: bool = True,
         snow_start_percent: float = 0.7,
         block_id: str = "minecraft:stone",
         snowy: str = "none",
-    ) -> "Terrain":
+    ) -> Terrain:
         """Add an organic mountain to the terrain.
 
         Creates a natural-looking mountain with irregular base shape, varying
@@ -1286,9 +1332,7 @@ class Terrain(Object3D):
         # Get base height at center before adding mountain
         base_height = self.heightmap.get(center_x, center_z)
 
-        self.heightmap.add_mountain(
-            center_x, center_z, radius, height, falloff, seed
-        )
+        self.heightmap.add_mountain(center_x, center_z, radius, height, falloff, seed)
 
         # Calculate peak height and snow line
         peak_height = base_height + height
@@ -1301,21 +1345,25 @@ class Terrain(Object3D):
         snowy_norm = snowy.strip().lower().replace("-", "_")
         if snowy_norm in ("top", "all"):
             snow_layer_mode = 2 if snowy_norm == "all" else 1
-            snow_layer_line = int(base_height + height * snow_start_percent) if snow_layer_mode == 1 else None
+            snow_layer_line = (
+                int(base_height + height * snow_start_percent) if snow_layer_mode == 1 else None
+            )
 
         # Register mountain for proper block generation
         # Use extended radius to account for domain warping
         extended_radius = int(radius * 1.4)
-        self._mountains.append(MountainInfo(
-            center_x=center_x,
-            center_z=center_z,
-            radius=extended_radius,
-            peak_height=peak_height,
-            surface_block_id=block_id,
-            snow_cap_line=snow_cap_line,
-            snow_layer_mode=snow_layer_mode,
-            snow_layer_line=snow_layer_line,
-        ))
+        self._mountains.append(
+            MountainInfo(
+                center_x=center_x,
+                center_z=center_z,
+                radius=extended_radius,
+                peak_height=peak_height,
+                surface_block_id=block_id,
+                snow_cap_line=snow_cap_line,
+                snow_layer_mode=snow_layer_mode,
+                snow_layer_line=snow_layer_line,
+            )
+        )
 
         return self
 
@@ -1328,12 +1376,12 @@ class Terrain(Object3D):
         width: int,
         height: int,
         falloff: float = 1.8,
-        seed: Optional[int] = None,
+        seed: int | None = None,
         snow: bool = True,
         snow_start_percent: float = 0.7,
         block_id: str = "minecraft:stone",
         snowy: str = "none",
-    ) -> "Terrain":
+    ) -> Terrain:
         """Add an organic mountain ridge between two points.
 
         Creates a natural-looking ridge with curved centerline, varying width,
@@ -1366,9 +1414,7 @@ class Terrain(Object3D):
         mid_z = (start_z + end_z) // 2
         base_height = self.heightmap.get(mid_x, mid_z)
 
-        self.heightmap.add_ridge(
-            start_x, start_z, end_x, end_z, width, height, falloff, seed
-        )
+        self.heightmap.add_ridge(start_x, start_z, end_x, end_z, width, height, falloff, seed)
 
         # Calculate peak height and snow line
         peak_height = base_height + height
@@ -1381,7 +1427,9 @@ class Terrain(Object3D):
         snowy_norm = snowy.strip().lower().replace("-", "_")
         if snowy_norm in ("top", "all"):
             snow_layer_mode = 2 if snowy_norm == "all" else 1
-            snow_layer_line = int(base_height + height * snow_start_percent) if snow_layer_mode == 1 else None
+            snow_layer_line = (
+                int(base_height + height * snow_start_percent) if snow_layer_mode == 1 else None
+            )
 
         # Register as a series of overlapping "mountains" along the ridge for block generation
         # Use extended width to account for curves and width variation
@@ -1397,16 +1445,18 @@ class Terrain(Object3D):
             px = int(start_x + t * ridge_dx)
             pz = int(start_z + t * ridge_dz)
 
-            self._mountains.append(MountainInfo(
-                center_x=px,
-                center_z=pz,
-                radius=extended_width,
-                peak_height=peak_height,
-                surface_block_id=block_id,
-                snow_cap_line=snow_cap_line,
-                snow_layer_mode=snow_layer_mode,
-                snow_layer_line=snow_layer_line,
-            ))
+            self._mountains.append(
+                MountainInfo(
+                    center_x=px,
+                    center_z=pz,
+                    radius=extended_width,
+                    peak_height=peak_height,
+                    surface_block_id=block_id,
+                    snow_cap_line=snow_cap_line,
+                    snow_layer_mode=snow_layer_mode,
+                    snow_layer_line=snow_layer_line,
+                )
+            )
 
         return self
 
@@ -1416,11 +1466,11 @@ class Terrain(Object3D):
         center_z: int,
         radius: int,
         height: int,
-        flat_radius: Optional[int] = None,
+        flat_radius: int | None = None,
         snow: bool = False,
         block_id: str = "minecraft:stone",
         snowy: str = "none",
-    ) -> "Terrain":
+    ) -> Terrain:
         """Add a flat-topped plateau/mesa.
 
         Creates a raised flat area with sloped edges and stone surface.
@@ -1461,16 +1511,18 @@ class Terrain(Object3D):
             snow_layer_line = peak_height if snow_layer_mode == 1 else None
 
         # Register plateau for proper block generation
-        self._mountains.append(MountainInfo(
-            center_x=center_x,
-            center_z=center_z,
-            radius=radius,
-            peak_height=peak_height,
-            surface_block_id=block_id,
-            snow_cap_line=snow_cap_line,
-            snow_layer_mode=snow_layer_mode,
-            snow_layer_line=snow_layer_line,
-        ))
+        self._mountains.append(
+            MountainInfo(
+                center_x=center_x,
+                center_z=center_z,
+                radius=radius,
+                peak_height=peak_height,
+                surface_block_id=block_id,
+                snow_cap_line=snow_cap_line,
+                snow_layer_mode=snow_layer_mode,
+                snow_layer_line=snow_layer_line,
+            )
+        )
 
         return self
 
@@ -1481,11 +1533,11 @@ class Terrain(Object3D):
         radius: int,
         depth: int,
         falloff: float = 1.8,
-        seed: Optional[int] = None,
+        seed: int | None = None,
         fill_water: bool = False,
-        water_level: Optional[int] = None,
-        liquid_block_id: Optional[str] = None,
-    ) -> "Terrain":
+        water_level: int | None = None,
+        liquid_block_id: str | None = None,
+    ) -> Terrain:
         """Add an organic valley depression to the terrain.
 
         Creates a natural-looking valley with irregular shape and smooth
@@ -1521,26 +1573,30 @@ class Terrain(Object3D):
         lowest_height = base_height - depth
 
         # Register valley for tracking
-        self._valleys.append(ValleyInfo(
-            center_x=center_x,
-            center_z=center_z,
-            radius=int(radius * 1.4),  # Extended for domain warping
-            lowest_height=lowest_height,
-            valley_type="valley",
-        ))
+        self._valleys.append(
+            ValleyInfo(
+                center_x=center_x,
+                center_z=center_z,
+                radius=int(radius * 1.4),  # Extended for domain warping
+                lowest_height=lowest_height,
+                valley_type="valley",
+            )
+        )
 
         # Fill with water if requested
         if fill_water:
             if water_level is None:
                 water_level = base_height - depth // 2
             liquid = liquid_block_id or self.config.liquid_block_id
-            self._lakes.append(LakeInfo(
-                center_x=center_x,
-                center_z=center_z,
-                radius=int(radius * 1.4),
-                water_level=water_level,
-                liquid_block_id=liquid,
-            ))
+            self._lakes.append(
+                LakeInfo(
+                    center_x=center_x,
+                    center_z=center_z,
+                    radius=int(radius * 1.4),
+                    water_level=water_level,
+                    liquid_block_id=liquid,
+                )
+            )
 
         return self
 
@@ -1553,10 +1609,10 @@ class Terrain(Object3D):
         width: int,
         depth: int,
         falloff: float = 2.5,
-        seed: Optional[int] = None,
+        seed: int | None = None,
         fill_water: bool = False,
-        liquid_block_id: Optional[str] = None,
-    ) -> "Terrain":
+        liquid_block_id: str | None = None,
+    ) -> Terrain:
         """Add a gorge or canyon between two points.
 
         Creates a narrow, steep-sided canyon. Can optionally fill with water
@@ -1588,9 +1644,7 @@ class Terrain(Object3D):
         base_height = self.heightmap.get(mid_x, mid_z)
 
         # Carve the gorge
-        self.heightmap.add_gorge(
-            start_x, start_z, end_x, end_z, width, depth, falloff, seed
-        )
+        self.heightmap.add_gorge(start_x, start_z, end_x, end_z, width, depth, falloff, seed)
 
         # Calculate gorge length and register valley info
         gorge_dx = end_x - start_x
@@ -1598,13 +1652,15 @@ class Terrain(Object3D):
         gorge_length = int(np.sqrt(gorge_dx * gorge_dx + gorge_dz * gorge_dz))
         extended_width = int(width * 1.5)
 
-        self._valleys.append(ValleyInfo(
-            center_x=mid_x,
-            center_z=mid_z,
-            radius=gorge_length // 2 + extended_width,
-            lowest_height=base_height - depth,
-            valley_type="gorge",
-        ))
+        self._valleys.append(
+            ValleyInfo(
+                center_x=mid_x,
+                center_z=mid_z,
+                radius=gorge_length // 2 + extended_width,
+                lowest_height=base_height - depth,
+                valley_type="gorge",
+            )
+        )
 
         # Fill with water if requested (as river)
         if fill_water:
@@ -1619,11 +1675,13 @@ class Terrain(Object3D):
                 pz = int(start_z + t * gorge_dz)
                 points.append((px, pz, water_level))
 
-            self._rivers.append(RiverInfo(
-                points=points,
-                width=width,
-                liquid_block_id=liquid,
-            ))
+            self._rivers.append(
+                RiverInfo(
+                    points=points,
+                    width=width,
+                    liquid_block_id=liquid,
+                )
+            )
 
         return self
 
@@ -1635,9 +1693,9 @@ class Terrain(Object3D):
         depth: int,
         rim_height: int = 0,
         fill_water: bool = False,
-        water_level: Optional[int] = None,
-        liquid_block_id: Optional[str] = None,
-    ) -> "Terrain":
+        water_level: int | None = None,
+        liquid_block_id: str | None = None,
+    ) -> Terrain:
         """Add a crater or circular depression.
 
         Creates a bowl-shaped crater with optional raised rim. Can fill
@@ -1669,13 +1727,15 @@ class Terrain(Object3D):
         self.heightmap.add_crater(center_x, center_z, radius, depth, rim_height)
 
         # Register valley for tracking
-        self._valleys.append(ValleyInfo(
-            center_x=center_x,
-            center_z=center_z,
-            radius=radius,
-            lowest_height=base_height - depth,
-            valley_type="crater",
-        ))
+        self._valleys.append(
+            ValleyInfo(
+                center_x=center_x,
+                center_z=center_z,
+                radius=radius,
+                lowest_height=base_height - depth,
+                valley_type="crater",
+            )
+        )
 
         # Fill with water if requested
         if fill_water:
@@ -1687,9 +1747,13 @@ class Terrain(Object3D):
             # Clamp to the lowest rim height to prevent overflow
             if rim_width > 0:
                 rim_inner = radius - rim_width
-                min_rim_height: Optional[int] = None
-                for z in range(max(0, center_z - radius - 2), min(self.config.depth, center_z + radius + 3)):
-                    for x in range(max(0, center_x - radius - 2), min(self.config.width, center_x + radius + 3)):
+                min_rim_height: int | None = None
+                for z in range(
+                    max(0, center_z - radius - 2), min(self.config.depth, center_z + radius + 3)
+                ):
+                    for x in range(
+                        max(0, center_x - radius - 2), min(self.config.width, center_x + radius + 3)
+                    ):
                         dx = x - center_x
                         dz = z - center_z
                         distance = np.sqrt(dx * dx + dz * dz)
@@ -1702,13 +1766,15 @@ class Terrain(Object3D):
                 if min_rim_height is not None:
                     water_surface = min(water_surface, min_rim_height - 1)
 
-            self._lakes.append(LakeInfo(
-                center_x=center_x,
-                center_z=center_z,
-                radius=bowl_radius,
-                water_level=water_surface,
-                liquid_block_id=liquid,
-            ))
+            self._lakes.append(
+                LakeInfo(
+                    center_x=center_x,
+                    center_z=center_z,
+                    radius=bowl_radius,
+                    water_level=water_surface,
+                    liquid_block_id=liquid,
+                )
+            )
 
         return self
 
@@ -1718,10 +1784,10 @@ class Terrain(Object3D):
         center_z: int,
         radius: int,
         depth: int,
-        water_level: Optional[int] = None,
-        seed: Optional[int] = None,
-        liquid_block_id: Optional[str] = None,
-    ) -> "Terrain":
+        water_level: int | None = None,
+        seed: int | None = None,
+        liquid_block_id: str | None = None,
+    ) -> Terrain:
         """Add a lake (valley filled with water).
 
         Convenience method that creates a valley and fills it with water.
@@ -1743,7 +1809,10 @@ class Terrain(Object3D):
             terrain.generate()
         """
         return self.add_valley(
-            center_x, center_z, radius, depth,
+            center_x,
+            center_z,
+            radius,
+            depth,
             seed=seed,
             fill_water=True,
             water_level=water_level,
@@ -1758,9 +1827,9 @@ class Terrain(Object3D):
         end_z: int,
         width: int = 5,
         depth: int = 3,
-        seed: Optional[int] = None,
-        liquid_block_id: Optional[str] = None,
-    ) -> "Terrain":
+        seed: int | None = None,
+        liquid_block_id: str | None = None,
+    ) -> Terrain:
         """Add a terrain-following river between two points.
 
         Carves a winding path and fills it with water. The river follows
@@ -1848,7 +1917,7 @@ class Terrain(Object3D):
                         if distance <= width:
                             # Carve with smooth falloff from center
                             t = distance / width
-                            carve_factor = 1 - t ** 1.5
+                            carve_factor = 1 - t**1.5
 
                             current_height = self.heightmap.get(nx, nz)
                             water_surface = water_level
@@ -1858,7 +1927,9 @@ class Terrain(Object3D):
                             # Ensures the river can cut through tall terrain.
                             min_carve_depth = 1
                             max_carve_depth = max(min_carve_depth, depth)
-                            carve_depth = min_carve_depth + int((max_carve_depth - min_carve_depth) * carve_factor)
+                            carve_depth = min_carve_depth + int(
+                                (max_carve_depth - min_carve_depth) * carve_factor
+                            )
                             target_height = water_surface - carve_depth
 
                             if current_height > target_height:
@@ -1866,11 +1937,13 @@ class Terrain(Object3D):
 
         # Register river for water generation
         liquid = liquid_block_id or self.config.liquid_block_id
-        self._rivers.append(RiverInfo(
-            points=points,
-            width=width,
-            liquid_block_id=liquid,
-        ))
+        self._rivers.append(
+            RiverInfo(
+                points=points,
+                width=width,
+                liquid_block_id=liquid,
+            )
+        )
 
         return self
 
@@ -1882,9 +1955,9 @@ def create_terrain(
     base_height: int = 64,
     height_range: int = 32,
     generate_decorations: bool = True,
-    water_level: Optional[int] = None,
+    water_level: int | None = None,
     liquid_block_id: str = "minecraft:water",
-    catalog: Optional[BlockCatalog] = None,
+    catalog: BlockCatalog | None = None,
     biome: str = "plains",
     tree_density: float = 1.0,
 ) -> Terrain:

@@ -598,9 +598,50 @@ export class ThreeStructureRenderer {
 	}
 
 	public dispose() {
+		// Remove chunk meshes from scene FIRST, then dispose geometries
 		this.chunkMeshes.forEach(mesh => {
+			this.structureScene.remove(mesh)
 			mesh.geometry.dispose()
 		})
+		this.chunkMeshes = []
+
+		// Remove and dispose overlay objects
+		if (this.grid) {
+			this.overlayScene.remove(this.grid)
+			this.grid.geometry.dispose()
+			this.grid = undefined
+		}
+		if (this.invisibleBlocks) {
+			this.overlayScene.remove(this.invisibleBlocks)
+			this.invisibleBlocks.geometry.dispose()
+			this.invisibleBlocks = undefined
+		}
+		if (this.outline) {
+			this.overlayScene.remove(this.outline)
+			this.outline.geometry.dispose()
+			this.outline = undefined
+		}
+		if (this.skyMesh) {
+			this.structureScene.remove(this.skyMesh)
+			this.skyMesh.geometry.dispose()
+			this.skyMesh = undefined
+		}
+		if (this.sunDisc) {
+			this.overlayScene.remove(this.sunDisc)
+			this.sunDisc.geometry.dispose()
+			;(this.sunDisc.material as THREE.Material)?.dispose()
+			this.sunDisc = undefined
+		}
+		if (this.postProcessQuad) {
+			this.postProcessQuad.geometry.dispose()
+			this.postProcessQuad = null
+		}
+
+		// Clear scenes completely to remove any remaining objects
+		this.structureScene.clear()
+		this.overlayScene.clear()
+
+		// Dispose materials
 		this.atlasTexture.dispose()
 		this.opaqueMaterial.dispose()
 		this.transparentMaterial.dispose()
@@ -608,13 +649,10 @@ export class ThreeStructureRenderer {
 		this.lineMaterial.dispose()
 		this.skyMaterial.dispose()
 		this.shadowDepthMaterial.dispose()
+
+		// Dispose shadow resources
 		this.shadowMap?.dispose()
-		this.grid?.geometry.dispose()
-		this.invisibleBlocks?.geometry.dispose()
-		this.outline?.geometry.dispose()
-		this.skyMesh?.geometry.dispose()
-		this.sunDisc?.geometry.dispose()
-		;(this.sunDisc?.material as THREE.Material)?.dispose()
+
 		// Post-processing cleanup
 		this.sceneTarget?.dispose()
 		this.depthTarget?.dispose()
@@ -623,12 +661,17 @@ export class ThreeStructureRenderer {
 		this.bloomBlurTarget2?.dispose()
 		this.godRaysTarget?.dispose()
 		this.aoTarget?.dispose()
-		this.postProcessQuad?.geometry.dispose()
 		this.ssaoMaterial?.dispose()
 		this.bloomBrightMaterial?.dispose()
 		this.bloomBlurMaterial?.dispose()
 		this.godRaysMaterial?.dispose()
 		this.compositeMaterial?.dispose()
+
+		// Dispose emissive light textures
+		this.emissiveLightDataTex?.dispose()
+		this.emissiveLightColorTex?.dispose()
+
+		// Finally dispose the WebGL renderer
 		this.renderer.dispose()
 	}
 
@@ -1248,9 +1291,9 @@ export class ThreeStructureRenderer {
 				uniform mat4 modelViewMatrix;
 				attribute vec3 position;
 				attribute vec3 blockPos;
-			
+
 				varying highp vec3 vColor;
-			
+
 				void main(void) {
 					gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 					vColor = blockPos / 256.0;
@@ -1258,9 +1301,9 @@ export class ThreeStructureRenderer {
 			`,
 			fragmentShader: `
 				precision highp float;
-			
+
 				varying highp vec3 vColor;
-			
+
 				void main(void) {
 					gl_FragColor = vec4(vColor, 1.0);
 				}

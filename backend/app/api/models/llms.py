@@ -11,6 +11,7 @@ AVAILABLE_MODELS = {
     ],
     "anthropic": [
         "claude-opus-4-5-20251101",
+        "claude-sonnet-4-5-20250929",
     ],
 }
 
