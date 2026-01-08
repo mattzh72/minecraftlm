@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect } from 'react';
-import { mat4, vec3 } from '../utils/deepslate';
+import { mat4, vec3 } from '../utils/lodestone';
 import { Config } from '../config';
 
 const { playable } = Config;

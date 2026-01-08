@@ -1,10 +1,10 @@
-// Deepslate utilities for Minecraft rendering
+// Lodestone utilities for Minecraft rendering (legacy naming)
 // Adapted from legacy implementation
 
-import { BlockDefinition, BlockModel, TextureAtlas, Structure } from 'deepslate-opt';
+import { BlockDefinition, BlockModel, TextureAtlas, Structure } from '@mattzh72/lodestone';
 import { mat4, vec3 } from 'gl-matrix';
 
-let deepslateResources = null;
+let lodestoneResources = null;
 
 function upperPowerOfTwo(x) {
   x -= 1;
@@ -24,7 +24,7 @@ const normalizeId = (id) => {
   return String(id);
 };
 
-export function loadDeepslateResources(textureImage, assets, blockFlags = {}) {
+export function loadLodestoneResources(textureImage, assets, blockFlags = {}) {
   const blockDefinitions = {};
   Object.keys(assets.blockstates).forEach((id) => {
     blockDefinitions["minecraft:" + id] = BlockDefinition.fromJson(
@@ -77,7 +77,7 @@ export function loadDeepslateResources(textureImage, assets, blockFlags = {}) {
   const nonSelfCullingBlocks = blockFlags.nonSelfCulling ?? new Set();
   const emissiveBlocks = blockFlags.emissive ?? {};
 
-  deepslateResources = {
+  lodestoneResources = {
     getBlockDefinition(id) {
       return blockDefinitions[normalizeId(id)];
     },
@@ -110,19 +110,19 @@ export function loadDeepslateResources(textureImage, assets, blockFlags = {}) {
         emissiveConditional: emissiveData?.conditional,
       };
     },
-    getBlockProperties(id) {
+    getBlockProperties() {
       return null;
     },
-    getDefaultBlockProperties(id) {
+    getDefaultBlockProperties() {
       return null;
     },
   };
 
-  return deepslateResources;
+  return lodestoneResources;
 }
 
-export function getDeepslateResources() {
-  return deepslateResources;
+export function getLodestoneResources() {
+  return lodestoneResources;
 }
 
 export function structureFromJsonData(data) {
@@ -173,9 +173,10 @@ export function structureFromJsonData(data) {
       }
       typeCounts.set(value.type, (typeCounts.get(value.type) ?? 0) + 1);
       blockCount++;
-    } catch (err) {
+    } catch (error) {
       console.warn(
-        `Unable to add block of type ${value.type} at position ${x}, ${y}, ${z}.`
+        `Unable to add block of type ${value.type} at position ${x}, ${y}, ${z}.`,
+        error
       );
     }
   });

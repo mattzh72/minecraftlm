@@ -26,18 +26,14 @@ uv run pytest -m "not integration"   # Skip integration tests (require API keys)
 ### Frontend (React/Vite)
 ```bash
 cd frontend
-npm install           # Install deps (also builds deepslate-opt package)
+npm install           # Install deps (legacy peer deps enabled in .npmrc)
 npm run dev           # Start dev server
 npm run build         # Production build
 npm run lint          # ESLint
 ```
 
-### deepslate-opt Package
-```bash
-cd packages/deepslate-opt
-npm install && npm run build  # Build the rendering library
-npm run test          # Run vitest tests
-```
+### Renderer Package
+Rendering uses `@mattzh72/lodestone` from npm; no local renderer package build is required.
 
 ## Architecture
 
@@ -54,12 +50,12 @@ npm run test          # Run vitest tests
 ### Frontend (`frontend/src/`)
 - **`components/SessionPage.tsx`**: Main page with chat panel and 3D viewer
 - **`components/ChatPanel.tsx`**: Streaming chat interface showing agent activity
-- **`components/MinecraftViewer.jsx`**: Three.js-based 3D renderer using deepslate-opt
+- **`components/MinecraftViewer.jsx`**: Three.js-based 3D renderer using Lodestone
 - **`hooks/`**: React hooks for streaming SSE, session state, and schematic data
 - **`store/`**: Zustand stores for global state
 
-### deepslate-opt (`packages/deepslate-opt/`)
-Optimized fork of [misode/deepslate](https://github.com/misode/deepslate) for Minecraft rendering. Provides NBT parsing, block rendering, and Three.js integration. The frontend imports this as a local dependency.
+### Lodestone (`@mattzh72/lodestone`)
+Rendering library providing NBT parsing, block rendering, and Three.js integration. The frontend imports this from npm.
 
 ## Key Patterns
 

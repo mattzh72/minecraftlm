@@ -1,5 +1,5 @@
 import { createCanvas, createImageData } from 'canvas';
-import { ThreeStructureRenderer, BlockDefinition, BlockModel, TextureAtlas, Structure } from 'deepslate-opt';
+import { ThreeStructureRenderer, BlockDefinition, BlockModel, TextureAtlas, Structure } from '@mattzh72/lodestone';
 import { mat4, vec3 } from 'gl-matrix';
 import fs from 'fs/promises';
 import path from 'path';
@@ -86,7 +86,7 @@ class HeadlessCanvasWrapper {
 }
 
 /**
- * Headless Node.js renderer using deepslate-opt for Minecraft structure screenshots
+ * Headless Node.js renderer using Lodestone for Minecraft structure screenshots
  */
 export class HeadlessRenderer {
   constructor(width = 1920, height = 1080, options = {}) {
@@ -196,7 +196,7 @@ export class HeadlessRenderer {
   }
 
   /**
-   * Load Minecraft assets and create deepslate resources
+   * Load Minecraft assets and create Lodestone resources
    */
   async loadAssets() {
     if (this.resources) {
@@ -221,8 +221,8 @@ export class HeadlessRenderer {
     // Load block flags
     const blockFlags = await this.loadBlockFlags(assetsDir);
 
-    // Create deepslate resources (adapted from frontend utils/deepslate.js)
-    this.resources = this.createDeepslateResources(atlasImage, assets, blockFlags);
+    // Create Lodestone resources (adapted from frontend utils/lodestone.js)
+    this.resources = this.createLodestoneResources(atlasImage, assets, blockFlags);
 
     console.log('✅ Assets loaded successfully');
     return this.resources;
@@ -287,7 +287,7 @@ export class HeadlessRenderer {
   }
 
   /**
-   * Load block flags from the block-flags directory (matches frontend useDeepslateResources.js)
+   * Load block flags from the block-flags directory (matches frontend useLodestoneResources.js)
    */
   async loadBlockFlags(assetsDir) {
     const flagsDir = path.join(assetsDir, 'block-flags');
@@ -334,9 +334,9 @@ export class HeadlessRenderer {
   }
 
   /**
-   * Create deepslate resources (adapted from frontend utils/deepslate.js)
+   * Create Lodestone resources (adapted from frontend utils/lodestone.js)
    */
-  createDeepslateResources(textureImage, assets, blockFlags = {}) {
+  createLodestoneResources(textureImage, assets, blockFlags = {}) {
     // Create block definitions
     const blockDefinitions = {};
     Object.keys(assets.blockstates || {}).forEach((id) => {
@@ -365,7 +365,7 @@ export class HeadlessRenderer {
     Object.values(blockModels).forEach((m) => m.flatten(blockModelAccessor));
 
     // Create texture atlas using the loaded image
-    // Ensure atlas dimensions are power of two (required by deepslate)
+    // Ensure atlas dimensions are power of two (required by Lodestone)
     const atlasSize = this.upperPowerOfTwo(Math.max(textureImage.width, textureImage.height));
 
     const idMap = {};
@@ -380,7 +380,7 @@ export class HeadlessRenderer {
       ];
     });
 
-    // Match frontend: Create canvas at original size, then get atlasSize imageData (with padding)
+    // Match frontend: create canvas at original size, then get atlasSize imageData (with padding)
     // Frontend code: atlasCanvas.width = textureImage.width; atlasCanvas.height = textureImage.height;
     // Then: atlasData = atlasCtx.getImageData(0, 0, atlasSize, atlasSize);
     const atlasCanvas = createCanvas(textureImage.width, textureImage.height);
@@ -413,7 +413,7 @@ export class HeadlessRenderer {
       getTextureUV: (id) => textureAtlas.getTextureUV(id),
       getTextureAtlas: () => textureAtlas.getTextureAtlas(),
       getBlockFlags: (id) => {
-        // Match frontend utils/deepslate.js getBlockFlags logic exactly
+        // Match frontend utils/lodestone.js getBlockFlags logic exactly
         const key = this.normalizeId(id);
         const isTransparent = transparentBlocks.has(key);
         const isExplicitOpaque = opaqueBlocks.has(key);
@@ -439,7 +439,7 @@ export class HeadlessRenderer {
   }
 
   /**
-   * Calculate upper power of two (from frontend utils/deepslate.js)
+   * Calculate upper power of two (from frontend utils/lodestone.js)
    */
   upperPowerOfTwo(x) {
     x -= 1;
@@ -463,7 +463,7 @@ export class HeadlessRenderer {
   }
 
   /**
-   * Create structure from JSON data (adapted from frontend utils/deepslate.js)
+   * Create structure from JSON data (adapted from frontend utils/lodestone.js)
    */
   createStructureFromJson(structureData) {
     const { blocks, width, height, depth } = structureData;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { vec3 } from '../utils/deepslate';
+import { vec3 } from '../utils/lodestone';
 
 const BASE_MOVE_SPEED = 0.15; // Base speed for first-person movement
 
@@ -14,6 +14,7 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
   const animationFrameRef = useRef(null);
   const isRunningRef = useRef(false);
   const metaKeyRef = useRef(false); // Track Cmd key to ignore Shift during screenshots
+  const tickRef = useRef(null);
 
   // Movement update function - updates camera position and schedules next frame
   const tick = useCallback(() => {
@@ -72,8 +73,16 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
     requestRender();
 
     // Schedule next tick
-    animationFrameRef.current = requestAnimationFrame(tick);
+    animationFrameRef.current = requestAnimationFrame(() => {
+      if (tickRef.current) {
+        tickRef.current();
+      }
+    });
   }, [camera, requestRender]);
+
+  useEffect(() => {
+    tickRef.current = tick;
+  }, [tick]);
 
   // Start the animation loop
   const startLoop = useCallback(() => {
@@ -84,8 +93,10 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
   }, [tick]);
 
   useEffect(() => {
+    const pressedKeys = pressedKeysRef.current;
+
     if (!camera || !requestRender || !enabled) {
-      pressedKeysRef.current.clear();
+      pressedKeys.clear();
       isRunningRef.current = false;
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -114,7 +125,7 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
           return;
         }
         e.preventDefault();
-        pressedKeysRef.current.add(key);
+        pressedKeys.add(key);
         startLoop();
       }
     };
@@ -127,7 +138,7 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
       }
 
       const key = e.key.toLowerCase();
-      pressedKeysRef.current.delete(key);
+      pressedKeys.delete(key);
       // Loop will stop itself when no keys are pressed
     };
 
@@ -142,7 +153,7 @@ export default function useKeyboardControls(camera, requestRender, enabled = tru
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
-      pressedKeysRef.current.clear();
+      pressedKeys.clear();
     };
   }, [camera, requestRender, enabled, startLoop]);
 }
