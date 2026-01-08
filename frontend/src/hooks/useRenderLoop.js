@@ -1,6 +1,6 @@
 import { useRef, useCallback, useEffect } from 'react';
-import { ThreeStructureRenderer } from 'deepslate-opt';
-import { structureFromJsonData } from '../utils/deepslate';
+import { ThreeStructureRenderer } from '@mattzh72/lodestone';
+import { structureFromJsonData } from '../utils/lodestone';
 import { Config, TimePresets } from '../config';
 
 /**
@@ -8,7 +8,7 @@ import { Config, TimePresets } from '../config';
  * Recreates renderer when canvas size changes to ensure correct projection
  * @param {React.RefObject} canvasRef - Reference to the canvas element
  * @param {object} structureData - Structure data to render
- * @param {object} resources - Deepslate resources
+ * @param {object} resources - Lodestone resources
  * @param {object} camera - Camera object
  * @param {string} timeOfDay - Time of day preset ('day', 'sunset', 'night')
  */
@@ -20,7 +20,9 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
   const cameraRef = useRef(camera);
 
   // Keep camera ref updated
-  cameraRef.current = camera;
+  useEffect(() => {
+    cameraRef.current = camera;
+  }, [camera]);
 
   // Render function - uses ref to avoid recreating when camera changes
   const render = useCallback(() => {
@@ -43,7 +45,7 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     if (!structureData || !resources || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    
+
     const hasValidDimensions = canvas.width > 0 && canvas.height > 0;
     if (!hasValidDimensions) return;
 
@@ -97,7 +99,7 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
       }
       rendererRef.current = null;
     };
-  }, [structureData, resources, render]);
+  }, [structureData, resources, render, canvasRef]);
 
   // Update sunlight when timeOfDay changes
   useEffect(() => {
@@ -116,7 +118,7 @@ export default function useRenderLoop(canvasRef, structureData, resources, camer
     // setViewport updates both gl.viewport AND the internal projection matrix
     rendererRef.current.setViewport(0, 0, width, height);
     render();
-  }, [render]);
+  }, [render, canvasRef]);
 
   return {
     rendererRef,

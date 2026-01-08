@@ -1,6 +1,6 @@
 import { useRef, useMemo, useCallback, useLayoutEffect, useEffect } from "react";
 import { useStore } from "../store";
-import useDeepslateResources from "../hooks/useDeepslateResources";
+import useLodestoneResources from "../hooks/useLodestoneResources";
 import useCamera from "../hooks/useCamera";
 import useFirstPersonCamera from "../hooks/useFirstPersonCamera";
 import useRenderLoop from "../hooks/useRenderLoop";
@@ -46,7 +46,7 @@ export function MinecraftViewer() {
   }, [activeSessionId]);
 
   // Load rendering resources
-  const { resources, isLoading, error } = useDeepslateResources();
+  const { resources, isLoading, error } = useLodestoneResources();
 
   // Calculate structure size for camera initialization
   const structureSize = useMemo(() => {

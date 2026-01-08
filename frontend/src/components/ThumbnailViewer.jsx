@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
-import { ThreeStructureRenderer } from 'deepslate-opt';
-import useDeepslateResources from '../hooks/useDeepslateResources';
-import { structureFromJsonData, mat4, vec3 } from '../utils/deepslate';
+import { ThreeStructureRenderer } from '@mattzh72/lodestone';
+import useLodestoneResources from '../hooks/useLodestoneResources';
+import { structureFromJsonData, mat4, vec3 } from '../utils/lodestone';
 import { Config } from '../config';
 
 const { thumbnail: thumb, renderer: rend } = Config;
@@ -15,7 +15,7 @@ const { thumbnail: thumb, renderer: rend } = Config;
  */
 export default function ThumbnailViewer({ structureData, size = thumb.defaultSize, onRenderComplete }) {
   const canvasRef = useRef(null);
-  const { resources, isLoading, error } = useDeepslateResources();
+  const { resources, isLoading, error } = useLodestoneResources();
 
   useEffect(() => {
     if (!structureData || !resources || !canvasRef.current) return;

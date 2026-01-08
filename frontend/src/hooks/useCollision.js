@@ -1,4 +1,4 @@
-import { vec3 } from '../utils/deepslate';
+import { vec3 } from '../utils/lodestone';
 import { Config } from '../config';
 
 const { playable } = Config;

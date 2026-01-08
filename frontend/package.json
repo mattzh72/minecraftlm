@@ -4,7 +4,6 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "preinstall": "cd ../packages/deepslate-opt && npm install && npm run build",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
@@ -15,7 +14,7 @@
     "@tailwindcss/vite": "^4.1.17",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "deepslate-opt": "file:../packages/deepslate-opt",
+    "@mattzh72/lodestone": "^0.3.1",
     "gl-matrix": "^3.4.3",
     "lucide-react": "^0.556.0",
     "react": "^19.2.0",
@@ -26,6 +25,7 @@
     "streamdown": "^1.6.10",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.17",
+    "three": "^0.182.0",
     "ts-pattern": "^5.9.0",
     "zod": "^4.1.13",
     "zustand": "^5.0.9"

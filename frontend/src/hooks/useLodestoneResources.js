@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { loadDeepslateResources, getDeepslateResources } from '../utils/deepslate';
+import { loadLodestoneResources, getLodestoneResources } from '../utils/lodestone';
 
 const BLOCK_FLAG_PATHS = {
   opaque: '/assets/block-flags/opaque.txt',
@@ -72,10 +72,10 @@ const loadAtlasImage = () =>
   });
 
 /**
- * Hook to load Deepslate rendering resources
+ * Hook to load Lodestone rendering resources
  * Loads atlas.png and assets.js on mount
  */
-export default function useDeepslateResources() {
+export default function useLodestoneResources() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [resources, setResources] = useState(null);
@@ -84,7 +84,7 @@ export default function useDeepslateResources() {
   useEffect(() => {
     // Prevent double loading in strict mode
     if (loadedRef.current) {
-      const existing = getDeepslateResources();
+      const existing = getLodestoneResources();
       if (existing) {
         setResources(existing);
         setIsLoading(false);
@@ -108,7 +108,7 @@ export default function useDeepslateResources() {
             fetchEmissiveBlocks(),
           ]);
 
-        const loaded = loadDeepslateResources(image, assets, {
+        const loaded = loadLodestoneResources(image, assets, {
           opaque: opaqueBlocks,
           transparent: transparentBlocks,
           nonSelfCulling: nonSelfCullingBlocks,

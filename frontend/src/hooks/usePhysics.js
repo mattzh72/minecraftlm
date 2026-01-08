@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react';
-import { vec3 } from '../utils/deepslate';
+import { vec3 } from '../utils/lodestone';
 import { Config } from '../config';
 import { attemptMove, attemptVerticalMove, checkGrounded } from './useCollision';
 
@@ -141,15 +141,17 @@ export default function usePhysics(
     if (newPos[1] < -50) {
       // Respawn at default position
       const structure = structureRef?.current;
+      const respawnPosition = cameraState.current.position;
       if (structure) {
         const size = structure.getSize();
-        cameraState.current.position = vec3.fromValues(
+        vec3.set(
+          respawnPosition,
           size[0] / 2,
           size[1] + playable.spawnHeightOffset + playable.playerHeight,
           size[2] / 2
         );
       } else {
-        cameraState.current.position = vec3.fromValues(0, 10, 0);
+        vec3.set(respawnPosition, 0, 10, 0);
       }
       physicsState.current.velocity = vec3.fromValues(0, 0, 0);
     }
